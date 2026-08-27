@@ -204,14 +204,21 @@ const streamImport = mock((...args: unknown[]) => {
 });
 void mock.module("@jxsuite/studio/import-client", () => ({ streamImport }));
 
-/* The shell runs in a browser; this file does not load happy-dom, so the two window members the
-   platform reaches for get a stub. Both are genuinely used: `focus` is the only thing that can
-   raise an `--app` window, and `open` is the fallback when handing a URL to the OS fails. */
+/* The shell runs in a browser; this file does not load happy-dom, so the window members the platform
+   reaches for get a stub. All three are genuinely used: `focus` is the only thing that can raise an
+   `--app` window, `open` is the fallback when handing a URL to the OS fails, and `addEventListener`
+   carries the `pagehide` that stops the RPC transport reconnecting to a server that is going away
+   with the window. */
 const windowFocus = mock(() => {});
 const windowOpen = mock((_url: string, _target?: string, _features?: string) => null);
+const windowListeners = new Map<string, () => void>();
 Object.defineProperty(globalThis, "window", {
   configurable: true,
-  value: { focus: windowFocus, open: windowOpen },
+  value: {
+    addEventListener: (type: string, handler: () => void) => windowListeners.set(type, handler),
+    focus: windowFocus,
+    open: windowOpen,
+  },
   writable: true,
 });
 
@@ -237,7 +244,15 @@ describe("chromium desktop platform", () => {
   });
 
   afterAll(() => {
+    /* The transport reconnects on close, so tearing the server down without this leaves a backoff
+       timer re-dialling a port that is gone for as long as the process lives. */
+    windowListeners.get("pagehide")?.();
     void server.stop();
+  });
+
+  test("stops reconnecting when the window goes away", () => {
+    // The listener is what a real browser fires on navigation away or on close.
+    expect(windowListeners.has("pagehide")).toBe(true);
   });
 
   test("has correct id", () => {

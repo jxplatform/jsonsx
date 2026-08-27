@@ -5,6 +5,12 @@ import type { ToJxResult } from "./to-jx.ts";
 import { captureStyles } from "./style-capture.ts";
 import { diffAllStyles, kebabToCamel } from "./style-diff.ts";
 import { extractMedia } from "./media-extract.ts";
+import {
+  DEFAULT_BREAKPOINT_POLICY,
+  analyzeMediaQueries,
+  planBreakpoints,
+} from "./breakpoint-plan.ts";
+import type { Breakpoint, BreakpointPolicy } from "./breakpoint-plan.ts";
 import { applyStylesToTree } from "./apply-styles.ts";
 import { collectAssets } from "./asset-collect.ts";
 import { downloadAssets } from "./asset-download.ts";
@@ -24,6 +30,16 @@ export interface CrawlOptions {
   noScroll?: boolean;
   /** Capture a reference screenshot of each page before closing (for --verify). */
   captureScreenshots?: boolean;
+  /**
+   * Capture the whole scrollable page rather than the viewport (default true).
+   *
+   * It has to agree with what `verifyProject` screenshots on the other side. A viewport reference
+   * diffed against a full-page render is compared by padding the shorter image, so the two would
+   * disagree over everything below the fold before a single style was compared.
+   */
+  fullPageScreenshots?: boolean;
+  /** Which of the site's declared breakpoints the project keeps (see `breakpoint-plan.ts`). */
+  breakpoints?: BreakpointPolicy | undefined;
   onProgress?: (msg: string) => void;
   /** Abort the crawl between pages; the loop throws before capturing the next page. */
   signal?: AbortSignal;
@@ -178,6 +194,7 @@ export async function crawlSite(options: CrawlOptions): Promise<CrawlResult> {
     skipStyles,
     skipAssets,
     respectRobots,
+    fullPageScreenshots = true,
     onProgress = console.log,
   } = options;
 
@@ -202,6 +219,9 @@ export async function crawlSite(options: CrawlOptions): Promise<CrawlResult> {
   const skippedByRobots: string[] = [];
   const skippedByNodeCap: string[] = [];
   let mergedBreakpoints: Record<string, string> | undefined;
+  /* Decided on the first page that declares a width query, then reused. See ExtractMediaOptions.plan
+     — a per-page plan would union back up to the count the policy just refused. */
+  let breakpointPlan: Breakpoint[] | undefined;
   let mergedTokens: Record<string, string> | undefined;
   const allFontFaceRules: string[] = [];
   const fontRewriteMap = new Map<string, string>();
@@ -243,7 +263,9 @@ export async function crawlSite(options: CrawlOptions): Promise<CrawlResult> {
       skippedByNodeCap.push(entry.url);
       let screenshot: Buffer | undefined;
       if (options.captureScreenshots) {
-        screenshot = Buffer.from(await capture.page.screenshot({ type: "png" }));
+        screenshot = Buffer.from(
+          await capture.page.screenshot({ fullPage: fullPageScreenshots, type: "png" }),
+        );
       }
       await capture.page.close();
 
@@ -277,11 +299,25 @@ export async function crawlSite(options: CrawlOptions): Promise<CrawlResult> {
         }
 
         if (styleResult.mediaQueries.length > 0) {
+          if (!breakpointPlan) {
+            const declared = analyzeMediaQueries(styleResult.mediaQueries);
+            breakpointPlan = planBreakpoints(
+              declared,
+              options.breakpoints ?? DEFAULT_BREAKPOINT_POLICY,
+            ).keep;
+            if (breakpointPlan.length < declared.length) {
+              onProgress?.(
+                `  ${declared.length} breakpoints declared, keeping ` +
+                  `${breakpointPlan.length}: ${breakpointPlan.map((b) => b.name).join(", ")}\n`,
+              );
+            }
+          }
           const media = await extractMedia(
             capture.page,
             styleResult.elements,
             styleResult.uaDefaults,
             styleResult.mediaQueries,
+            { plan: breakpointPlan },
           );
           const bpCount = Object.keys(media.breakpoints).length;
           if (bpCount > 0) {
@@ -347,7 +383,9 @@ export async function crawlSite(options: CrawlOptions): Promise<CrawlResult> {
 
     let screenshot: Buffer | undefined;
     if (options.captureScreenshots) {
-      screenshot = Buffer.from(await capture.page.screenshot({ type: "png" }));
+      screenshot = Buffer.from(
+        await capture.page.screenshot({ fullPage: fullPageScreenshots, type: "png" }),
+      );
     }
     await capture.page.close();
 

@@ -807,6 +807,37 @@ describe("syncEditModeCss", () => {
     expect(document.head.querySelectorAll(`#${EDIT_PLACEHOLDER_STYLE_ID}`)).toHaveLength(1);
   });
 
+  test("the text placeholder is gated on DOM emptiness, and yields to the active block", () => {
+    // The affordance may not outlive the state it describes. A class stamped from the DOCUMENT
+    // Cannot: the first character typed into an empty block reaches the DOM natively, and the
+    // Commit that follows comes back as an echo the patcher must not re-render — so the class is
+    // Stale for as long as the caret stays, and "Click here to add text..." used to sit beside the
+    // Text just typed. The selector is asserted rather than exercised because happy-dom's `:empty`
+    // Ignores text children (a text node leaves it matching), so a `matches()` test here would
+    // Assert the harness's bug. The DOM semantics are browser-verified: Chrome 151 reports
+    // `::after` content "none" for a placeholder-classed <p> holding text, the slash hint for one
+    // That is empty and active, and the placeholder again for the `<p><br></p>` that editing a
+    // Block to empty actually leaves behind.
+    syncEditModeCss(document, "design");
+    const css = sheet()!.textContent!;
+    /** The selector of the rule declaring `content: "<text>"`. */
+    const selectorOf = (text: string) => {
+      const rule = css.split("}").find((r) => r.includes(`content: "${text}"`));
+      return rule!.slice(0, rule!.indexOf("{")).trim();
+    };
+    const placeholder = selectorOf("Click here to add text...");
+    const hint = selectorOf("Type / for commands");
+
+    // Emptiness is asked of the DOM, and a lone `<br>` — what a browser leaves when a block is
+    // Emptied by editing — counts as empty in both rules.
+    for (const selector of [placeholder, hint]) {
+      expect(selector).toContain(":is(:empty, :has(> br:only-child))");
+    }
+    // The block holding the caret advertises the slash menu instead; the emptiness test broke the
+    // Specificity tie that used to leave that to source order, so the exclusion is explicit.
+    expect(placeholder).toContain(":not([data-jx-active-block])");
+  });
+
   test("a preview render removes it", () => {
     syncEditModeCss(document, "design");
     expect(sheet()).toBeTruthy();

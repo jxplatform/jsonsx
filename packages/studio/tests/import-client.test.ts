@@ -221,14 +221,31 @@ describe("streamImport — the run summary", () => {
     const plain = JSON.parse((fetchMock.mock.calls[0]![1] as RequestInit).body as string);
     expect(plain).not.toHaveProperty("verify");
     expect(plain).not.toHaveProperty("verifyThreshold");
+    expect(plain).not.toHaveProperty("verifyMinFidelity");
 
     await streamImport(
       "/__studio/import-site",
-      { ...OPTS, verify: true, verifyThreshold: 0.2 },
+      { ...OPTS, verify: true, verifyMinFidelity: 60, verifyThreshold: 0.2 },
       () => {},
     );
     const asked = JSON.parse((fetchMock.mock.calls[1]![1] as RequestInit).body as string);
-    expect(asked).toMatchObject({ verify: true, verifyThreshold: 0.2 });
+    /* Two numbers, not one: `verifyThreshold` is pixelmatch's per-pixel colour tolerance and only
+       moves the score, `verifyMinFidelity` is the bar the run is judged against. */
+    expect(asked).toMatchObject({ verify: true, verifyMinFidelity: 60, verifyThreshold: 0.2 });
+  });
+
+  // 0 is a real answer — "report the score, judge nothing" — so it must survive the wire.
+  test("sends a zero fidelity minimum rather than dropping it", async () => {
+    const fetchMock = stubFetch(async () =>
+      ndjsonResponse(['{"type":"done","root":"/p","config":{}}\n']),
+    );
+    await streamImport(
+      "/__studio/import-site",
+      { ...OPTS, verify: true, verifyMinFidelity: 0 },
+      () => {},
+    );
+    const body = JSON.parse((fetchMock.mock.calls[0]![1] as RequestInit).body as string);
+    expect(body.verifyMinFidelity).toBe(0);
   });
 
   test("returns what the run found", async () => {
@@ -272,5 +289,84 @@ describe("streamImport — the run summary", () => {
     const out = await streamImport("/__studio/import-site", OPTS, () => {});
     expect(out.root).toBe("/p");
     expect(out.result).toBeUndefined();
+  });
+});
+
+describe("the ready line", () => {
+  test("names the root as soon as the destination is a project, long before done", async () => {
+    stubFetch(async () =>
+      ndjsonResponse([
+        '{"type":"ready","root":"/home/dev/Sites/clone"}\n',
+        '{"type":"progress","phase":"seed","message":"Created it"}\n',
+        '{"type":"done","root":"/home/dev/Sites/clone","config":{"name":"Clone"}}\n',
+      ]),
+    );
+    const seen: string[] = [];
+    const events: ImportProgressEvent[] = [];
+    await streamImport(
+      "/e",
+      OPTS,
+      (e) => events.push(e),
+      undefined,
+      ({ root }) => {
+        seen.push(root);
+      },
+    );
+    expect(seen).toEqual(["/home/dev/Sites/clone"]);
+    // And the progress line still arrives — the `ready` line adds a fact, it does not replace one.
+    expect(events.map((e) => e.phase)).toContain("seed");
+  });
+
+  test("a caller with no interest in it is not required to have one", async () => {
+    stubFetch(async () =>
+      ndjsonResponse([
+        '{"type":"ready","root":"/home/dev/Sites/clone"}\n',
+        '{"type":"done","root":"/home/dev/Sites/clone","config":{}}\n',
+      ]),
+    );
+    const result = await streamImport("/e", OPTS, () => {});
+    expect(result.root).toBe("/home/dev/Sites/clone");
+  });
+
+  test("a ready line with no root is not a ready line", async () => {
+    stubFetch(async () =>
+      ndjsonResponse([
+        '{"type":"ready"}\n',
+        '{"type":"done","root":"/home/dev/Sites/clone","config":{}}\n',
+      ]),
+    );
+    const seen: string[] = [];
+    await streamImport(
+      "/e",
+      OPTS,
+      () => {},
+      undefined,
+      ({ root }) => seen.push(root),
+    );
+    expect(seen).toEqual([]);
+  });
+});
+
+describe("the breakpoint policy", () => {
+  test("rides the request body when the caller has one", async () => {
+    const fetchMock = stubFetch(async () =>
+      ndjsonResponse(['{"type":"done","root":"r","config":{}}\n']),
+    );
+    await streamImport(
+      "/e",
+      { ...OPTS, breakpoints: { count: 3, mode: "limit", rounding: "nearest" } },
+      () => {},
+    );
+    const body = JSON.parse(String(fetchMock.mock.calls[0]![1]!.body)) as Record<string, unknown>;
+    expect(body.breakpoints).toEqual({ count: 3, mode: "limit", rounding: "nearest" });
+  });
+
+  test("is omitted entirely when the caller has none", async () => {
+    const fetchMock = stubFetch(async () =>
+      ndjsonResponse(['{"type":"done","root":"r","config":{}}\n']),
+    );
+    await streamImport("/e", OPTS, () => {});
+    const body = JSON.parse(String(fetchMock.mock.calls[0]![1]!.body)) as Record<string, unknown>;
+    expect("breakpoints" in body).toBe(false);
   });
 });

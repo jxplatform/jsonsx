@@ -2,7 +2,7 @@
 
 ## AI Assistant for Jx Studio
 
-**Version:** 0.1.9-draft
+**Version:** 0.1.10-draft
 **Status:** Partial
 **Updated:** 2026-08-26
 **License:** MIT
@@ -168,7 +168,7 @@ cannot be honoured. Both are stated in the prompt as prohibitions.
 ### 3.5 Bootstrapping by import
 
 `import_site` is `create_project`'s sibling: it clones a live site into a new project and adopts it
-into the window. Four properties are normative.
+into the window. Five properties are normative.
 
 **Availability is a tier AND a capability.** "No project is open" is exactly as true on a backend
 with no import pipeline as on one with it, so a tier alone cannot express this; the tool declares the
@@ -187,11 +187,21 @@ tools go through the same adoption sequence: version control, then the open flow
 the workspace really moved. The adopter reports its failures rather than raising them, so a resolved
 promise is not proof.
 
+**The project opens when it EXISTS, not when the run ends.** A crawl takes minutes, and adopting on
+the terminal line spent all of them with the author on the welcome screen — the only account of what
+was happening was a log in the sidebar. The pipeline announces the destination as soon as it holds an
+openable `project.json` (`specs/server.md`'s `ready` line), and adoption happens there, so pages,
+components and assets arrive in a file tree somebody is watching. Adoption runs at most once: a
+second one at the end would replace every tab the author opened while the crawl ran. A backend that
+sends no such signal is not broken — it is older — and the project opens at the end as before.
+
 **The pipeline reports; the agent asks.** The import stream is one-way, so nothing pauses mid-crawl.
 What the run found — pages skipped by robots or by the node cap, the layout it did not detect, the
 components it may have split wrongly, per-page render fidelity — travels on the terminal line and
 becomes the material for §3.4, against real numbers rather than a guess made before the browser
-launched.
+launched. The run's own account of itself outlives it: the transcript keeps the whole log under the
+tool call that produced it, scrollable and collapsed once the run is over, rather than showing a
+fixed tail of it and discarding the record on success.
 
 ## 4. Security & Trust
 
@@ -212,6 +222,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.1.10-draft** (2026-08-26) — import_site adopts the project when it exists, not when the run ends; the run's log outlives it (§3.5).
 - **0.1.9-draft** (2026-08-26) — ask_user suspends a turn on the author (§3.4); import_site bootstraps a project from a live site (§3.5).
 - **0.1.8-draft** (2026-08-23) — 2.1 Managed providers: a platform may broker credentials, Studio offers that path before the key form, and the models endpoint is specified as a capability probe that must answer 200 for every credential state — with cf_not_connected, cf_reconnect_required and cf_upstream_error distinguished.
 - **0.1.7-draft** (2026-08-20) — The Anthropic client yields an error event with code NOT_IMPLEMENTED; it does not throw (§2).
@@ -225,4 +236,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_Jx `@jxsuite/ai` Specification v0.1.9-draft — a stub, subject to expansion._
+_Jx `@jxsuite/ai` Specification v0.1.10-draft — a stub, subject to expansion._

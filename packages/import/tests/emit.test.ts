@@ -27,8 +27,7 @@ describe("emitProject", () => {
       expect(files.length).toBeGreaterThanOrEqual(2);
 
       const project = await Bun.file(join(dir, "project.json")).json();
-      expect(project.title).toBe("Test Site");
-      expect(project.description).toContain("example.com");
+      expect(project.name).toBe("Test Site");
 
       const page = await Bun.file(join(dir, "pages", "index.json")).json();
       expect(page.tagName).toBe("div");

@@ -54,6 +54,16 @@ function structuralHash(node: JxElement | string): string {
   return `<${tag}>${childHashes.join(",")}`;
 }
 
+/**
+ * Attributes that may not become a component prop.
+ *
+ * A prop is something a person fills in per instance, and a class is not one: `emit.ts` strips the
+ * source site's classes on the way out (`strip-classes.ts`), so a class that happened to differ
+ * between two instances of the same block would otherwise mint a `${state.class}` prop whose value
+ * is then deleted — a prop with a name nobody chose, wired to nothing.
+ */
+const PRESENTATION_ATTRS = new Set(["class", "className"]);
+
 function collectLeafValues(node: JxElement | string, prefix: string, out: Map<string, string>) {
   if (typeof node === "string") {
     out.set(`${prefix}.$text`, node);
@@ -64,6 +74,9 @@ function collectLeafValues(node: JxElement | string, prefix: string, out: Map<st
   }
   if (node.attributes) {
     for (const [k, v] of Object.entries(node.attributes)) {
+      if (PRESENTATION_ATTRS.has(k)) {
+        continue;
+      }
       if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") {
         out.set(`${prefix}.attr.${k}`, String(v));
       }

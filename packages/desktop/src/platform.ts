@@ -16,6 +16,7 @@ import type {
 import type {
   CreateProjectDestination,
   ImportProgressEvent,
+  ImportReadyEvent,
   ImportSiteOptions,
   StudioPlatform,
 } from "@jxsuite/studio/types";
@@ -691,13 +692,14 @@ export function createDesktopPlatform() {
       opts: ImportSiteOptions,
       onProgress: (evt: ImportProgressEvent) => void,
       signal?: AbortSignal,
+      onReady?: (evt: ImportReadyEvent) => void,
     ) {
       const { directory } = opts;
       if (!/^(?:[a-zA-Z]:[\\/]|\/)/.test(directory)) {
         throw new Error("A destination folder is required.");
       }
       const endpoint = (await rpc.request.importSiteUrl()) as string;
-      return streamImport(endpoint, opts, onProgress, signal);
+      return streamImport(endpoint, opts, onProgress, signal, onReady);
     },
 
     /*

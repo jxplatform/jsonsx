@@ -28,6 +28,7 @@ import type {
   ExtensionsInfo,
   FsEvent,
   ImportProgressEvent,
+  ImportReadyEvent,
   ImportSiteOptions,
   ProjectSchemasResponse,
   ReferencesResult,
@@ -336,8 +337,9 @@ export function createDevServerPlatform() {
       opts: ImportSiteOptions,
       onProgress: (evt: ImportProgressEvent) => void,
       signal?: AbortSignal,
+      onReady?: (evt: ImportReadyEvent) => void,
     ) {
-      return await streamImport("/__studio/import-site", opts, onProgress, signal);
+      return await streamImport("/__studio/import-site", opts, onProgress, signal, onReady);
     },
 
     // ─── File operations ──────────────────────────────────────────────────

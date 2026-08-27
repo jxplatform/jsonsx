@@ -8,6 +8,7 @@ code:
   - packages/studio/src/panels/ai-chat/chat-view.ts
   - packages/studio/src/panels/ai-chat/sessions-view.ts
   - packages/studio/src/services/ai-session-store.ts
+  - packages/studio/src/services/import-client.ts
 ---
 
 # The AI assistant
@@ -78,9 +79,17 @@ The assistant is told to ask sparingly: only for things that are genuinely your 
 
 ## Watching a long job
 
-Some work takes minutes instead of seconds: cloning a site with **[Import](/docs/studio/projects/create)** is the main one. It runs as one of those chips, with a live line beneath it: the phase it is in, what it is doing right now, and the last few lines of its log. When it lands, the chip's summary says how many pages the run found, what it skipped, and which pages didn't render faithfully if you asked it to check.
+Some work takes minutes instead of seconds: cloning a site with **[Import](/docs/studio/projects/create)** is the main one. It runs as one of those chips, with its log open beneath it, reporting the phase it is in, what it is doing right now, and every line it has reported so far.
 
-That report is there so the assistant can act on it, and so it can ask you about the parts that were genuinely ambiguous.
+The log is a scroll region you own. It follows the newest line as it arrives, and stops following the moment you scroll up to read something, so you can go back through what happened without being yanked to the bottom every second.
+
+**When the run ends the log stays.** The panel collapses to its outcome (`Imported example.com`, or the reason it failed) with a count of the lines folded behind it, and clicking the summary opens the whole thing again. A finished import is exactly when you want to reread what it warned you about.
+
+The chip's own summary says how many pages the run found, what it skipped, and which pages didn't render faithfully if you asked it to check. That report is there so the assistant can act on it, and so it can ask you about the parts that were genuinely ambiguous.
+
+:::doc-note
+An import opens its project immediately, a few seconds in, rather than waiting for the run to finish. You watch the log in the Inspector while the Files panel fills up beside it.
+:::
 
 ## Review and undo edits
 

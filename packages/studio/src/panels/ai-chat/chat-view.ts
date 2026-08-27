@@ -264,7 +264,30 @@ const ASK_TOOL = "ask_user";
 const IMPORT_TOOL = "import_site";
 
 /** Log lines drawn under a running import. The tail is what a reader wants. */
-const IMPORT_LOG_LINES = 6;
+/**
+ * How close to the bottom counts as "following along".
+ *
+ * The same threshold and the same reasoning as the transcript's own scroller
+ * (`panels/ai-panel.ts`): a reader who has scrolled up is reading something, and yanking them back
+ * on every new line is the behaviour that makes a live log unreadable.
+ */
+const IMPORT_STICK_THRESHOLD = 24;
+
+/**
+ * Keep an import log pinned to its newest line, unless the reader has scrolled away from it.
+ *
+ * The log is a scroller now rather than a six-line tail, and a scroller that does not follow is a
+ * box that shows the same six lines it started with while the interesting ones pile up below.
+ */
+function stickToBottom(element: Element | undefined): void {
+  if (!(element instanceof HTMLElement)) {
+    return;
+  }
+  const distance = element.scrollHeight - element.scrollTop - element.clientHeight;
+  if (distance <= IMPORT_STICK_THRESHOLD || element.scrollTop === 0) {
+    element.scrollTop = element.scrollHeight;
+  }
+}
 
 /** What `ask_user` was called with, as far as the arguments actually parse. */
 interface AskArgs {
@@ -351,24 +374,37 @@ export function toolOutcomeText(tc: ToolCallRecord): string {
  * chip and the progress are one thing, joined by the tool-call id.
  */
 function renderImportProgress(record: ImportRunRecord): TemplateResult {
+  const running = record.status === "running";
   const determinate = record.total !== null && record.current !== null;
-  const tail = record.log.slice(-IMPORT_LOG_LINES);
+  const outcome =
+    record.status === "done"
+      ? `Imported ${record.url}`
+      : record.status === "failed"
+        ? `Import failed — ${record.error || "the run did not say why"}`
+        : record.status === "stopped"
+          ? "Import stopped"
+          : record.message;
   return html`
-    <div class="ai-import-progress">
-      <div class="ai-import-head">
+    <details class="ai-import-progress" ?open=${running}>
+      <summary class="ai-import-head">
         ${
-          determinate
-            ? html`<sp-progress-circle
-                size="s"
-                progress=${Math.round((record.current! / Math.max(record.total!, 1)) * 100)}
-              ></sp-progress-circle>`
-            : html`<sp-progress-circle indeterminate size="s"></sp-progress-circle>`
+          running
+            ? determinate
+              ? html`<sp-progress-circle
+                  size="s"
+                  progress=${Math.round((record.current! / Math.max(record.total!, 1)) * 100)}
+                ></sp-progress-circle>`
+              : html`<sp-progress-circle indeterminate size="s"></sp-progress-circle>`
+            : nothing
         }
-        <span class="ai-import-phase">${record.phase}</span>
-        <span class="ai-import-message">${record.message}</span>
-      </div>
-      <div class="ai-import-log">
-        ${tail.map(
+        ${running ? html`<span class="ai-import-phase">${record.phase}</span>` : nothing}
+        <span class="ai-import-message">${outcome}</span>
+        <span class="ai-import-count">${record.log.length}</span>
+      </summary>
+      <div class="ai-import-log" ${ref(stickToBottom)}>
+        ${repeat(
+          record.log,
+          (evt, index) => `${index}:${evt.phase}`,
           (evt) => html`
             <div class="ai-import-log-line">
               <span class="ai-import-phase">${evt.phase}</span>${evt.message}
@@ -376,7 +412,7 @@ function renderImportProgress(record: ImportRunRecord): TemplateResult {
           `,
         )}
       </div>
-    </div>
+    </details>
   `;
 }
 
@@ -482,10 +518,15 @@ function renderToolChips(
           return renderAskCard(tc, ask, outcome, handlers);
         }
         const text = toolOutcomeText(tc);
-        const run =
-          tc.name === IMPORT_TOOL && outcome === "pending"
-            ? (handlers.importRun?.(tc.id) ?? null)
-            : null;
+        /*
+         * For EVERY import chip, not only a running one.
+         *
+         * A finished run used to lose its whole account of itself at the instant it finished — the
+         * record was fetched only while the call was pending, so the log vanished on success. That
+         * is the failure the hand-off from the wizard to the assistant was made to fix, reproduced
+         * one layer in. It stays, collapsed, under the chip that produced it.
+         */
+        const run = tc.name === IMPORT_TOOL ? (handlers.importRun?.(tc.id) ?? null) : null;
         return html`
           <span class="ai-tool-chip" data-outcome=${outcome} title=${text || formatToolLabel(tc)}>
             <sp-icon-gears size="xs"></sp-icon-gears>

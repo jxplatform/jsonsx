@@ -189,6 +189,7 @@ import * as rightPanelMod from "./panels/right-panel";
 import * as chatPanelMod from "./panels/chat-panel";
 import { setProjectAdopter } from "./services/project-adoption";
 import { setImportHandoff } from "./services/import-seed";
+import { watchConnection } from "./services/connection";
 import { tabBufferUnsaved } from "./services/monaco-buffer";
 import * as leftPanelMod from "./panels/left-panel";
 import * as tabStrip from "./panels/tab-strip";
@@ -809,6 +810,10 @@ frontmatterPanelMod.mount();
 // Flow as the recent-projects list.
 setProjectAdopter(openRecentProject);
 setImportHandoff(revealImportHandoff);
+
+/* A launcher whose backend can go away says so. Installs nothing on a platform that cannot lose
+   one — see services/connection.ts for why only the chromium shell can. */
+watchConnection();
 
 leftPanelMod.mount({
   cloneRepository: () => cloneRepository({ openRecentProject }),

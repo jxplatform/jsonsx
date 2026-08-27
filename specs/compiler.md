@@ -2,9 +2,9 @@
 
 ## Static HTML Compiler, Custom Element Emitter, and Island Detector
 
-**Version:** 0.4.0-draft
+**Version:** 0.4.1-draft
 **Status:** Partial
-**Updated:** 2026-08-26
+**Updated:** 2026-08-27
 **License:** MIT
 
 ---
@@ -837,6 +837,20 @@ The site build bundles Function-def `$src` modules for the browser
   falls back to the CDN URLs with a warning, since a page with no runtime is
   worse than a page with a third-party one. Emitted once per build, and only
   when some page actually carries an import map.
+
+  **The set is read back out of the finished HTML**, not recorded where a map
+  is written. A page acquires a map by more than one route — the component
+  injector adds one, and the page-template tiers (§3) each emit their own —
+  and a set filled at one of those sites describes the build only when that
+  site is the one that ran. Recording only the component injector's meant a
+  project with interactivity but no components shipped a map naming
+  `/assets/vue-reactivity.js` with no `dist/assets/` at all: 404 on both
+  modules, a blank page, and a build reporting success with zero errors. What
+  the shipped HTML names and what the build writes are therefore one set,
+  derived from the artifact rather than from an intention. Prefix keys
+  (`"lit-html/"`) and CDN fallbacks are excluded: neither names a file this
+  build produces.
+
 - **Backends**: `Bun.build` when the build runs under Bun; esbuild
   (dynamically imported, a `@jxsuite/compiler` dependency) under plain Node.
   Options are minimal and identical (`format: esm`, browser target). Browser
@@ -894,6 +908,7 @@ neither file.
 
 ## Changelog
 
+- **0.4.1-draft** (2026-08-27) — §12: the client-runtime asset set is derived from the emitted HTML, so every import map a build ships names files it wrote.
 - **0.4.0-draft** (2026-08-26) — Browser bundles are minified (§12); component CSS is inlined rather than linked (§8.2); image sizes derives from the container and variants stop at the configured ceiling (§7.2, §7.2.1).
 - **0.3.3-draft** (2026-08-26) — §8: the boolean-attribute rule is shared with the runtime rather than restated, and covers the enumerated family.
 - **0.3.2-draft** (2026-08-26) — Static output omits a false boolean attribute and emits a true one bare.
@@ -933,4 +948,4 @@ neither file.
 
 ---
 
-_`@jxsuite/compiler` Specification v0.4.0-draft_
+_`@jxsuite/compiler` Specification v0.4.1-draft_

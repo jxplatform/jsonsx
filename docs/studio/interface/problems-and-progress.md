@@ -11,6 +11,7 @@ code:
   - packages/studio/src/ui/progress-modal.ts
   - packages/studio/src/ui/field-row.ts
   - packages/studio/src/panels/statusbar.ts
+  - packages/studio/src/services/connection.ts
 ---
 
 # Problems and progress
@@ -62,6 +63,12 @@ Rows are grouped under where they came from (**Save**, **Source Control**, **Can
 :::doc-note
 Problems belong to the project you have open. Closing the project clears them, so a failure never follows you into a different repository.
 :::
+
+### Losing the backend
+
+The desktop app talks to a small local server for everything that touches your files. If that connection drops, whether the machine slept or a long job tied the server up, a Problem appears saying so, and Studio reconnects on its own. Once it does, the Problem is retired and a toast says you're back.
+
+It matters that it says anything at all. There was a stretch where a lost connection was completely silent: file operations neither succeeded nor failed, so a button like **Open Project** simply did nothing, with no error anywhere and no way back except restarting the app. Editing in an already-open document keeps working while the connection is down; anything that reads or writes a file will fail until it returns, and now it fails visibly.
 
 ## The Bottom dock
 

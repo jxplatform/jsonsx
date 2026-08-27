@@ -528,6 +528,29 @@ describe("ws dispatch", () => {
     }
   });
 
+  test("__ping is answered ahead of the session, so a keepalive survives what an RPC does not", async () => {
+    /*
+     * A ping proves the SOCKET is alive, which is a fact about the socket and not about which
+     * project a window is bound to. Behind the session lookup it would be refused — and close the
+     * connection — in exactly the state where staying connected matters most: a window mid-re-root,
+     * or one whose session was torn down and rebuilt. The shell sends one every 30s because this
+     * server's idle timeout is 120s and a studio can be quiet for far longer (a site import runs
+     * for minutes over a separate HTTP stream and touches this socket not at all).
+     */
+    const ws = await openWs(`?token=${token}&win=gone`);
+    session1Alive = false;
+    try {
+      const ping = await rpcRaw(ws, "__ping");
+      if (!ping.timedOut) {
+        expect(ping.error).toBeUndefined();
+        expect(ping.result).toBeNull();
+      }
+    } finally {
+      session1Alive = true;
+      ws.close();
+    }
+  });
+
   test("fails closed when the session vanishes mid-connection", async () => {
     const ws = await openWs(`?token=${token}&win=gone`);
     session1Alive = false;

@@ -97,6 +97,15 @@ if (wsStr.includes("WebSocketImplementation") || wsStr.includes("DOMException"))
   delete globalThis.WebSocket;
 }
 
+/* The platform installs a `pagehide` listener so its RPC transport stops reconnecting to a server
+   that is going away with the window. This file loads no DOM, so `window` gets the one member the
+   platform reaches for. */
+Object.defineProperty(globalThis, "window", {
+  configurable: true,
+  value: { addEventListener: () => {} },
+  writable: true,
+});
+
 // ─── Import after globals are set ──────────────────────────────────────────
 
 const { createDesktopPlatform } = await import("../src/chromium/platform");

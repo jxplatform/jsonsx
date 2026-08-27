@@ -12,16 +12,34 @@
  * anything the pipeline had to guess at.
  */
 
-import { html } from "lit-html";
+import { html, nothing } from "lit-html";
 import { live } from "lit/directives/live.js";
 import { getPlatform } from "../platform";
 import { preferredModel } from "../services/ai-models";
 import { createModelPicker } from "../ui/ai-model-picker";
 import { destinationPath } from "./location-fields";
 import type { TemplateResult } from "lit-html";
-import type { CreateProjectDestination } from "../types";
+import type { CreateProjectDestination, ImportBreakpointPolicy } from "../types";
+
 import { setPendingImportBrief } from "../services/import-seed";
 import type { ImportBrief } from "../services/import-seed";
+
+/** The three answers the Breakpoints control offers. */
+type BreakpointMode = "all" | "limit" | "explicit";
+
+/** How a kept width matches one the site declared. */
+type BreakpointRounding = "nearest" | "down" | "up";
+
+/** The most breakpoints the control will offer to keep — `@jxsuite/import`'s own ceiling. */
+const MAX_BREAKPOINTS = 12;
+
+/**
+ * The deepest crawl the pipeline accepts.
+ *
+ * The field said 2 while `import_site` and the endpoint both clamped to 5, so the wizard could not
+ * ask for a depth the backend was willing to run.
+ */
+const MAX_DEPTH = 5;
 
 /** Structural view of src/ui/ai-credentials-form's controller (what this tab renders when gated). */
 export interface CredsFormLike {
@@ -64,6 +82,19 @@ export interface ImportTabCtx {
 let _url = "";
 let _depth = 1;
 let _maxPages = 20;
+/**
+ * How many of the site's breakpoints the project keeps, and how a kept width matches a declared
+ * one.
+ *
+ * Three by default, and that default is the point of the control. A real site declares as many
+ * breakpoints as it has accumulated frameworks — nine is ordinary — and the importer used to keep
+ * every one, so an imported project opened with nine canvas sizes and nine columns in every style
+ * editor. Nobody authors against nine, and nobody chose these nine.
+ */
+let _breakpointMode: BreakpointMode = "limit";
+let _breakpointCount = 3;
+let _breakpointWidths = "";
+let _breakpointRounding: BreakpointRounding = "nearest";
 let _aiNaming = true;
 /**
  * The model this import will run its AI passes on. Empty means "whatever the assistant would use",
@@ -85,6 +116,20 @@ let _prompt = "";
  * assistant can put to a person.
  */
 let _verify = false;
+/**
+ * The average fidelity the clone has to reach before the run counts as having matched the original.
+ *
+ * A floor, not a quality target: a faithful import of a complicated site lands well under 100 for
+ * reasons no importer can fix (a rotating hero, a font rendering a hair differently). What it
+ * catches is the other case — the clone that came out at 8% and reported success anyway. Same
+ * default as `jx-import --min-fidelity`, so the two surfaces answer the same question the same
+ * way.
+ *
+ * Failing it is a FINDING here rather than a failure: the project is written and opened either way,
+ * and the assistant reports that the bar was missed. The CLI turns the same number into an exit
+ * code because a script in a pipeline has nobody to tell.
+ */
+let _minFidelity = 25;
 let _errorMsg = "";
 let _dirManual = false;
 
@@ -93,10 +138,15 @@ export function resetImportTab() {
   _url = "";
   _depth = 1;
   _maxPages = 20;
+  _breakpointMode = "limit";
+  _breakpointCount = 3;
+  _breakpointWidths = "";
+  _breakpointRounding = "nearest";
   _aiNaming = true;
   _model = "";
   _prompt = "";
   _verify = false;
+  _minFidelity = 25;
   _errorMsg = "";
   _dirManual = false;
 }
@@ -123,6 +173,32 @@ function modelPicker() {
     requestRender: () => _rerender?.(),
   });
   return _picker;
+}
+
+/**
+ * The policy the three controls describe.
+ *
+ * Exported so a test can read what the form would send without driving the assistant, for the same
+ * reason {@link importBriefFor} is.
+ *
+ * @returns {ImportBreakpointPolicy}
+ */
+export function breakpointPolicyFromForm(): ImportBreakpointPolicy {
+  if (_breakpointMode === "all") {
+    return { mode: "all" };
+  }
+  if (_breakpointMode === "explicit") {
+    const widths = _breakpointWidths
+      .split(",")
+      .map((part) => Math.trunc(Number(part.trim())))
+      .filter((width) => Number.isFinite(width) && width > 0);
+    /* A half-typed width list is not an instruction to keep nothing. Until it parses into at least
+       one width, the form still means "three, evenly spaced" — the value the field started from. */
+    if (widths.length > 0) {
+      return { mode: "explicit", rounding: _breakpointRounding, widths };
+    }
+  }
+  return { count: _breakpointCount, mode: "limit", rounding: _breakpointRounding };
 }
 
 function slugOf(name: string): string {
@@ -181,12 +257,14 @@ export function importBriefFor(ctx: ImportTabCtx): ImportBrief | null {
   }
   return {
     aiComponents: _aiNaming,
+    breakpoints: breakpointPolicyFromForm(),
     depth: _depth,
     directory: destinationPath(destination, ctx.form.directory),
     maxPages: _maxPages,
     model: _model,
     name: ctx.form.name.trim(),
     prompt: _prompt.trim(),
+    minFidelity: _minFidelity,
     url: parsed.href,
     verify: _verify,
   };
@@ -244,6 +322,93 @@ function onUrlInput(ctx: ImportTabCtx) {
   };
 }
 
+/**
+ * The Breakpoints control: how many of the site's own breakpoints the project ends up with.
+ *
+ * Three controls rather than one because they answer different questions and only some of them
+ * apply at a time — a count is meaningless once you have named the widths, and both are meaningless
+ * when you are keeping everything. The rounding picker stays for the two that use it: it decides
+ * which DECLARED width backs a kept one, and the styles flip where the site says they do.
+ *
+ * @param {ImportTabCtx} ctx
+ * @returns {TemplateResult}
+ */
+function breakpointsField(ctx: ImportTabCtx): TemplateResult {
+  const onMode = (e: Event) => {
+    _breakpointMode = (e.target as HTMLInputElement).value as BreakpointMode;
+    ctx.rerender();
+  };
+  return html`
+    <label class="new-project-field">
+      <span class="new-project-label">Breakpoints</span>
+      <div class="new-project-import-breakpoints">
+        <sp-picker
+          size="m"
+          class="new-project-breakpoint-mode"
+          label="Breakpoints"
+          .value=${live(_breakpointMode)}
+          @change=${onMode}
+        >
+          <sp-menu-item value="limit">Limit to</sp-menu-item>
+          <sp-menu-item value="explicit">Custom widths</sp-menu-item>
+          <sp-menu-item value="all">Keep all</sp-menu-item>
+        </sp-picker>
+        ${
+          _breakpointMode === "limit"
+            ? html`<sp-number-field
+                class="new-project-breakpoint-count"
+                min="1"
+                max=${MAX_BREAKPOINTS}
+                .value=${live(_breakpointCount)}
+                @change=${(e: Event) => {
+                  _breakpointCount = Math.trunc(Number((e.target as HTMLInputElement).value)) || 3;
+                }}
+              ></sp-number-field>`
+            : nothing
+        }
+        ${
+          _breakpointMode === "explicit"
+            ? html`<sp-textfield
+                class="new-project-breakpoint-widths"
+                placeholder="640, 1024, 1440"
+                .value=${live(_breakpointWidths)}
+                @input=${(e: Event) => {
+                  _breakpointWidths = (e.target as HTMLInputElement).value;
+                }}
+              ></sp-textfield>`
+            : nothing
+        }
+        ${
+          _breakpointMode === "all"
+            ? nothing
+            : html`<sp-picker
+                size="m"
+                class="new-project-breakpoint-rounding"
+                label="Rounding"
+                .value=${live(_breakpointRounding)}
+                @change=${(e: Event) => {
+                  _breakpointRounding = (e.target as HTMLInputElement).value as BreakpointRounding;
+                }}
+              >
+                <sp-menu-item value="nearest">nearest</sp-menu-item>
+                <sp-menu-item value="down">round down</sp-menu-item>
+                <sp-menu-item value="up">round up</sp-menu-item>
+              </sp-picker>`
+        }
+      </div>
+      <span class="new-project-hint">
+        ${
+          _breakpointMode === "all"
+            ? "Every breakpoint the site declares becomes a canvas size. Real sites often declare nine."
+            : _breakpointMode === "explicit"
+              ? "The project gets these widths, each backed by the declared width nearest it."
+              : "Evenly spaced across the widths the site declares — the narrowest, the widest, and the ones between."
+        }
+      </span>
+    </label>
+  `;
+}
+
 export function renderImportSource(ctx: ImportTabCtx): TemplateResult {
   // `ctx` is rebuilt per render, so the picker's scheduler has to be re-pointed at the current one.
   _rerender = ctx.rerender;
@@ -279,7 +444,7 @@ export function renderImportSource(ctx: ImportTabCtx): TemplateResult {
         <span class="new-project-label">Crawl Depth</span>
         <sp-number-field
           min="0"
-          max="2"
+          max=${MAX_DEPTH}
           .value=${live(_depth)}
           @change=${(e: Event) => {
             _depth = Math.trunc(Number((e.target as HTMLInputElement).value)) || 0;
@@ -298,6 +463,7 @@ export function renderImportSource(ctx: ImportTabCtx): TemplateResult {
         ></sp-number-field>
       </label>
     </div>
+    ${breakpointsField(ctx)}
     <sp-switch
       .checked=${live(_aiNaming)}
       @change=${(e: Event) => {
@@ -310,10 +476,36 @@ export function renderImportSource(ctx: ImportTabCtx): TemplateResult {
       .checked=${live(_verify)}
       @change=${(e: Event) => {
         _verify = (e.target as HTMLInputElement).checked;
+        // The bar below it only means anything while the check runs, so it appears with it.
+        ctx.rerender();
       }}
     >
       Check fidelity against the original (slower)
     </sp-switch>
+    ${
+      _verify
+        ? html`
+            <label class="new-project-field">
+              <span class="new-project-label">Minimum fidelity</span>
+              <sp-number-field
+                class="new-project-min-fidelity"
+                min="0"
+                max="100"
+                .value=${live(_minFidelity)}
+                @change=${(e: Event) => {
+                  const raw = Math.trunc(Number((e.target as HTMLInputElement).value));
+                  _minFidelity = Number.isNaN(raw) ? 0 : Math.min(100, Math.max(0, raw));
+                }}
+              ></sp-number-field>
+              <span class="new-project-hint">
+                Below this average, the assistant reports that the clone did not match the original.
+                A floor rather than a target: a faithful import of a complicated site still lands
+                well under 100. Set 0 to report the score without judging it.
+              </span>
+            </label>
+          `
+        : ""
+    }
     <label class="new-project-field">
       <span class="new-project-label">Model</span>
       ${modelPicker().render()}

@@ -37,11 +37,18 @@ const captureStyles = mock(() =>
 );
 void mock.module("../src/style-capture.ts", () => ({ captureStyles }));
 
-const extractMedia = mock(() =>
-  Promise.resolve({
-    breakpoints: { "--md": "(max-width: 768px)" } as Record<string, string>,
-    deltas: {},
-  }),
+const extractMedia = mock(
+  (
+    _page?: unknown,
+    _base?: unknown,
+    _uaDefaults?: unknown,
+    _queries?: readonly string[],
+    _options?: Record<string, unknown>,
+  ) =>
+    Promise.resolve({
+      breakpoints: { "--md": "(max-width: 768px)" } as Record<string, string>,
+      deltas: {},
+    }),
 );
 void mock.module("../src/media-extract.ts", () => ({ extractMedia }));
 
@@ -57,8 +64,8 @@ void mock.module("../src/asset-collect.ts", () => ({ collectAssets }));
 const downloadAssets = mock(() =>
   Promise.resolve({
     rewriteMap: new Map([
-      ["https://site.example/hero.jpg", "public/assets/images/hero.jpg"],
-      ["https://site.example/font.woff2", "public/assets/fonts/font.woff2"],
+      ["https://site.example/hero.jpg", "/assets/images/hero.jpg"],
+      ["https://site.example/font.woff2", "/assets/fonts/font.woff2"],
     ]),
     failed: ["https://site.example/broken.png"],
     skipped: [] as string[],
@@ -68,7 +75,7 @@ const downloadAssets = mock(() =>
 void mock.module("../src/asset-download.ts", () => ({ downloadAssets }));
 
 const emitMultiPageProject = mock((_opts: Record<string, unknown>) =>
-  Promise.resolve({ files: ["project.json", "a", "b"] }),
+  Promise.resolve({ classesStripped: 0, files: ["project.json", "a", "b"] }),
 );
 void mock.module("../src/emit.ts", () => ({ emitMultiPageProject }));
 
@@ -90,7 +97,33 @@ const aiComponentize = mock(
 void mock.module("../src/ai-componentize.ts", () => ({ aiComponentize }));
 
 const captureReferenceScreenshot = mock(() => Promise.resolve(Buffer.from("png")));
-const verifyProject = mock((_opts: Record<string, unknown>) => {
+
+/**
+ * The shape `verifyProject` answers with, spelled out so a per-test override can populate the
+ * arrays. Inference from the default implementation types them `never[]`, which then rejects the
+ * very cases worth testing — a page that logged console errors, a build that reported one.
+ */
+interface FakeVerifyResult {
+  pages: {
+    route: string;
+    sourceUrl: string;
+    fidelity: number;
+    mismatchedPixels: number;
+    totalPixels: number;
+    diffImagePath: string;
+    originalScreenshotPath: string;
+    renderedScreenshotPath: string;
+    consoleErrors: string[];
+    failedRequests: string[];
+    error?: string;
+  }[];
+  averageFidelity: number;
+  reportDir: string;
+  buildErrors: string[];
+  passed: boolean;
+}
+
+const verifyProject = mock((_opts: Record<string, unknown>): Promise<FakeVerifyResult> => {
   (_opts.onProgress as ((msg: string) => void) | undefined)?.("Building site...");
   return Promise.resolve({
     pages: [
@@ -103,10 +136,14 @@ const verifyProject = mock((_opts: Record<string, unknown>) => {
         diffImagePath: "d",
         originalScreenshotPath: "o",
         renderedScreenshotPath: "r",
+        consoleErrors: [],
+        failedRequests: [],
       },
     ],
     averageFidelity: 97.5,
     reportDir: "/tmp/report",
+    buildErrors: [],
+    passed: true,
   });
 });
 void mock.module("../src/verify.ts", () => ({ captureReferenceScreenshot, verifyProject }));
@@ -157,6 +194,8 @@ const { importSite } = await import("../src/run.ts");
 interface ProgressEvent {
   phase: string;
   message: string;
+  /** Present on the `seed` event alone — the root a host can open straight away. */
+  root?: string;
 }
 
 function freshOutDir(): string {
@@ -207,6 +246,51 @@ describe("importSite — validation", () => {
     await expect(importSite({ url: "https://x.example", outDir: dir })).rejects.toThrow(
       "is not empty",
     );
+  });
+
+  test("tolerates its OWN seed, so a re-entered run is not refused by its first statement", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "jx-run-seeded-"));
+    writeFileSync(join(dir, "project.json"), '{ "name": "x" }');
+    const result = await importSite({ url: "https://site.example/", outDir: dir, maxDepth: 0 });
+    expect(result.outDir).toBe(dir);
+  });
+});
+
+describe("importSite — the seed", () => {
+  test("creates the destination and announces the root before the browser launches", async () => {
+    const events: ProgressEvent[] = [];
+    const outDir = freshOutDir();
+    await importSite({ url: "https://www.site.example/", outDir, maxDepth: 0 }, (e) => {
+      events.push(e);
+    });
+
+    expect(events[0]).toEqual({
+      message: `Created ${outDir}`,
+      phase: "seed",
+      root: outDir,
+    });
+    // The seed lands before anything that could take minutes, which is the point of it.
+    expect(events.findIndex((e) => e.phase === "seed")).toBeLessThan(
+      events.findIndex((e) => e.phase === "launch"),
+    );
+    const seeded = await Bun.file(join(outDir, "project.json")).json();
+    expect(seeded.name).toBe("site.example");
+  });
+
+  test("falls back to a placeholder name when the URL has no readable hostname", async () => {
+    const outDir = freshOutDir();
+    capturePage.mockResolvedValueOnce({
+      url: "https://site.example/",
+      title: "Example Site",
+      bodyHtml: "<div></div>",
+      links: [],
+      page: { close: pageClose },
+    });
+    // `importSite` has already accepted the scheme; this is the belt-and-braces branch for a URL
+    // That parses at the guard and not at `new URL` — an empty authority.
+    await importSite({ url: "https://", outDir, maxDepth: 0 });
+    const seeded = await Bun.file(join(outDir, "project.json")).json();
+    expect(seeded.name).toBe("Imported Site");
   });
 });
 
@@ -283,9 +367,94 @@ describe("importSite — single-page mode", () => {
     expect(emitOpts.breakpoints).toEqual({ "--md": "(max-width: 768px)" });
   });
 
+  test("names the breakpoints it kept and the widths that folded into them", async () => {
+    captureStyles.mockResolvedValueOnce({
+      elements: [],
+      uaDefaults: {},
+      mediaQueries: [
+        "(max-width: 520px)",
+        "(min-width: 600px)",
+        "(max-width: 767px)",
+        "(min-width: 782px)",
+        "(min-width: 1390px)",
+      ],
+      customProperties: {},
+      documentStyles: {},
+    });
+    const events: ProgressEvent[] = [];
+    await importSite({ url: "https://site.example/", outDir: freshOutDir(), maxDepth: 0 }, (e) => {
+      events.push(e);
+    });
+    const line = events.map((e) => e.message).find((m) => m.includes("breakpoints declared"));
+    expect(line).toBe("5 breakpoints declared, keeping 3: --520 (+600), --767 (+782), --1390");
+  });
+
+  test("says so when it is keeping every declared breakpoint", async () => {
+    captureStyles.mockResolvedValueOnce({
+      elements: [],
+      uaDefaults: {},
+      mediaQueries: ["(max-width: 520px)", "(min-width: 1390px)"],
+      customProperties: {},
+      documentStyles: {},
+    });
+    const events: ProgressEvent[] = [];
+    await importSite({ url: "https://site.example/", outDir: freshOutDir(), maxDepth: 0 }, (e) => {
+      events.push(e);
+    });
+    expect(events.map((e) => e.message)).toContain("Keeping all 2 declared breakpoints");
+  });
+
+  test("warns about width queries it could not read, naming them", async () => {
+    captureStyles.mockResolvedValueOnce({
+      elements: [],
+      uaDefaults: {},
+      mediaQueries: ["(min-width: 48rem)", "(hover: hover)"],
+      customProperties: {},
+      documentStyles: {},
+    });
+    const result = await importSite({
+      url: "https://site.example/",
+      outDir: freshOutDir(),
+      maxDepth: 0,
+    });
+    expect(result.warnings.some((w) => w.includes("(min-width: 48rem)"))).toBe(true);
+    // A query with no width in it is not a lost breakpoint and must not be reported as one.
+    expect(result.warnings.some((w) => w.includes("(hover: hover)"))).toBe(false);
+  });
+
+  test("honours an explicit breakpoint policy", async () => {
+    captureStyles.mockResolvedValueOnce({
+      elements: [],
+      uaDefaults: {},
+      mediaQueries: ["(max-width: 767px)", "(min-width: 1390px)"],
+      customProperties: {},
+      documentStyles: {},
+    });
+    await importSite({
+      url: "https://site.example/",
+      outDir: freshOutDir(),
+      maxDepth: 0,
+      breakpoints: { mode: "explicit", rounding: "nearest", widths: [768] },
+    });
+    const options = extractMedia.mock.calls.at(-1)?.[4] as { policy?: unknown } | undefined;
+    expect(options?.policy).toEqual({ mode: "explicit", rounding: "nearest", widths: [768] });
+  });
+
+  test("reports what the class strip removed", async () => {
+    emitMultiPageProject.mockResolvedValueOnce({
+      classesStripped: 42,
+      files: ["project.json"],
+    });
+    const events: ProgressEvent[] = [];
+    await importSite({ url: "https://site.example/", outDir: freshOutDir(), maxDepth: 0 }, (e) => {
+      events.push(e);
+    });
+    expect(events.map((e) => e.message)).toContain("Wrote 1 files, stripped 42 source class names");
+  });
+
   test("reports sub-kilobyte download sizes and skipped tracking URLs", async () => {
     downloadAssets.mockResolvedValueOnce({
-      rewriteMap: new Map([["https://site.example/hero.jpg", "public/assets/images/hero.jpg"]]),
+      rewriteMap: new Map([["https://site.example/hero.jpg", "/assets/images/hero.jpg"]]),
       failed: [],
       skipped: ["https://site.example/analytics.js"],
       totalBytes: 512,
@@ -301,7 +470,7 @@ describe("importSite — single-page mode", () => {
 
   test("reports megabyte-range download sizes", async () => {
     downloadAssets.mockResolvedValueOnce({
-      rewriteMap: new Map([["https://site.example/hero.jpg", "public/assets/images/hero.jpg"]]),
+      rewriteMap: new Map([["https://site.example/hero.jpg", "/assets/images/hero.jpg"]]),
       failed: [],
       skipped: [],
       totalBytes: 3 * 1024 * 1024,
@@ -431,16 +600,90 @@ describe("importSite — single-page mode", () => {
       verify: { threshold: 0.2 },
     });
     expect(captureReferenceScreenshot).toHaveBeenCalled();
-    const verifyOpts = verifyProject.mock.calls[0]?.[0] as { threshold: number; browser?: unknown };
+    const verifyOpts = verifyProject.mock.calls[0]?.[0] as {
+      threshold: number;
+      minFidelity: number;
+      fullPage: boolean;
+      browser?: unknown;
+    };
     expect(verifyOpts.threshold).toBe(0.2);
     expect(verifyOpts.browser).toBe(fakeBrowser);
+    // The whole scrollable page by default — the old viewport-only diff looked at the first 900px.
+    expect(verifyOpts.fullPage).toBe(true);
     /* Per page, not just the average: "average fidelity 97.5%" is a fact nobody can act on, and
        "the pricing page renders at 61%" is a decision. */
     expect(result.verify).toEqual({
       averageFidelity: 97.5,
-      pages: [{ fidelity: 97.5, route: "pages/index.json" }],
+      buildErrors: [],
+      minFidelity: 0,
+      pages: [{ consoleErrors: 0, failedRequests: 0, fidelity: 97.5, route: "pages/index.json" }],
+      passed: true,
       reportDir: "/tmp/report",
     });
+  });
+
+  /*
+   * Issue #232: nothing about verify could fail. Build errors were logged inside the verifier and
+   * dropped, and an 8%-fidelity clone finished exactly like a 95% one.
+   */
+  test("a run below the minimum fidelity does not pass, and says so", async () => {
+    verifyProject.mockImplementationOnce(() =>
+      Promise.resolve({
+        averageFidelity: 8.17,
+        buildErrors: [],
+        pages: [
+          {
+            consoleErrors: ["Failed to load resource"],
+            diffImagePath: "d",
+            failedRequests: ["404 /assets/images/logo.webp"],
+            fidelity: 8.17,
+            mismatchedPixels: 400,
+            originalScreenshotPath: "o",
+            renderedScreenshotPath: "r",
+            route: "pages/index.json",
+            sourceUrl: "https://site.example/",
+            totalPixels: 500,
+          },
+        ],
+        passed: false,
+        reportDir: "/tmp/report",
+      }),
+    );
+    const result = await importSite({
+      url: "https://site.example/",
+      outDir: freshOutDir(),
+      maxDepth: 0,
+      verify: { minFidelity: 25 },
+    });
+
+    expect(result.verify!.passed).toBe(false);
+    expect(result.verify!.minFidelity).toBe(25);
+    // The counts a percentage cannot carry: 404s are why this page scores 8%.
+    expect(result.verify!.pages).toEqual([
+      { consoleErrors: 1, failedRequests: 1, fidelity: 8.17, route: "pages/index.json" },
+    ]);
+    expect(result.warnings.some((w) => w.includes("Verification failed"))).toBe(true);
+  });
+
+  test("build errors reach the caller as warnings instead of being swallowed", async () => {
+    verifyProject.mockImplementationOnce(() =>
+      Promise.resolve({
+        averageFidelity: 99,
+        buildErrors: ["Error compiling /about: unknown $ref"],
+        pages: [],
+        passed: false,
+        reportDir: "/tmp/report",
+      }),
+    );
+    const result = await importSite({
+      url: "https://site.example/",
+      outDir: freshOutDir(),
+      maxDepth: 0,
+      verify: {},
+    });
+
+    expect(result.verify!.buildErrors).toEqual(["Error compiling /about: unknown $ref"]);
+    expect(result.warnings.some((w) => w.includes("unknown $ref"))).toBe(true);
   });
 
   test("a page the verifier could not render carries its reason", async () => {
@@ -459,8 +702,12 @@ describe("importSite — single-page mode", () => {
             route: "pages/about.json",
             sourceUrl: "https://site.example/about",
             totalPixels: 0,
+            consoleErrors: [],
+            failedRequests: [],
           },
         ],
+        buildErrors: [],
+        passed: false,
         reportDir: "/tmp/report",
       }),
     );
@@ -471,7 +718,13 @@ describe("importSite — single-page mode", () => {
       verify: {},
     });
     expect(result.verify!.pages).toEqual([
-      { error: "Navigation failed", fidelity: 0, route: "pages/about.json" },
+      {
+        consoleErrors: 0,
+        error: "Navigation failed",
+        failedRequests: 0,
+        fidelity: 0,
+        route: "pages/about.json",
+      },
     ]);
   });
 
@@ -557,6 +810,13 @@ describe("importSite — crawl mode", () => {
     expect([...verifyOpts.pages.keys()]).toEqual(["pages/about.json"]);
     expect(verifyOpts.threshold).toBe(0.15);
     expect(result.verify?.averageFidelity).toBe(97.5);
+    /*
+     * The crawl frames its references the same way the verifier renders the clone. Half of a
+     * comparison captured at the viewport and the other half full-page is not a comparison at all:
+     * the diff pads the shorter image, so everything below the fold counts as a mismatch.
+     */
+    const crawlOpts = crawlSite.mock.calls.at(-1)?.[0] as { fullPageScreenshots: boolean };
+    expect(crawlOpts.fullPageScreenshots).toBe(true);
   });
 
   test("skips verify when the crawl produced no screenshots", async () => {

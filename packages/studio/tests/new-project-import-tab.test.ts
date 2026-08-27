@@ -23,7 +23,8 @@ import type { ImportProgressEvent } from "../src/types";
 
 const { closeNewProjectModal, openNewProjectModal } =
   await import("../src/new-project/new-project-modal");
-const { handoffImport, importButtonLabel } = await import("../src/new-project/import-tab");
+const { breakpointPolicyFromForm, handoffImport, importBriefFor, importButtonLabel } =
+  await import("../src/new-project/import-tab");
 const { clearPendingImportBrief, pendingImportBrief } = await import("../src/services/import-seed");
 const { initLayers } = await import("../src/ui/layers");
 
@@ -46,6 +47,20 @@ function nameError(): string {
       .querySelector('#layer-modal .new-project-name sp-help-text[slot="negative-help-text"]')
       ?.textContent?.trim() ?? ""
   );
+}
+
+/** Every number field on the Import source step, in render order. */
+function numberFields(): (HTMLElement & { value: string })[] {
+  return [...document.querySelectorAll("#layer-modal sp-number-field")] as (HTMLElement & {
+    value: string;
+  })[];
+}
+
+/** The "Check fidelity against the original" switch — the second of the step's two. */
+function verifySwitch(): HTMLElement & { checked: boolean } {
+  return [...document.querySelectorAll("#layer-modal sp-switch")][1] as HTMLElement & {
+    checked: boolean;
+  };
 }
 
 /** The inline error rendered under the destination fields (or by a failed run). */
@@ -189,7 +204,10 @@ describe("Import source step", () => {
     expect(document.querySelectorAll("#layer-modal sp-textfield")).toHaveLength(2);
     expect(document.querySelector("#layer-modal .new-project-import-prompt")).toBeTruthy();
     expect(document.querySelector("#layer-modal .new-project-import-model")).toBeTruthy();
-    expect(document.querySelectorAll("#layer-modal sp-number-field")).toHaveLength(2);
+    // Crawl depth, max pages, and how many breakpoints the project keeps.
+    expect(document.querySelectorAll("#layer-modal sp-number-field")).toHaveLength(3);
+    expect(document.querySelector("#layer-modal .new-project-breakpoint-mode")).toBeTruthy();
+    expect(document.querySelector("#layer-modal .new-project-breakpoint-rounding")).toBeTruthy();
     expect(document.querySelector("#layer-modal sp-switch")).toBeTruthy();
     const labels = footerButtons().map((b) => b.textContent?.trim());
     expect(labels).toEqual(["Cancel", "Next"]);
@@ -287,13 +305,11 @@ describe("Import — the brief the form hands over", () => {
     switchTab("import");
     npType(urlField(), "https://clone.example/");
 
-    const numberFields = [
-      ...document.querySelectorAll("#layer-modal sp-number-field"),
-    ] as (HTMLElement & { value: string })[];
-    numberFields[0]!.value = "2";
-    numberFields[0]!.dispatchEvent(new Event("change", { bubbles: true }));
-    numberFields[1]!.value = "50";
-    numberFields[1]!.dispatchEvent(new Event("change", { bubbles: true }));
+    const [depth, maxPages] = numberFields();
+    depth!.value = "2";
+    depth!.dispatchEvent(new Event("change", { bubbles: true }));
+    maxPages!.value = "50";
+    maxPages!.dispatchEvent(new Event("change", { bubbles: true }));
     const aiSwitch = document.querySelector("#layer-modal sp-switch") as HTMLElement & {
       checked: boolean;
     };
@@ -315,6 +331,82 @@ describe("Import — the brief the form hands over", () => {
       prompt: "Modernise the typography",
       url: "https://clone.example/",
     });
+  });
+
+  /*
+   * The fidelity bar (jxsuite/jx issue 232). It appears WITH the check it belongs to: a minimum
+   * for a comparison nobody asked to run is a number with nothing to measure.
+   */
+  test("the fidelity minimum appears only once the fidelity check is on", async () => {
+    setKey();
+    importPlatform();
+    void openNewProjectModal();
+    switchTab("import");
+    // Crawl depth, max pages and the breakpoint count — and no fidelity bar while the check is off.
+    expect(document.querySelector("#layer-modal .new-project-min-fidelity")).toBeNull();
+
+    verifySwitch().checked = true;
+    verifySwitch().dispatchEvent(new Event("change", { bubbles: true }));
+    await flush();
+
+    expect(document.querySelector("#layer-modal .new-project-min-fidelity")).toBeTruthy();
+    expect(
+      [...document.querySelectorAll("#layer-modal .new-project-hint")]
+        .map((n) => n.textContent)
+        .join(" "),
+    ).toContain("did not match the original");
+  });
+
+  test("the fidelity minimum reaches the brief", async () => {
+    setKey();
+    importPlatform();
+    void openNewProjectModal();
+    switchTab("import");
+    npType(urlField(), "https://clone.example/");
+    verifySwitch().checked = true;
+    verifySwitch().dispatchEvent(new Event("change", { bubbles: true }));
+    await flush();
+
+    const fidelity = document.querySelector(
+      "#layer-modal .new-project-min-fidelity",
+    ) as HTMLInputElement;
+    fidelity.value = "60";
+    fidelity.dispatchEvent(new Event("change", { bubbles: true }));
+
+    clickFooter("Next");
+    npFillLocation();
+    clickFooter("Import Site");
+    await flush();
+    expect(pendingImportBrief()).toMatchObject({ minFidelity: 60, verify: true });
+  });
+
+  // A percentage is the only thing this number can be, so the field refuses to carry anything else.
+  test("the fidelity minimum is clamped to a percentage", async () => {
+    setKey();
+    importPlatform();
+    void openNewProjectModal();
+    switchTab("import");
+    npType(urlField(), "https://clone.example/");
+    verifySwitch().checked = true;
+    verifySwitch().dispatchEvent(new Event("change", { bubbles: true }));
+    await flush();
+
+    const fidelity = document.querySelector(
+      "#layer-modal .new-project-min-fidelity",
+    ) as HTMLInputElement;
+    /* Read the brief directly rather than through the footer: handing off CLOSES the modal, so a
+       loop that clicks Import Site could only ever check its first case. */
+    const { ctx } = directCtx(() => ({ kind: "path", parent: "/home/dev/Sites" }));
+    for (const [typed, expected] of [
+      ["250", 100],
+      ["-5", 0],
+      ["", 0],
+      ["60", 60],
+    ] as const) {
+      fidelity.value = typed;
+      fidelity.dispatchEvent(new Event("change", { bubbles: true }));
+      expect(importBriefFor(ctx)).toMatchObject({ minFidelity: expected });
+    }
   });
 
   test("Import Site is a no-op when the platform lacks importSite", async () => {
@@ -441,5 +533,106 @@ describe("Import — the hand-off", () => {
       name: "Cloned Site",
       url: "https://clone.example/",
     });
+  });
+});
+
+// ─── Breakpoints ─────────────────────────────────────────────────────────────
+
+describe("Import — how many breakpoints the project keeps", () => {
+  /** Set a picker's value and fire the change the template listens for. */
+  function pick(selector: string, value: string) {
+    const el = document.querySelector(`#layer-modal ${selector}`) as HTMLInputElement;
+    el.value = value;
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+
+  function reachSource() {
+    setKey();
+    importPlatform();
+    void openNewProjectModal();
+    switchTab("import");
+  }
+
+  test("defaults to three, evenly spaced, rounding to the nearest declared width", () => {
+    /*
+     * A real site declares as many breakpoints as it has accumulated frameworks. One import
+     * produced NINE — 520, 600, 767, 781, 782, 960, 1024, 1025, 1390 — and every one of them became
+     * a canvas size in Studio and a column in every style editor. Three is the default because that
+     * is the complaint this control answers.
+     */
+    reachSource();
+    expect(breakpointPolicyFromForm()).toEqual({
+      count: 3,
+      mode: "limit",
+      rounding: "nearest",
+    });
+  });
+
+  test("the count and the rounding are the author's to change", () => {
+    reachSource();
+    pick(".new-project-breakpoint-count", "5");
+    pick(".new-project-breakpoint-rounding", "down");
+    expect(breakpointPolicyFromForm()).toEqual({ count: 5, mode: "limit", rounding: "down" });
+  });
+
+  test("Keep all hides both value controls and asks for every declared width", () => {
+    reachSource();
+    pick(".new-project-breakpoint-mode", "all");
+    expect(document.querySelector("#layer-modal .new-project-breakpoint-count")).toBeNull();
+    expect(document.querySelector("#layer-modal .new-project-breakpoint-rounding")).toBeNull();
+    expect(breakpointPolicyFromForm()).toEqual({ mode: "all" });
+  });
+
+  test("Custom widths takes a list, and keeps the rounding rule that matches it to the site", () => {
+    reachSource();
+    pick(".new-project-breakpoint-mode", "explicit");
+    const widths = document.querySelector(
+      "#layer-modal .new-project-breakpoint-widths",
+    ) as HTMLInputElement;
+    expect(widths).toBeTruthy();
+    widths.value = " 640 , 1024,1440 ";
+    widths.dispatchEvent(new Event("input", { bubbles: true }));
+    pick(".new-project-breakpoint-rounding", "up");
+
+    expect(breakpointPolicyFromForm()).toEqual({
+      mode: "explicit",
+      rounding: "up",
+      widths: [640, 1024, 1440],
+    });
+  });
+
+  test("a half-typed width list still means the default, not nothing", () => {
+    reachSource();
+    pick(".new-project-breakpoint-mode", "explicit");
+    const widths = document.querySelector(
+      "#layer-modal .new-project-breakpoint-widths",
+    ) as HTMLInputElement;
+    widths.value = "six hundred";
+    widths.dispatchEvent(new Event("input", { bubbles: true }));
+    expect(breakpointPolicyFromForm()).toEqual({ count: 3, mode: "limit", rounding: "nearest" });
+  });
+
+  test("the policy rides the brief the assistant reads", async () => {
+    setKey();
+    importPlatform();
+    void reachParams();
+    npFillLocation();
+    npType(npName(), "Cloned Site");
+    clickFooter("Import Site");
+    await flush();
+
+    expect(pendingImportBrief()?.breakpoints).toEqual({
+      count: 3,
+      mode: "limit",
+      rounding: "nearest",
+    });
+  });
+
+  test("the crawl-depth field reaches the depth the backend actually accepts", () => {
+    // It said 2 while `import_site` and the endpoint both clamped to 5, so the wizard could not ask
+    // For a depth the pipeline was willing to run.
+    reachSource();
+    const depth = document.querySelector("#layer-modal sp-number-field") as HTMLElement;
+    expect(depth.getAttribute("max")).toBe("5");
   });
 });

@@ -32,6 +32,7 @@ import type {
   GitLogEntry,
   GitStatusResult,
   ImportProgressEvent,
+  ImportReadyEvent,
   ImportSiteOptions,
   ImportSiteSummary,
   PackageInfo,
@@ -80,7 +81,9 @@ export type {
   GitFileStatus,
   GitLogEntry,
   GitStatusResult,
+  ImportBreakpointPolicy,
   ImportProgressEvent,
+  ImportReadyEvent,
   ImportSiteOptions,
   ImportSiteSummary,
   JsonValue,
@@ -492,11 +495,18 @@ export interface StudioPlatform {
    * AI-guided import of an existing site into a new project. Runs in the backend (headless Chrome +
    * fs), streaming progress until the project is written. Absent on platforms without a backend
    * import pipeline — the New Project modal hides its Import tab then.
+   *
+   * `onReady` fires the moment the destination holds an openable `project.json` — seconds in, where
+   * the resolved promise is minutes away on a real crawl. It is what lets the caller OPEN the
+   * project and let its file tree fill up while the run continues, instead of showing a welcome
+   * screen throughout. Optional on both sides: a backend that never sends the line simply never
+   * calls it, and the caller opens the project when the run ends, as it always did.
    */
   importSite?: (
     opts: ImportSiteOptions,
     onProgress: (evt: ImportProgressEvent) => void,
     signal?: AbortSignal,
+    onReady?: (evt: ImportReadyEvent) => void,
   ) => Promise<{ root: string; config: ProjectConfig; result?: ImportSiteSummary }>;
   /**
    * Open a native directory picker and return the chosen absolute path (null when cancelled). Backs
@@ -631,6 +641,19 @@ export interface StudioPlatform {
    * showing a stale value until its next boot rather than losing anything.
    */
   subscribeSettings?: (handler: (settings: Record<string, string>) => void) => () => void;
+  /**
+   * Watch the backend connection, on platforms whose transport can lose one.
+   *
+   * Only a socket-based launcher implements this: the dev server talks over `fetch` and has nothing
+   * to lose, and the electrobun launcher's RPC times a request out rather than dropping it. The
+   * chromium launcher holds one long-lived WebSocket, and when it died every call after it hung
+   * with no error anywhere — so the transport reports the state, and the studio says it out loud.
+   *
+   * The handler is called on each transition, never repeatedly for one state.
+   */
+  subscribeConnection?: (
+    handler: (state: { online: boolean; reason?: string }) => void,
+  ) => () => void;
 }
 
 // ─── Studio Types ───────────────────────────────────────────────────────────

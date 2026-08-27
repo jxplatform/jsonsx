@@ -960,6 +960,9 @@ const SELF_SCROLLING_MODES: ReadonlySet<string> = new Set([
   "entry",
   "grid",
   "manage",
+  /* `media` — the Media viewer's own scrolling column (`media/media-pane.ts`). There is no artboard
+     here either: a wheel over an image is a scroll down the page it sits on, not a zoom. */
+  "media",
   "preview",
   "settings",
 ]);

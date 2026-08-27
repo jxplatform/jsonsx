@@ -2,7 +2,7 @@
 
 ## Platform Abstraction, Project Loading, and Component Scoping
 
-**Version:** 0.4.4-draft
+**Version:** 0.4.5-draft
 **Status:** Pending
 **Updated:** 2026-08-27
 **License:** MIT
@@ -447,6 +447,14 @@ A live preview under the fields shows the resolved destination (`/home/you/Sites
 **The obligation belongs to whatever creates the project, not to the wizard.** The assistant's bootstrap tools create projects too, and for a release only the wizard was keeping this promise — a project the agent scaffolded was not a repository and nothing said so. Both tools now run the same adoption sequence: version control, then the open flow, then a check that the workspace really moved, because the adopter reports its failures rather than raising them and a resolved promise is not proof of adoption.
 
 **Import shares this destination, and hands it to the assistant.** The Import tab is one of the three New Project sources, so it collects the same Location field; the resolved absolute path reaches the backend as `ImportSiteOptions.directory`, and a relative directory arriving there means a caller skipped the field and is refused. The wizard no longer runs the pipeline: it gathers the URL, the crawl options, a model and a brief, then closes without having created anything, and the assistant runs the import as a tool call (`specs/ai.md` §3.5). That is what makes the run watchable and questionable — the wizard's progress log was destroyed at the moment a successful import handed off, taking every phase line and every warning with it. **Stop in the assistant aborts the run**, in place of the wizard's Cancel Import.
+
+**How many breakpoints the project keeps is a decision the wizard makes explicit.** A real site declares as many as it has accumulated frameworks — nine is ordinary — and the importer used to keep every one, so an imported project opened with nine canvas sizes and nine columns in every style editor. Nobody authors against nine, and nobody chose these nine. The Import tab therefore offers three answers: keep a COUNT of them, evenly spaced across the widths the site declares (three by default); name the WIDTHS the project should have; or keep every one. The first two carry a rounding rule — nearest, down, or up — because it decides which DECLARED width backs a kept one, and the styles flip where the site says they do rather than where the author wishes they did. A width that is not kept is FOLDED into the kept one nearest it, so nothing the site expressed is discarded silently, and the run says which widths went where.
+
+**What the import emits is a Jx project, not a transcription of the source.** Three consequences are normative, and each was a defect before it was a rule:
+
+- **The emitted `project.json` validates against the project's own generated schema.** That document closes its composition with `unevaluatedProperties: false` (extensions.md §5.2), so a key the core fragment does not declare is not a harmless extra — it fails the file, and Studio's Contexts editor validates the whole configuration before saving, which made the base width of an imported site uneditable. A description belongs in `$head`, where `@jxsuite/create` writes it and a browser reads it.
+- **The source site's classes do not reach disk.** Every visual fact the pipeline emits comes from computed style, and the only CSS it writes is the `@font-face` rules it recovered; the original stylesheets are never emitted. A `class` attribute that survives therefore names rules that do not exist, in every page, layout and component a reader then edits around — and a class that happens to differ between two instances of one block would otherwise become a component prop nobody chose. The strip runs last, after componentization and after any AI naming pass, both of which legitimately read those names to choose a better one. This is not a claim that Jx is classless: `className` remains a first-class element property (`specs/spec.md` §8.1) and the compiler still emits generated classes for nested style rules (§9.2).
+- **Downloaded assets are referenced the way an author would write them.** `public/` is served from the site root, so a file at `public/assets/images/hero.jpg` is referenced `/assets/images/hero.jpg`. A reference without a leading slash resolves against the referencing DOCUMENT's directory, so emitting the file path made every imported image resolve to a path under `pages/` — broken on the canvas and in the build alike.
 
 ---
 
@@ -1255,7 +1263,8 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
-- **0.4.4-draft** (2026-08-27) — Both launchers preview the working tree live at real routes; Build Site keeps the compiler, and leaving the webview is stated to be one-way.
+- **0.4.5-draft** (2026-08-27) — Both launchers preview the working tree live at real routes; Build Site keeps the compiler, and leaving the webview is stated to be one-way.
+- **0.4.4-draft** (2026-08-26) — the Import tab chooses how many breakpoints the project keeps, and what an import emits is normative (§4.5).
 - **0.4.3-draft** (2026-08-26) — Typechecking resolves the ElectroBun SDK from the pinned vendor/electrobun submodule; .hutch/devkit stays the build sysroot.
 - **0.4.2-draft** (2026-08-26) — Packages capability row: the registry seam is `packageVersions?` (each dependency's own latest), not `outdatedPackages?`.
 - **0.4.1-draft** (2026-08-26) — the Import source hands its brief to the assistant, which runs the import; the git-init obligation moves to whatever creates the project (§4.5).
@@ -1303,4 +1312,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_Jx Studio Desktop Architecture Specification v0.4.4-draft_
+_Jx Studio Desktop Architecture Specification v0.4.5-draft_

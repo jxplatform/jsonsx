@@ -9,6 +9,7 @@ import type {
   ExtensionsInfo,
   FsEvent,
   ImportProgressEvent,
+  ImportReadyEvent,
   ImportSiteOptions,
   RecentProjectEntry,
   ReferencesResult,
@@ -47,11 +48,42 @@ import type {
 /* Inferred return type with a `satisfies` conformance check at the bottom, so callers see which of
    the PAL's OPTIONAL members this launcher actually implements — annotating `StudioPlatform` made
    every one of them `| undefined` at the call site, including in this package's own tests. */
+/**
+ * What a caller is told when the socket is not there.
+ *
+ * One sentence, and it says both halves: what failed, and that it is being dealt with. The studio
+ * surfaces it through the ordinary error path every PAL call already has — `files.ts`'s open flow
+ * catches it and shows a notification — so the button that "did nothing" now reports.
+ */
+const DISCONNECTED = "Lost connection to the Jx backend — reconnecting…";
+
+/** Backoff bounds for reconnecting the RPC socket, matching `@jxsuite/collab`'s wire client. */
+const RECONNECT_MIN_MS = 500;
+const RECONNECT_MAX_MS = 30_000;
+
+/**
+ * How long a request may wait for its reply before it is abandoned.
+ *
+ * Matches the electrobun launcher's `maxRequestTime`. Some handlers are genuinely slow — a build, a
+ * dependency install, the XDG folder picker sitting open while somebody decides — so it is minutes
+ * rather than seconds. What it rules out is the state this launcher used to reach: a request that
+ * waits forever, pinning `platformInFlight()` and the idle probe with it.
+ */
+const REQUEST_TIMEOUT_MS = 300_000;
+
+/**
+ * How often the shell pokes the socket while it has nothing to say.
+ *
+ * The project server's idle timeout is 120s and the shell can easily be quiet for longer than that
+ * — an import runs for minutes over a SEPARATE HTTP stream, so the RPC socket sees no traffic at
+ * all while it happens. Comfortably inside the window, so one dropped ping is not a disconnection.
+ */
+const PING_INTERVAL_MS = 30_000;
+
 export function createDesktopPlatform() {
   // The project server gates the WS upgrade on the token. The launcher passes it in the shell URL
   // (?token=…); read it here before the shell strips it from the address bar after boot.
   const token = new URLSearchParams(location.search).get("token") ?? "";
-  const ws = new WebSocket(`ws://${location.host}/?token=${encodeURIComponent(token)}`);
   // The canvas iframe runs the in-iframe runtime, which authenticates its dev-proxy loopback
   // Resolve/server fetches with this same per-process rpcToken (?rpcToken=…). Thread it onto the
   // Canvas URL when present so createProjectServer does not 403 those fetches; keep the bare path
@@ -96,46 +128,144 @@ export function createDesktopPlatform() {
   /** The settings kernel's subscriber, so another window's change reaches this one. */
   let settingsHandler: ((settings: Record<string, string>) => void) | null = null;
 
-  ws.addEventListener("message", (event) => {
-    const msg = JSON.parse(event.data as string) as {
-      id?: number;
-      method?: string;
-      params?: unknown;
-      error?: string;
-      result?: unknown;
-    };
-    if (msg.method) {
-      // Unsolicited: dispatch by name. An unknown method is a newer launcher talking to an older
-      // Shell, which is not an error — it is a message this build has no use for.
-      messages[msg.method]?.(msg.params as never);
-      return;
+  /*
+   * ─── The RPC transport ──────────────────────────────────────────────────────
+   *
+   * This used to be four lines: one socket, a `message` listener, an `open` listener resolving a
+   * `ready` promise, and a `request` that awaited `ready` and called `ws.send`. It had no failure
+   * path at all, and the failure is silent by construction:
+   *
+   * - `ready` resolves once and is never reset, so it goes on resolving after the socket dies;
+   * - `WebSocket.send()` on a CLOSING or CLOSED socket does not throw — per WHATWG it discards the
+   *   data and the browser may log "WebSocket is already in CLOSING or CLOSED state" to the console,
+   *   which is the ENTIRE observable evidence;
+   * - the pending entry can then only be settled by the `message` listener, which will never fire
+   *   again.
+   *
+   * So every call after a disconnection returned a promise that never settled. `openProject()`'s
+   * caller has a `try/catch` and a notification ready for a rejection, and never saw one: the button
+   * did nothing, no toast, no log, and `platformInFlight()` reported `openProject` for the rest of
+   * the session so the idle probe never went idle again. The only recovery was relaunching Studio.
+   *
+   * The socket can die for several ordinary reasons — the server closes it on an unknown window, a
+   * long import occupies the same Bun process for minutes, the OS suspends a backgrounded window —
+   * and none of them needs to be identified to fix this. What the transport owes its callers is that
+   * every request SETTLES: with a reply, with a rejection, or with a timeout. The reconnect and the
+   * keepalive are what make the rejection recoverable rather than terminal.
+   */
+  let ws: WebSocket;
+  let ready: Promise<void>;
+  let reconnectMs = RECONNECT_MIN_MS;
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  let closed = false;
+
+  /** Notified once per disconnection, and again on recovery. Wired by the studio at boot. */
+  let connectionHandler: ((state: { online: boolean; reason?: string }) => void) | null = null;
+
+  /** Fail every in-flight request. A request that cannot be answered must not be left waiting. */
+  function rejectAllPending(reason: string): void {
+    const waiting = [...pending.values()];
+    pending.clear();
+    for (const entry of waiting) {
+      entry.reject(new Error(reason));
     }
-    const p = msg.id === undefined ? undefined : pending.get(msg.id);
-    if (!p) {
-      return;
+  }
+
+  function connect(): void {
+    ws = new WebSocket(`ws://${location.host}/?token=${encodeURIComponent(token)}`);
+    ready = new Promise<void>((resolve) => {
+      ws.addEventListener("open", () => {
+        reconnectMs = RECONNECT_MIN_MS;
+        connectionHandler?.({ online: true });
+        resolve();
+      });
+    });
+
+    ws.addEventListener("message", (event) => {
+      const msg = JSON.parse(event.data as string) as {
+        id?: number;
+        method?: string;
+        params?: unknown;
+        error?: string;
+        result?: unknown;
+      };
+      if (msg.method) {
+        // Unsolicited: dispatch by name. An unknown method is a newer launcher talking to an older
+        // Shell, which is not an error — it is a message this build has no use for.
+        messages[msg.method]?.(msg.params as never);
+        return;
+      }
+      const p = msg.id === undefined ? undefined : pending.get(msg.id);
+      if (!p) {
+        return;
+      }
+      pending.delete(msg.id!);
+      if (msg.error) {
+        p.reject(new Error(msg.error));
+      } else {
+        p.resolve(msg.result);
+      }
+    });
+
+    /* `close` fires for an error too (the error event is always followed by a close), so one
+       handler covers both and there is no way to end up half-disconnected. */
+    ws.addEventListener("close", () => {
+      rejectAllPending(DISCONNECTED);
+      if (closed) {
+        return;
+      }
+      connectionHandler?.({ online: false, reason: DISCONNECTED });
+      reconnectTimer = setTimeout(connect, reconnectMs);
+      reconnectMs = Math.min(reconnectMs * 2, RECONNECT_MAX_MS);
+    });
+  }
+
+  connect();
+
+  /* A keepalive, because the server's idle timeout is the disconnection this shell is least able to
+     predict: the studio can be quiet for minutes at a stretch (an import runs over a separate HTTP
+     stream and touches this socket not at all). `__ping` is answered ahead of the session lookup on
+     the server, so it survives states an ordinary method would not. */
+  const pingTimer = setInterval(() => {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ id: 0, method: "__ping" }));
     }
-    pending.delete(msg.id!);
-    if (msg.error) {
-      p.reject(new Error(msg.error));
-    } else {
-      p.resolve(msg.result);
+  }, PING_INTERVAL_MS);
+  /* The window is going away; stop trying to reconnect to a server that is going with it. */
+  window.addEventListener("pagehide", () => {
+    closed = true;
+    clearInterval(pingTimer);
+    if (reconnectTimer !== null) {
+      clearTimeout(reconnectTimer);
     }
   });
 
-  const ready = new Promise<void>((resolve) => {
-    ws.addEventListener("open", () => resolve());
-  });
-
-  function request(method: string, params?: Record<string, unknown>): Promise<unknown> {
-    return ready.then(
-      () =>
-        new Promise((resolve, reject) => {
-          nextId += 1;
-          const id = nextId;
-          pending.set(id, { reject, resolve });
-          ws.send(JSON.stringify({ id, method, params }));
-        }),
-    );
+  async function request(method: string, params?: Record<string, unknown>): Promise<unknown> {
+    await ready;
+    /* The guard the old transport did not have. `send` on a dead socket is a no-op, so without
+       this the frame vanishes and the caller waits forever for a reply nobody will write. */
+    if (ws.readyState !== WebSocket.OPEN) {
+      throw new Error(DISCONNECTED);
+    }
+    return new Promise((resolve, reject) => {
+      nextId += 1;
+      const id = nextId;
+      const timer = setTimeout(() => {
+        pending.delete(id);
+        reject(new Error(`The backend did not answer "${method}" in time.`));
+      }, REQUEST_TIMEOUT_MS);
+      pending.set(id, {
+        reject: (error) => {
+          clearTimeout(timer);
+          reject(error);
+        },
+        resolve: (value) => {
+          clearTimeout(timer);
+          resolve(value);
+        },
+      });
+      ws.send(JSON.stringify({ id, method, params }));
+    });
   }
 
   /*
@@ -259,6 +389,20 @@ export function createDesktopPlatform() {
       settingsHandler = handler;
       return () => {
         settingsHandler = null;
+      };
+    },
+
+    /**
+     * Report the RPC socket going away and coming back.
+     *
+     * The studio turns this into a notification. Without it a disconnection was invisible: every
+     * call after it returned a promise that never settled, so nothing failed and nothing succeeded,
+     * and the only symptom was a UI that stopped responding to a button.
+     */
+    subscribeConnection(handler: (state: { online: boolean; reason?: string }) => void) {
+      connectionHandler = handler;
+      return () => {
+        connectionHandler = null;
       };
     },
 
@@ -643,6 +787,7 @@ export function createDesktopPlatform() {
       opts: ImportSiteOptions,
       onProgress: (evt: ImportProgressEvent) => void,
       signal?: AbortSignal,
+      onReady?: (evt: ImportReadyEvent) => void,
     ) {
       const { directory } = opts;
       if (!/^(?:[a-zA-Z]:[\\/]|\/)/.test(directory)) {
@@ -653,6 +798,7 @@ export function createDesktopPlatform() {
         { ...opts, directory },
         onProgress,
         signal,
+        onReady,
       );
     },
 

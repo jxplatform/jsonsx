@@ -20,10 +20,12 @@ import type { ImportProgressEvent } from "../types";
  * Lines kept per run.
  *
  * A wide crawl emits one per page plus one per asset batch, and every line is also held in the
- * session's localStorage budget once the tool result lands. The tail is what a reader wants; the
- * head is what the summary is for.
+ * session's localStorage budget once the tool result lands — so there is a ceiling, and it is here.
+ * It was 200 back when the view showed the last SIX of them and the rest existed only to be
+ * summarised; the transcript now renders the whole log in a scroller the reader owns, so the number
+ * that matters is how far back they can scroll.
  */
-export const MAX_LOG_LINES = 200;
+export const MAX_LOG_LINES = 500;
 
 export interface ImportRunRecord {
   /** The tool-call id — the join key with the chip the transcript draws. */

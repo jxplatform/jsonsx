@@ -1523,6 +1523,45 @@ describe("data surface + secrets", () => {
     expect(put!.body).toEqual({ remove: ["OLD"], set: { MAIN_URL: "v" } });
   });
 
+  test("importSite streams the NDJSON endpoint, and hands the ready line straight on", async () => {
+    /* The adapter's whole job here is passing the four callbacks through to `streamImport`. It is
+       worth a test because `onReady` is what lets a caller OPEN the project while the crawl runs,
+       and a signature that quietly drops it would look identical to a backend that never sends the
+       line — the project would simply open minutes later, as it used to. */
+    route(
+      "/__studio/import-site",
+      () =>
+        new Response(
+          '{"type":"ready","root":"cloned"}\n' +
+            '{"type":"progress","phase":"seed","message":"Created it"}\n' +
+            '{"type":"done","root":"cloned","config":{"name":"Cloned"}}\n',
+          { headers: { "Content-Type": "application/x-ndjson" }, status: 200 },
+        ),
+      "POST",
+    );
+    const p = createDevServerPlatform();
+    const ready: string[] = [];
+    const phases: string[] = [];
+    const result = await p.importSite!(
+      {
+        aiComponents: true,
+        depth: 1,
+        directory: "cloned",
+        maxPages: 20,
+        name: "Cloned",
+        url: "https://clone.example/",
+      },
+      (evt) => phases.push(evt.phase),
+      undefined,
+      ({ root }) => ready.push(root),
+    );
+
+    expect(ready).toEqual(["cloned"]);
+    expect(phases).toEqual(["seed"]);
+    expect(result.root).toBe("cloned");
+    expect(callsTo("/__studio/import-site")).toHaveLength(1);
+  });
+
   test("secrets errors surface", async () => {
     route("/__studio/secrets", () => json({ error: "denied" }, 400), "GET");
     route("/__studio/secrets", () => json({ error: "bad name" }, 400), "PUT");

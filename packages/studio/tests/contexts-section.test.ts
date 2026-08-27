@@ -21,15 +21,26 @@ import { projectState } from "../src/store";
 import type { MockPlatformState } from "./harness";
 import type { StudioPlatform } from "../src/types";
 
-/** What the mocked validator returns on the next call. */
-let validatorResult: string[] | Error = [];
+type AnyConfig = Record<string, any>;
 
-const validateProjectConfig = mock(async (_config: unknown): Promise<string[]> => {
+/**
+ * What the mocked validator returns.
+ *
+ * A FUNCTION of the config, because the section validates twice now — the file as it stands and the
+ * file as the edit would leave it — and subtracts the first from the second, so a test that cannot
+ * tell those two calls apart cannot test either half. A bare array answers both, which is exactly
+ * how a pre-existing problem is expressed.
+ */
+let validatorResult: string[] | Error | ((candidate: AnyConfig) => string[]) = [];
+
+const validateProjectConfig = mock(async (candidate: unknown): Promise<string[]> => {
   if (validatorResult instanceof Error) {
     // eslint-disable-next-line no-throw-literal -- validatorResult IS an Error on this branch
     throw validatorResult as Error;
   }
-  return validatorResult;
+  return typeof validatorResult === "function"
+    ? validatorResult(candidate as AnyConfig)
+    : validatorResult;
 });
 void mock.module("../src/services/jx-validate.js", () => ({
   validateProjectConfig,
@@ -40,8 +51,6 @@ void mock.module("../src/services/jx-validate.js", () => ({
 
 const { contextKeyOf, contextKindOf, renderContextsSection, splitContexts } =
   await import("../src/settings/contexts-section");
-
-type AnyConfig = Record<string, any>;
 
 function setup(
   media: Record<string, string> | undefined,
@@ -81,6 +90,11 @@ function addButton(container: HTMLElement, kind: string): HTMLElement {
 function setAndFire(el: Element, value: string): void {
   (el as HTMLInputElement).value = value;
   el.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+/** The base-width field, addressed by the data hook rather than by position. */
+function baseField(container: HTMLElement): Element {
+  return container.querySelector('[data-context="base"]')!;
 }
 
 function errorTexts(container: HTMLElement): string[] {
@@ -319,13 +333,46 @@ describe("refusals", () => {
 
 describe("validation", () => {
   test("a schema refusal blocks the write and is shown at the row that caused it", async () => {
-    validatorResult = ["/$media/--sm: must match pattern"];
+    // Clean before, broken after: an error THIS edit introduced.
+    validatorResult = (candidate) =>
+      candidate.$media?.["--sm"] === "nonsense" ? ["/$media/--sm: must match pattern"] : [];
     const { container, state } = setup({ "--sm": "(max-width: 600px)" });
     setAndFire(group(container, "size").querySelector(".settings-media-value")!, "nonsense");
     await flush(6);
     expect(errorTexts(container)).toContain("/$media/--sm: must match pattern");
     expect(config().$media["--sm"]).toBe("(max-width: 600px)");
     expect(state.calls.filter(([name]) => name === "writeFile")).toHaveLength(0);
+  });
+
+  test("a problem the file already had does not block an unrelated edit", async () => {
+    /*
+     * This is what an imported project looked like. Its `project.json` carried three top-level keys
+     * the composed schema does not allow, so every Contexts edit was refused with three copies of
+     * "(root): must NOT have unevaluated properties" parked under whichever control was touched —
+     * typing a base width reported an error about `title`. The candidate is the whole file, so the
+     * baseline has to be subtracted or the section can only ever be used on a perfect one.
+     */
+    validatorResult = ["(root): must NOT have unevaluated properties (title)"];
+    const { container, state } = setup({ "--sm": "(max-width: 600px)" });
+    setAndFire(baseField(container), "1280px");
+    await flush(6);
+
+    expect(config().$media["--"]).toBe("1280px");
+    expect(state.calls.filter(([name]) => name === "writeFile").length).toBeGreaterThan(0);
+  });
+
+  test("but the file's own problem is still reported, once, at section level", async () => {
+    validatorResult = ["(root): must NOT have unevaluated properties (title)"];
+    const { container } = setup({ "--sm": "(max-width: 600px)" });
+    setAndFire(baseField(container), "1280px");
+    await flush(6);
+
+    const notice = container.querySelector(".settings-section-notice")?.textContent ?? "";
+    expect(notice).toContain("pre-existing schema");
+    // And it NAMES the key, which is the whole difference between a diagnosis and a mystery.
+    expect(notice).toContain("(title)");
+    // Not under the control the author touched — it is not that control's fault.
+    expect(errorTexts(container)).toEqual([]);
   });
 
   test("a validator that will not compile reports itself and blocks nothing else", async () => {

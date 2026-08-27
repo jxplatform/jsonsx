@@ -55,6 +55,7 @@ export type EditorKind =
   | "library"
   | "config"
   | "entry"
+  | "media"
   | "none";
 
 /** The Canvas view axis — one control, three values (§4.2). */
@@ -87,6 +88,10 @@ const EDITOR_KIND_BY_MODE: Readonly<Record<string, EditorKind>> = {
   "git-diff": "diff",
   grid: "grid",
   manage: "library",
+  /* The Media viewer — `media/media-pane.ts`. An image, a video, a font specimen: files the studio
+     can SHOW but has no document model for, which is why clicking one used to end in "No format
+     class imported for …", advice that means nothing about a PNG. */
+  media: "media",
   preview: "canvas",
   /* Project Settings — `settings/settings-document.ts`'s SETTINGS_MODE. A form over `project.json`,
      which is a configuration object and not a document tree; `stylebook` (Project Styles) is the
@@ -117,6 +122,7 @@ export const EDITOR_KIND_LABELS: Readonly<Record<EditorKind, string>> = {
   diff: "Diff",
   entry: "Entry",
   grid: "Grid",
+  media: "Media",
   library: "Library",
   none: "None",
 };

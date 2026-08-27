@@ -6,6 +6,7 @@
  */
 
 import type { Page } from "puppeteer-core";
+import { SRCSET_SEPARATOR } from "./srcset.ts";
 
 export interface DiscoveredAsset {
   /** Absolute URL of the asset. */
@@ -46,7 +47,12 @@ export interface AssetCollectionResult {
  * page.evaluate() — no per-element round-trips.
  */
 export async function collectAssets(page: Page): Promise<AssetCollectionResult> {
-  const result = await page.evaluate(() => {
+  /*
+   * The separator crosses into the page as a SOURCE STRING: an evaluated body is serialised and
+   * re-parsed in the browser, so it cannot close over a value declared out here.
+   */
+  const result = await page.evaluate((srcsetSeparator: string) => {
+    const separator = new RegExp(srcsetSeparator);
     const assets: { url: string; source: string }[] = [];
     const seen = new Set<string>();
     let inlineSvgCount = 0;
@@ -73,7 +79,7 @@ export async function collectAssets(page: Page): Promise<AssetCollectionResult> 
 
     function parseSrcset(srcset: string): string[] {
       return srcset
-        .split(",")
+        .split(separator)
         .map((entry) => entry.trim().split(/\s+/)[0] ?? "")
         .filter(Boolean);
     }
@@ -193,7 +199,7 @@ export async function collectAssets(page: Page): Promise<AssetCollectionResult> 
       inlineSvgCount: number;
       stylesheets: { href: string | null; cssText: string | null; fontFaceRules: string[] }[];
     };
-  });
+  }, SRCSET_SEPARATOR.source);
 
   // R2: For cross-origin sheets we couldn't access (cssText=null, has href), fetch them
   // In-browser to get @font-face rules (e.g. Google Fonts loaded via <link>)

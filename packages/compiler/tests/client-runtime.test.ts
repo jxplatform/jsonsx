@@ -12,6 +12,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   CLIENT_RUNTIME_MODULES,
+  importMapAssets,
+  importMapAssetsInHtml,
   isPrefixSpecifier,
   renderImportMap,
   resolveClientRuntime,
@@ -126,6 +128,75 @@ describe("renderImportMap", () => {
 
   test("escapes a URL that would otherwise break the JSON", () => {
     expect(renderImportMap({ x: 'a"b' })).toContain(String.raw`"a\"b"`);
+  });
+});
+
+/*
+ * Issue #227: the build promised files it never wrote. The set that gates bundling was populated
+ * at ONE of the several places a page can acquire an import map, so a project with interactivity
+ * but no components shipped a map naming `/assets/vue-reactivity.js` with no `dist/assets/` at
+ * all — 404, blank page, build reports success. Reading the set back out of the finished HTML is
+ * what makes the promise and the output the same thing.
+ */
+describe("importMapAssets", () => {
+  test("keeps the exact keys the build must write", () => {
+    expect(importMapAssets(resolveClientRuntime().imports)).toEqual([
+      "/assets/vue-reactivity.js",
+      "/assets/lit-html.js",
+    ]);
+  });
+
+  test("drops prefix keys — a directory is not a file any build writes", () => {
+    expect(
+      importMapAssets({ "lit-html": "/assets/lit-html.js", "lit-html/": "/assets/lit-html/" }),
+    ).toEqual(["/assets/lit-html.js"]);
+  });
+
+  test("drops a CDN fallback — that module belongs to somebody else", () => {
+    expect(importMapAssets({ "lit-html": "https://esm.sh/lit-html@3.3.0" })).toEqual([]);
+  });
+});
+
+describe("importMapAssetsInHtml", () => {
+  test("finds what a rendered map names", () => {
+    const html = `<head>${renderImportMap(resolveClientRuntime().imports)}</head>`;
+
+    expect(importMapAssetsInHtml(html)).toEqual([
+      "/assets/vue-reactivity.js",
+      "/assets/lit-html.js",
+    ]);
+  });
+
+  /*
+   * The page-template tiers write their map by hand rather than through `renderImportMap`, with
+   * two exact keys and no prefixes — and that is the shape the component-less project shipped.
+   */
+  test("finds what a hand-written template map names", () => {
+    const html = `<script type="importmap">
+  {
+    "imports": {
+      "@vue/reactivity": "/assets/vue-reactivity.js",
+      "lit-html": "/assets/lit-html.js"
+    }
+  }
+  </script>`;
+
+    expect(importMapAssetsInHtml(html)).toEqual([
+      "/assets/vue-reactivity.js",
+      "/assets/lit-html.js",
+    ]);
+  });
+
+  test("finds nothing in a page that ships no map", () => {
+    expect(importMapAssetsInHtml("<html><body>static</body></html>")).toEqual([]);
+  });
+
+  test("ignores a map it cannot parse rather than throwing mid-build", () => {
+    expect(importMapAssetsInHtml('<script type="importmap">{ not json </script>')).toEqual([]);
+    expect(importMapAssetsInHtml('<script type="importmap">{"imports":null}</script>')).toEqual([]);
+    expect(importMapAssetsInHtml('<script type="importmap">{"imports":{"a":7}}</script>')).toEqual(
+      [],
+    );
   });
 });
 

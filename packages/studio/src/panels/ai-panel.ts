@@ -37,6 +37,7 @@ import { hasAiCredentials } from "../services/ai-models";
 import { answerAsk, isAwaitingAnswer, pendingAsk, skipAsk } from "../services/ai-ask";
 import { activeImportRun, importRun } from "../services/import-run";
 import type { ImportBrief } from "../services/import-seed";
+import type { ImportBreakpointPolicy } from "../types";
 import { openPreferences } from "../settings/preferences-dialog";
 import { onCredentialsChanged } from "../settings/preferences-accounts";
 import { setDockCollapsed } from "../shell";
@@ -324,6 +325,17 @@ export async function revealImportHandoff(brief: ImportBrief): Promise<void> {
  * @param {ImportBrief} brief
  * @returns {string}
  */
+/** The breakpoint policy in a sentence the model can act on rather than a JSON blob. */
+function describeBreakpoints(policy: ImportBreakpointPolicy): string {
+  if (policy.mode === "all") {
+    return "keep every one the site declares";
+  }
+  if (policy.mode === "explicit") {
+    return `${(policy.widths ?? []).join(", ")} (rounding ${policy.rounding ?? "nearest"})`;
+  }
+  return `keep ${policy.count ?? 3}, evenly spaced (rounding ${policy.rounding ?? "nearest"})`;
+}
+
 export function buildImportTurn(brief: ImportBrief): string {
   const body = brief.prompt.trim() || `Import ${brief.url} and get it ready for me to work on.`;
   return buildMessageWithContext(body, [
@@ -331,7 +343,8 @@ export function buildImportTurn(brief: ImportBrief): string {
       detail:
         `Import request from the New Project form — url: ${brief.url}, ` +
         `destination: ${brief.directory}, depth: ${brief.depth}, ` +
-        `max pages: ${brief.maxPages}, AI component naming: ${brief.aiComponents}. ` +
+        `max pages: ${brief.maxPages}, AI component naming: ${brief.aiComponents}, ` +
+        `breakpoints: ${describeBreakpoints(brief.breakpoints)}. ` +
         "Call import_site with the url; the destination and options above are already settled.",
       kind: "import",
       label: `Import ${brief.url}`,

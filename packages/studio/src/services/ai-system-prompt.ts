@@ -95,10 +95,12 @@ export const AI_TOOL_TIERS: AiToolInfo[] = [
     tier: "no-project",
     capability: "importSite",
     blurb:
-      "import_site(url, directory?, depth?, maxPages?, aiComponents?) — clone a live website into " +
-      "a new Jx project and open it: pages, styles, assets, a shared layout and recurring " +
-      "components. When the user came through the New Project Import form the destination and " +
-      "options are already settled — pass the url alone.",
+      "import_site(url, directory?, depth?, maxPages?, aiComponents?, maxBreakpoints?, " +
+      "breakpointWidths?, breakpointRounding?) — clone a live website into a new Jx project and " +
+      "open it: pages, styles, assets, a shared layout and recurring components. The project opens " +
+      "as soon as the destination exists, so the user watches it fill up while the crawl runs. " +
+      "When the user came through the New Project Import form the destination and options are " +
+      "already settled — pass the url alone.",
   },
   {
     name: "create_project",

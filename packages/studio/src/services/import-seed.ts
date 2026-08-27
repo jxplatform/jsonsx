@@ -16,6 +16,8 @@
  * @license MIT
  */
 
+import type { ImportBreakpointPolicy } from "../types";
+
 /** What the wizard gathered, as the tool needs it. */
 export interface ImportBrief {
   /** Absolute http(s) URL of the site to clone. */
@@ -26,9 +28,24 @@ export interface ImportBrief {
   directory: string;
   depth: number;
   maxPages: number;
+  /**
+   * How many of the site's declared breakpoints the project keeps.
+   *
+   * A real site declares as many as it has accumulated frameworks — nine is ordinary — and each one
+   * is a canvas size in Studio and a column in every style editor. The wizard defaults this to
+   * three because that is the complaint it answers, not because three is a magic number.
+   */
+  breakpoints: ImportBreakpointPolicy;
   aiComponents: boolean;
   /** Build and screenshot-diff the result. Off by default — it roughly doubles the run. */
   verify: boolean;
+  /**
+   * The average fidelity, 0..100, the clone has to reach for `verify` to report success.
+   *
+   * Only meaningful when `verify` is on. A finding rather than a failure here: the project is
+   * written and opened either way, and the assistant says the bar was missed.
+   */
+  minFidelity: number;
   /** Empty means "whatever the assistant would use" (`preferredModel()`). */
   model: string;
   /** What the user wants done with the site once it is cloned. May be empty. */

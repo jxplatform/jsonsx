@@ -21,7 +21,7 @@ import coreDocumentSchema from "@jxsuite/schema/schema.json";
 import coreProjectSchema from "@jxsuite/schema/project-schema.json";
 
 type ValidateFn = ((doc: unknown) => boolean) & {
-  errors?: { instancePath?: string; message?: string }[] | null;
+  errors?: { instancePath?: string; message?: string; params?: Record<string, unknown> }[] | null;
 };
 
 /** Which of the two entry documents a validator covers. */
@@ -108,6 +108,17 @@ export function resetProjectSchemas(): void {
 }
 
 /**
+ * The keys ajv uses to name the property an error is ABOUT, in the order they can appear.
+ *
+ * `message` alone is not a diagnosis for any of these three. "must NOT have unevaluated properties"
+ * says a key is unrecognised without saying which key — and at the root of a `project.json` that is
+ * the difference between a fixable problem and a mystery. An imported project once produced that
+ * line three times over, naming nothing, and the only way to learn it meant `title`, `description`
+ * and `$style` was to compile the schema by hand.
+ */
+const ERROR_PROPERTY_KEYS = ["unevaluatedProperty", "additionalProperty", "missingProperty"];
+
+/**
  * Format ajv errors the way the agent loop consumes them (see ai-tools.ts
  * `translateValidationError`).
  *
@@ -115,7 +126,11 @@ export function resetProjectSchemas(): void {
  * @returns {string[]} One formatted string per error
  */
 function formatErrors(validate: ValidateFn): string[] {
-  return (validate.errors || []).map((e) => `${e.instancePath || "(root)"}: ${e.message}`);
+  return (validate.errors || []).map((e) => {
+    const key = ERROR_PROPERTY_KEYS.find((name) => typeof e.params?.[name] === "string");
+    const property = key ? ` (${String(e.params?.[key])})` : "";
+    return `${e.instancePath || "(root)"}: ${e.message}${property}`;
+  });
 }
 
 /**

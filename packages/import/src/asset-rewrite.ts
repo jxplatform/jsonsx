@@ -6,6 +6,7 @@
  */
 
 import type { JxElement, JxStyle } from "@jxsuite/schema/types";
+import { SRCSET_SEPARATOR } from "./srcset.ts";
 
 /** Rewrite all asset URLs in a Jx tree in-place. Returns the count of rewrites performed. */
 export function rewriteAssetUrls(
@@ -46,9 +47,14 @@ export function rewriteAssetUrls(
     return null;
   }
 
+  /*
+   * Split by the same rule the collector downloads by (`SRCSET_SEPARATOR`). If the two disagreed,
+   * the importer would fetch one set of URLs and rewrite another — the attribute would be
+   * reassembled around fragments nothing had downloaded.
+   */
   function rewriteSrcset(srcset: string): string {
     return srcset
-      .split(",")
+      .split(SRCSET_SEPARATOR)
       .map((entry) => {
         const parts = entry.trim().split(/\s+/);
         const [url = ""] = parts;

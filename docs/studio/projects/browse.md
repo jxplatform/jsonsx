@@ -60,6 +60,8 @@ The Library renders what fits the window, not what is in the project: a 300-page
 
 Click any item to open it in a tab. Right-click for **Open**, **Rename…**, **Duplicate** and **Delete**. A duplicate lands beside the original with `-copy` on its name.
 
+A media tile opens in the **[Media viewer](/docs/studio/projects/media#open-a-media-file)**: the picture at full size, with its dimensions, the reference a document writes for it, and the pages that use it.
+
 Rename and delete go through the same confirmations as the Files panel, and they carry the same counts: a rename tells you how many references Studio will rewrite for you, and a delete tells you how many stop resolving. See **[Before you delete or rename](/docs/studio/projects/pages-layouts-components#before-you-delete-or-rename)**.
 
 ## Create something

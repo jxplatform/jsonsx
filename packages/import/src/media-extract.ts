@@ -1,110 +1,86 @@
 /**
- * Extract @media breakpoints from captured CSS and orchestrate style re-capture at each breakpoint
- * width to produce per-node $media style deltas.
+ * Extract `@media` breakpoints from captured CSS and orchestrate style re-capture at each kept
+ * breakpoint width to produce per-node `$media` style deltas.
+ *
+ * The set of breakpoints a project keeps is decided in `breakpoint-plan.ts`, BEFORE anything is
+ * re-captured — each kept breakpoint costs a viewport change and a full style walk, so a limited
+ * import does less work rather than merely emitting less.
+ *
+ * A folded-away width is not sampled at all, and does not need to be. The computed style at a kept
+ * width is already the site's own cascade resolved AT that width, folded rules included; merging a
+ * separately-sampled delta on top of it could only disagree with the browser. The fold map exists
+ * so the import can SAY where a width went, not so its styles can be recovered.
  */
 
 import type { Page } from "puppeteer-core";
 import type { CapturedStyle } from "./style-capture.ts";
 import { captureStylesAtWidth } from "./style-capture.ts";
 import { computeMediaDelta } from "./style-diff.ts";
+import { analyzeMediaQueries, planBreakpoints } from "./breakpoint-plan.ts";
+import type { Breakpoint, BreakpointPolicy } from "./breakpoint-plan.ts";
 import type { DiffedStyle } from "./style-diff.ts";
 
-export interface Breakpoint {
-  /** Jx breakpoint name, e.g. "--md" */
-  name: string;
-  /** CSS media query string, e.g. "(max-width: 768px)" */
-  query: string;
-  /** The width in px to test this breakpoint at */
-  testWidth: number;
-}
+/* The query analysis is pure and lives with the planner; it is re-exported here because this is the
+   module a caller reaches for when it is thinking about media. */
+export { analyzeMediaQueries, skippedWidthQueries } from "./breakpoint-plan.ts";
+export type {
+  Breakpoint,
+  BreakpointPolicy,
+  BreakpointPlanResult,
+  BreakpointRounding,
+} from "./breakpoint-plan.ts";
 
 export interface MediaExtractionResult {
-  /** Breakpoints to add to project.json.$media */
+  /** Breakpoints to add to `project.json`'s `$media`. */
   breakpoints: Record<string, string>;
-  /** Per-breakpoint style deltas keyed by breakpoint name */
+  /** Per-breakpoint style deltas keyed by breakpoint name. */
   deltas: Record<string, DiffedStyle[]>;
 }
 
-/**
- * Parse a media query string and extract a pixel width if it's a simple min-width or max-width
- * query. Returns null for complex/non-size queries.
- */
-function parseWidthQuery(query: string): { type: "min" | "max"; width: number } | null {
-  const minMatch = query.match(/^\s*\(\s*min-width\s*:\s*([\d.]+)px\s*\)\s*$/);
-  if (minMatch) {
-    return { type: "min", width: Number(minMatch[1]) };
-  }
-  const maxMatch = query.match(/^\s*\(\s*max-width\s*:\s*([\d.]+)px\s*\)\s*$/);
-  if (maxMatch) {
-    return { type: "max", width: Number(maxMatch[1]) };
-  }
-  return null;
-}
-
-/** Generate a Jx breakpoint name from a width, e.g. 768 → "--768" */
-function breakpointName(width: number): string {
-  return `--${width}`;
+export interface ExtractMediaOptions {
+  /** The base viewport width to restore after extraction. */
+  originalWidth?: number;
+  /** Which of the discovered breakpoints to keep (default: the three-breakpoint limit). */
+  policy?: BreakpointPolicy | undefined;
+  /**
+   * An already-decided plan, used verbatim instead of planning from this page's own queries.
+   *
+   * A crawl needs this. Planning per page would let page 2 keep a width page 1 folded away, so the
+   * project's `$media` would be the UNION of several plans — the very thing a limit is for — and
+   * the breakpoint names a node carries would depend on which page it came from. One plan, decided
+   * on the first page that declares any width, is what keeps the names meaning one thing.
+   */
+  plan?: readonly Breakpoint[] | undefined;
 }
 
 /**
- * Analyze discovered @media queries and produce a set of testable breakpoints. Only picks up simple
- * min-width / max-width queries — complex queries (orientation, hover, prefers-*) are logged and
- * skipped.
- */
-export function analyzeMediaQueries(queries: string[]): Breakpoint[] {
-  const seen = new Set<number>();
-  const breakpoints: Breakpoint[] = [];
-
-  for (const query of queries) {
-    const parsed = parseWidthQuery(query);
-    if (!parsed) {
-      continue;
-    }
-    if (seen.has(parsed.width)) {
-      continue;
-    }
-    seen.add(parsed.width);
-
-    // For max-width: test AT that width (it's the upper bound)
-    // For min-width: test AT that width (it's the lower bound — styles kick in here)
-    breakpoints.push({
-      name: breakpointName(parsed.width),
-      query,
-      testWidth: parsed.width,
-    });
-  }
-
-  // Sort by width ascending
-  breakpoints.sort((a, b) => a.testWidth - b.testWidth);
-  return breakpoints;
-}
-
-/**
- * Extract $media style deltas by re-capturing at each breakpoint width.
+ * Extract `$media` style deltas by re-capturing at each KEPT breakpoint width.
  *
- * @param page - Puppeteer page (must still have the target page loaded)
- * @param baseElements - Style capture from the base viewport (1440px)
- * @param uaDefaults - UA-default baselines per tagName
- * @param mediaQueries - @media queries discovered in the page's stylesheets
- * @param originalWidth - The base viewport width to restore after extraction
+ * @param {Page} page - Puppeteer page (must still have the target page loaded)
+ * @param {CapturedStyle[]} baseElements - Style capture from the base viewport
+ * @param {Record<string, Record<string, string>>} uaDefaults - UA-default baselines per tagName
+ * @param {readonly string[]} mediaQueries - `@media` queries discovered in the page's stylesheets
+ * @param {ExtractMediaOptions} [options]
+ * @returns {Promise<MediaExtractionResult>}
  */
 export async function extractMedia(
   page: Page,
   baseElements: CapturedStyle[],
   uaDefaults: Record<string, Record<string, string>>,
-  mediaQueries: string[],
-  originalWidth = 1440,
+  mediaQueries: readonly string[],
+  options: ExtractMediaOptions = {},
 ): Promise<MediaExtractionResult> {
-  const breakpoints = analyzeMediaQueries(mediaQueries);
+  const { originalWidth = 1440, plan, policy } = options;
+  const keep = plan ?? planBreakpoints(analyzeMediaQueries(mediaQueries), policy).keep;
 
-  if (breakpoints.length === 0) {
+  if (keep.length === 0) {
     return { breakpoints: {}, deltas: {} };
   }
 
   const projectBreakpoints: Record<string, string> = {};
   const allDeltas: Record<string, DiffedStyle[]> = {};
 
-  for (const bp of breakpoints) {
+  for (const bp of keep) {
     const bpElements = await captureStylesAtWidth(page, bp.testWidth);
     const deltas = computeMediaDelta(baseElements, bpElements, uaDefaults);
 

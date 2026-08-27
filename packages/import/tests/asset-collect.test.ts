@@ -147,6 +147,24 @@ describe("collectAssets - DOM discovery", () => {
     expect(sheet.fontFaceRules[0]).toContain("/fonts/x.woff2");
   });
 
+  /*
+   * Issue #231: `srcset` was split on every comma, so a Wix/Cloudinary/imgix URL — which encodes
+   * its image transform as `w_375,h_127,al_c,q_85` inside the path — became a dozen fragments,
+   * every one of which failed to fetch. A failed download leaves the reference untouched, so the
+   * emitted page went on serving those images from the host it had just cloned.
+   */
+  it("collects a transform-CDN srcset as whole URLs", async () => {
+    const narrow =
+      "https://static.wixstatic.com/media/X~mv2.png/v1/fill/w_375,h_127,al_c,q_85/logo.png";
+    const wide =
+      "https://static.wixstatic.com/media/X~mv2.png/v1/fill/w_750,h_254,al_c,q_85/logo.png";
+    setDom("", `<img srcset="${narrow} 1x, ${wide} 2x">`);
+
+    const result = await collectAssets(fakePage);
+
+    expect(result.assets.map((a) => a.url)).toEqual([narrow, wide]);
+  });
+
   it("returns empty results for a bare page", async () => {
     setDom("", "<p>nothing here</p>");
     const result = await collectAssets(fakePage);

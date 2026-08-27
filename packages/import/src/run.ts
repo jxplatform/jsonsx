@@ -5,13 +5,21 @@
  */
 
 import { existsSync, readdirSync } from "node:fs";
-import { isAbsolute } from "node:path";
+import { isAbsolute, join } from "node:path";
+import { mkdir } from "node:fs/promises";
 import { capturePage, closeBrowser, launchBrowser } from "./capture.ts";
 import { convertToJx } from "./to-jx.ts";
 import { emitMultiPageProject } from "./emit.ts";
 import { captureStyles } from "./style-capture.ts";
-import { diffAllStyles, kebabToCamel } from "./style-diff.ts";
 import { extractMedia } from "./media-extract.ts";
+import {
+  DEFAULT_BREAKPOINT_POLICY,
+  analyzeMediaQueries,
+  planBreakpoints,
+  skippedWidthQueries,
+} from "./breakpoint-plan.ts";
+import type { BreakpointPolicy } from "./breakpoint-plan.ts";
+import { diffAllStyles, kebabToCamel } from "./style-diff.ts";
 import { applyStylesToTree } from "./apply-styles.ts";
 import { collectAssets } from "./asset-collect.ts";
 import { downloadAssets } from "./asset-download.ts";
@@ -34,6 +42,14 @@ export interface ImportSiteOptions {
   maxPages?: number;
   /** Skip styles/assets for pages above this node count (default 5000). */
   maxNodesPerPage?: number;
+  /**
+   * Which of the site's declared breakpoints the project keeps (default: three, evenly spaced).
+   *
+   * A real site declares as many breakpoints as it has accumulated frameworks; nine `$media`
+   * entries is nine canvas sizes in Studio and nine columns in every style editor, and nobody
+   * authors against that. See `breakpoint-plan.ts`.
+   */
+  breakpoints?: BreakpointPolicy;
   /** Capture computed styles (default true). */
   styles?: boolean;
   /** Download and rewrite assets (default true). */
@@ -46,8 +62,14 @@ export interface ImportSiteOptions {
   componentize?: false | { minInstances?: number; minDepth?: number };
   /** LLM refinement of component/prop names; false/undefined to skip. */
   ai?: false | { apiKey: string; baseUrl?: string | undefined; model?: string | undefined };
-  /** Build + screenshot-diff the emitted project against the original; false to skip. */
-  verify?: false | { threshold?: number };
+  /**
+   * Build + screenshot-diff the emitted project against the original; false to skip.
+   *
+   * `threshold` is pixelmatch's per-pixel COLOUR tolerance, not a bar; `minFidelity` is the bar,
+   * and the run reports `passed` against it. `fullPage` compares the whole scrollable page (default
+   * true) rather than the first viewport.
+   */
+  verify?: false | { threshold?: number; minFidelity?: number; fullPage?: boolean | undefined };
   /** Explicit browser binary (wins over CHROME_PATH and PATH discovery). */
   chromePath?: string;
   /** Aborts between phases (and between crawled pages). */
@@ -55,6 +77,7 @@ export interface ImportSiteOptions {
 }
 
 export type ImportPhase =
+  | "seed"
   | "launch"
   | "capture"
   | "crawl"
@@ -72,6 +95,14 @@ export interface ImportProgressEvent {
   message: string;
   current?: number;
   total?: number;
+  /**
+   * The project root, on the `seed` event alone.
+   *
+   * The destination exists and holds a valid `project.json` from that moment, which is what lets a
+   * host OPEN it and watch the rest of the run land in its own file tree — rather than staring at a
+   * welcome screen for the several minutes a crawl takes.
+   */
+  root?: string;
 }
 
 export interface ImportSiteResult {
@@ -82,15 +113,55 @@ export interface ImportSiteResult {
     averageFidelity: number;
     reportDir: string;
     /**
+     * Whether the run met its bar — it built cleanly, every page rendered, and the average reached
+     * `minFidelity`. Nothing about verify could fail before this existed: a clone scoring 8%
+     * finished exactly like one scoring 95% (issue #232).
+     */
+    passed: boolean;
+    /** The bar `passed` was measured against. */
+    minFidelity: number;
+    /** Errors the compiler reported building the project — recorded, and now also enforced. */
+    buildErrors: string[];
+    /**
      * Per page, because the average cannot name one.
      *
      * "Average fidelity 84%" is a fact nobody can act on; "the pricing page renders at 61%" is a
      * decision — retry it, patch it by hand, or accept it. The verifier computed both and only the
      * average was reported, so the actionable half was thrown away one level below the caller.
+     *
+     * The counts alongside it are what a percentage cannot say: a page that 404s on fifteen images
+     * scores badly, and only `failedRequests` says why.
      */
-    pages: { route: string; fidelity: number; error?: string }[];
+    pages: {
+      route: string;
+      fidelity: number;
+      consoleErrors: number;
+      failedRequests: number;
+      error?: string;
+    }[];
   } | null;
   warnings: string[];
+}
+
+/**
+ * The viewport the base capture runs at, and therefore the project's base width.
+ *
+ * It is `capture.ts`'s own default; naming it here is what lets the emitted `$media` carry a `"--"`
+ * base entry that agrees with the styles actually sampled. Without one, Studio's canvas falls back
+ * to 320px — narrower than every breakpoint an import discovers.
+ */
+const CAPTURE_WIDTH = 1440;
+
+/** The one file the seed writes, and the only thing the empty-directory guard tolerates. */
+const PROJECT_FILE = "project.json";
+
+/** A placeholder project name from the URL, replaced by the page title at emit. */
+function seedName(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "") || "Imported Site";
+  } catch {
+    return "Imported Site";
+  }
 }
 
 function throwIfAborted(signal?: AbortSignal): void {
@@ -165,6 +236,7 @@ export async function importSite(
     verify = false,
     chromePath,
     signal,
+    breakpoints: breakpointPolicy = DEFAULT_BREAKPOINT_POLICY,
   } = options;
 
   if (!url.startsWith("http://") && !url.startsWith("https://")) {
@@ -173,7 +245,11 @@ export async function importSite(
   if (!isAbsolute(outDir)) {
     throw new Error(`outDir must be an absolute path, got "${outDir}"`);
   }
-  if (existsSync(outDir) && readdirSync(outDir).length > 0) {
+  /* The guard admits the run's OWN seed and nothing else. It has to: the destination is created and
+     given a `project.json` before the browser launches, so a host can open the project and watch the
+     rest of the run arrive in its file tree — and a guard that could not tell that seed from a
+     stranger's files would refuse every import at its second statement. */
+  if (existsSync(outDir) && readdirSync(outDir).some((entry) => entry !== PROJECT_FILE)) {
     throw new Error(`Directory "${outDir}" is not empty`);
   }
 
@@ -190,14 +266,36 @@ export async function importSite(
     progress(phase, `⚠ ${message}`);
   };
   const verifyThreshold = verify === false ? 0.15 : (verify.threshold ?? 0.15);
+  const verifyMinFidelity = verify === false ? 0 : (verify.minFidelity ?? 0);
+  const verifyFullPage = verify === false ? true : (verify.fullPage ?? true);
 
   try {
+    await seedProject();
     if (maxDepth === 0) {
       return await runSinglePage();
     }
     return await runCrawl();
   } finally {
     await closeBrowser();
+  }
+
+  /**
+   * Create the destination and give it a `project.json` valid enough to open.
+   *
+   * The emit phase rewrites this file completely, so nothing here is a guess at what the import
+   * will find — it is the minimum that makes the directory a PROJECT, so the caller can open it now
+   * instead of at the end. Everything a crawl writes then lands in a file tree somebody is
+   * watching.
+   */
+  async function seedProject(): Promise<void> {
+    await mkdir(outDir, { recursive: true });
+    const seed = { name: seedName(url), imports: {}, images: { optimize: false } };
+    await Bun.write(join(outDir, PROJECT_FILE), `${JSON.stringify(seed, null, 2)}\n`);
+    onProgress?.({
+      message: `Created ${outDir}`,
+      phase: "seed",
+      root: outDir,
+    });
   }
 
   // ─── Single-page mode: Phase 0-2 pipeline, no crawl overhead ────────────────
@@ -261,11 +359,13 @@ export async function importSite(
           "styles",
           `Extracting @media breakpoints (${styleResult.mediaQueries.length} queries found)...`,
         );
+        reportBreakpointPlan(styleResult.mediaQueries);
         const media = await extractMedia(
           capture.page,
           styleResult.elements,
           styleResult.uaDefaults,
           styleResult.mediaQueries,
+          { policy: breakpointPolicy },
         );
         const bpCount = Object.keys(media.breakpoints).length;
         if (bpCount > 0) {
@@ -349,7 +449,12 @@ export async function importSite(
     if (verify !== false) {
       progress("verify", "Capturing reference screenshot...");
       const { captureReferenceScreenshot } = await import("./verify.ts");
-      referenceScreenshot = await captureReferenceScreenshot(capture.page);
+      referenceScreenshot = await captureReferenceScreenshot(
+        capture.page,
+        undefined,
+        undefined,
+        verifyFullPage,
+      );
     }
 
     await capture.page.close();
@@ -365,19 +470,20 @@ export async function importSite(
 
     throwIfAborted(signal);
     progress("emit", "Writing project...");
-    const { files } = await emitMultiPageProject({
+    const { files, classesStripped } = await emitMultiPageProject({
       outDir,
       title: capture.title,
       pages: pageMap,
       sourceUrl: url,
       breakpoints,
+      baseWidth: CAPTURE_WIDTH,
       componentizeOptions: precomputedComponents ? false : componentizeOptions,
       precomputedComponents,
       fontFaceRules,
       fontRewriteMap,
       styleTokens,
     });
-    progress("emit", `Wrote ${files.length} files`);
+    reportEmit(files.length, classesStripped);
 
     let verifySummary: ImportSiteResult["verify"] = null;
     if (verify !== false && referenceScreenshot) {
@@ -414,6 +520,9 @@ export async function importSite(
       respectRobots,
       noScroll: !scroll,
       captureScreenshots: verify !== false,
+      // The reference and the render must be framed the same way, or the diff pads one of them.
+      fullPageScreenshots: verifyFullPage,
+      breakpoints: breakpointPolicy,
       onProgress: (msg) => progress("crawl", msg.trim()),
       ...(signal === undefined ? {} : { signal }),
     });
@@ -467,20 +576,21 @@ export async function importSite(
     throwIfAborted(signal);
     progress("emit", "Writing project...");
     const title = result.pages[0]?.title || new URL(url).hostname;
-    const { files } = await emitMultiPageProject({
+    const { files, classesStripped } = await emitMultiPageProject({
       outDir,
       title,
       sourceUrl: url,
       pages: pageMap,
       layout,
       breakpoints: result.breakpoints,
+      baseWidth: CAPTURE_WIDTH,
       componentizeOptions: precomputedComponents ? false : componentizeOptions,
       precomputedComponents,
       fontFaceRules: result.fontFaceRules.length > 0 ? result.fontFaceRules : undefined,
       fontRewriteMap: result.fontRewriteMap.size > 0 ? result.fontRewriteMap : undefined,
       styleTokens: result.styleTokens,
     });
-    progress("emit", `Wrote ${files.length} files`);
+    reportEmit(files.length, classesStripped);
 
     let verifySummary: ImportSiteResult["verify"] = null;
     if (verify !== false) {
@@ -511,6 +621,60 @@ export async function importSite(
     };
   }
 
+  /** One emit line, naming what the strip pass removed — silence would read as "nothing to do". */
+  function reportEmit(fileCount: number, classesStripped: number): void {
+    const classes =
+      classesStripped > 0
+        ? `, stripped ${classesStripped} source class name${classesStripped === 1 ? "" : "s"}`
+        : "";
+    progress("emit", `Wrote ${fileCount} files${classes}`);
+  }
+
+  /**
+   * Say which breakpoints the project is getting, and where the others went.
+   *
+   * The plan is a decision made ON THE AUTHOR'S BEHALF — nine declared widths become three — so it
+   * has to be visible. "9 breakpoints found, keeping 3" with the fold spelled out is the difference
+   * between a project that mysteriously has different breakpoints from its source and one whose
+   * import said so at the time.
+   */
+  function reportBreakpointPlan(mediaQueries: readonly string[]): void {
+    const skipped = skippedWidthQueries(mediaQueries);
+    if (skipped.length > 0) {
+      warn(
+        "styles",
+        `${skipped.length} width media ${skipped.length === 1 ? "query" : "queries"} could not be ` +
+          `read (only single-clause px min-width/max-width is supported): ${skipped.join(", ")}`,
+      );
+    }
+    const discovered = analyzeMediaQueries(mediaQueries);
+    if (discovered.length === 0) {
+      return;
+    }
+    const { keep, fold } = planBreakpoints(discovered, breakpointPolicy);
+    if (keep.length === discovered.length) {
+      progress("styles", `Keeping all ${keep.length} declared breakpoints`);
+      return;
+    }
+    const folded = new Map<string, string[]>();
+    for (const [from, to] of fold) {
+      if (from === to) {
+        continue;
+      }
+      folded.set(to, [...(folded.get(to) ?? []), from.replace(/^--/, "")]);
+    }
+    const detail = keep
+      .map((bp) => {
+        const into = folded.get(bp.name) ?? [];
+        return into.length > 0 ? `${bp.name} (+${into.join(", ")})` : bp.name;
+      })
+      .join(", ");
+    progress(
+      "styles",
+      `${discovered.length} breakpoints declared, keeping ${keep.length}: ${detail}`,
+    );
+  }
+
   // ─── Phase 5: build + screenshot-diff against the original ─────────────────
   async function runVerify(
     verifyPages: Map<string, { sourceUrl: string; screenshot: Buffer | string }>,
@@ -523,21 +687,51 @@ export async function importSite(
       projectDir: outDir,
       pages: verifyPages,
       threshold: verifyThreshold,
+      minFidelity: verifyMinFidelity,
+      fullPage: verifyFullPage,
       onProgress: (msg) => progress("verify", msg),
       ...(browser === undefined ? {} : { browser }),
     });
+    /*
+     * Build errors were logged inside the verifier and dropped there. They are warnings on the
+     * import as a whole: a project that did not compile is not a clone of anything, however the
+     * pixels happen to score.
+     */
+    for (const error of verifyResult.buildErrors) {
+      warn("verify", `Build error: ${error}`);
+    }
     for (const page of verifyResult.pages) {
       const status = page.error ? `ERROR: ${page.error}` : `${page.fidelity}% fidelity`;
-      progress("verify", `${page.route} — ${status}`);
+      const misses =
+        page.failedRequests.length > 0 ? `, ${page.failedRequests.length} failed request(s)` : "";
+      progress("verify", `${page.route} — ${status}${misses}`);
     }
     progress("verify", `Average fidelity: ${verifyResult.averageFidelity}%`);
+    if (!verifyResult.passed) {
+      warn(
+        "verify",
+        `Verification failed: average fidelity ${verifyResult.averageFidelity}% ` +
+          `(minimum ${verifyMinFidelity}%). See ${verifyResult.reportDir}/report.json`,
+      );
+    }
     return {
       averageFidelity: verifyResult.averageFidelity,
       reportDir: verifyResult.reportDir,
+      passed: verifyResult.passed,
+      minFidelity: verifyMinFidelity,
+      buildErrors: verifyResult.buildErrors,
       pages: verifyResult.pages.map((page) => {
-        const entry: { route: string; fidelity: number; error?: string } = {
+        const entry: {
+          route: string;
+          fidelity: number;
+          consoleErrors: number;
+          failedRequests: number;
+          error?: string;
+        } = {
           route: page.route,
           fidelity: page.fidelity,
+          consoleErrors: page.consoleErrors.length,
+          failedRequests: page.failedRequests.length,
         };
         if (page.error !== undefined) {
           entry.error = page.error;

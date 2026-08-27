@@ -56,9 +56,35 @@ export function applyIframePatch(
   const echoed = new Set(echoPaths.map((p) => serializeJxPath(p)));
   for (const op of forwardOps) {
     if (op.op === "set-key" && echoed.has(serializeJxPath(op.path))) {
+      // The content is already right; only the model-derived placeholder class can be stale, and
+      // Reconciling a class touches neither the caret nor the text under it.
+      syncEchoedPlaceholder(shadowDoc, op.path, container);
       continue;
     }
     applyOpToDom(shadowDoc, op, container, ctx);
+  }
+}
+
+/**
+ * Re-derive the empty-placeholder class of an ECHOED node without writing its content.
+ *
+ * An echo is the author's own typing coming back as a patch, so the DOM already holds the text —
+ * but `empty-text-placeholder` was stamped when the block was empty and nothing else would ever
+ * take it off, because the write that would have (patchText) is exactly what echo suppression
+ * skips. The CSS asks the DOM whether the block is empty, so nothing is misdrawn in the meantime;
+ * this keeps the class itself honest, so the DOM does not carry a claim the document contradicts.
+ *
+ * Best-effort by design: a missing element is not an error worth escalating a full render (and the
+ * caret with it) over a class.
+ */
+function syncEchoedPlaceholder(
+  doc: JxMutableNode,
+  path: (string | number)[],
+  container: HTMLElement,
+): void {
+  const el = findElement(container, path);
+  if (el) {
+    syncPlaceholderClass(el, getNodeAtPath(doc, path));
   }
 }
 
@@ -134,7 +160,7 @@ function insertChild(
   // Remap existing siblings BEFORE attaching the new subtree so it isn't itself remapped.
   remapChildPaths(container, parentPath, index, 1);
   insertAt(parentEl, newEl, domChildReference(parentEl, parentNode, index));
-  syncContainerPlaceholder(parentEl, parentNode);
+  syncPlaceholderClass(parentEl, parentNode);
 }
 
 /** Re-render the node at `docPath` and swap it into the DOM in place (disposing the old subtree). */
@@ -165,7 +191,7 @@ function removeChild(
   el.remove();
   remapChildPaths(container, parentPath, index + 1, -1);
   if (parentEl) {
-    syncContainerPlaceholder(parentEl, getNodeAtPath(doc, parentPath));
+    syncPlaceholderClass(parentEl, getNodeAtPath(doc, parentPath));
   }
 }
 
@@ -202,25 +228,25 @@ function moveChild(
   // Emptiness may have changed at either end (e.g. moved the last/only child out, or into an empty
   // Container) — keep both parents' placeholder classes in sync with the folded doc.
   if (fromParentEl) {
-    syncContainerPlaceholder(
+    syncPlaceholderClass(
       fromParentEl,
       getNodeAtPath(doc, elementPath(fromParentEl) ?? fromParentPath),
     );
   }
-  syncContainerPlaceholder(toParentEl, toParentNode);
+  syncPlaceholderClass(toParentEl, toParentNode);
 }
 
 /**
- * Keep a container's empty-placeholder class in sync with its (folded) doc node after a child
- * change.
+ * Put `el`'s empty-placeholder class back in step with its (folded) doc node — a container's after
+ * a child change, a text block's after its content changed.
  */
-function syncContainerPlaceholder(parentEl: Element, parentNode: JxMutableNode | undefined): void {
+function syncPlaceholderClass(el: Element, node: JxMutableNode | undefined): void {
   for (const cls of EMPTY_PLACEHOLDER_CLASSES) {
-    parentEl.classList.remove(cls);
+    el.classList.remove(cls);
   }
-  const placeholder = parentNode ? computeEmptyPlaceholderClass(parentNode) : null;
+  const placeholder = node ? computeEmptyPlaceholderClass(node) : null;
   if (placeholder) {
-    parentEl.classList.add(placeholder);
+    el.classList.add(placeholder);
   }
 }
 
@@ -321,24 +347,24 @@ function patchText(doc: JxMutableNode, path: (string | number)[], container: HTM
   const el = requireElement(container, path);
   const node = getNodeAtPath(doc, path);
   el.textContent = textDisplayValue(node);
-  for (const cls of EMPTY_PLACEHOLDER_CLASSES) {
-    el.classList.remove(cls);
-  }
-  const placeholder = node ? computeEmptyPlaceholderClass(node) : null;
-  if (placeholder) {
-    el.classList.add(placeholder);
-  }
+  syncPlaceholderClass(el, node);
 }
 
 /** Locate the rendered element for a document path via its stamped `data-jx-path` attribute. */
 function requireElement(container: HTMLElement, path: (string | number)[]): HTMLElement {
+  const el = findElement(container, path);
+  if (!el) {
+    throw new Error(`iframe-patch-element-not-found:${serializeJxPath(path)}`);
+  }
+  return el;
+}
+
+/** The rendered element for a document path, or null when this render has none. */
+function findElement(container: HTMLElement, path: (string | number)[]): HTMLElement | null {
   const serialized = serializeJxPath(path);
   const esc = serialized.replaceAll("\\", String.raw`\\`).replaceAll("'", String.raw`\'`);
   const el = container.querySelector(`[data-jx-path='${esc}']`);
-  if (!(el instanceof HTMLElement)) {
-    throw new Error(`iframe-patch-element-not-found:${serialized}`);
-  }
-  return el;
+  return el instanceof HTMLElement ? el : null;
 }
 
 /**

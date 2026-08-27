@@ -105,9 +105,25 @@ export const EDIT_PLACEHOLDER_STYLE_ID = "jx-canvas-edit-css";
  * iframe-safe fallbacks — the parent theme variables (--fg-dim/--radius/--accent) don't exist in
  * the iframe document. The placeholder CLASSES are stamped by prepareForEditMode (parent-side
  * resolution + surgical subtree renders), so preview mode never matches these rules — but the sheet
- * is still removed there (belt and braces). The `[contenteditable="true"]:empty` hint is new: it
- * marks the caret's empty paragraph (e.g. right after an Enter split) and advertises the slash
- * menu.
+ * is still removed there (belt and braces). The `[data-jx-active-block]` hint marks the caret's
+ * empty paragraph (e.g. right after an Enter split) and advertises the slash menu.
+ *
+ * `.empty-text-placeholder` is gated on emptiness IN THE DOM because a CLASS cannot tell the truth
+ * about a block the author is typing in. The class is stamped from the document, and the first
+ * thing typed into an empty block reaches the DOM natively — the model learns of it a commit tick
+ * later, and that patch comes back as an ECHO, which `applyIframePatch` deliberately does not
+ * re-render (it would destroy the caret). So the class outlived its own meaning, and "Click here to
+ * add text..." sat beside the text you had just typed until the next full render. The class now
+ * selects WHICH affordance; the DOM answers whether the block is empty.
+ *
+ * "Empty" is `:empty` OR a lone `<br>`, because emptying a block by editing does not leave it
+ * `:empty`: the engine drops in a filler `<br>` to keep the line visible (Chrome 151, verified —
+ * `execCommand("delete")` over a `<p>`'s whole content leaves `<p><br></p>`). Without that arm the
+ * affordance would go dark exactly when the block became empty again.
+ *
+ * `:not([data-jx-active-block])` keeps the slash hint winning on an empty block that HAS the caret:
+ * both rules match the same element, and the emptiness test broke the specificity tie that used to
+ * decide it by source order.
  */
 export const EDIT_PLACEHOLDER_CSS = `
 .empty-media-placeholder {
@@ -123,7 +139,7 @@ export const EDIT_PLACEHOLDER_CSS = `
   font-size: 0;
   overflow: hidden;
 }
-.empty-text-placeholder:not([contenteditable])::after {
+.empty-text-placeholder:is(:empty, :has(> br:only-child)):not([data-jx-active-block]):not([contenteditable])::after {
   content: "Click here to add text...";
   color: color-mix(in srgb, #808080 40%, transparent);
   font-style: italic;
@@ -149,7 +165,7 @@ export const EDIT_PLACEHOLDER_CSS = `
   pointer-events: none;
   white-space: nowrap;
 }
-[data-jx-active-block]:empty::after {
+[data-jx-active-block]:is(:empty, :has(> br:only-child))::after {
   content: "Type / for commands";
   color: color-mix(in srgb, #808080 40%, transparent);
   font-style: italic;

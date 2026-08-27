@@ -11,8 +11,9 @@ import type { DiscoveredAsset } from "./asset-collect.ts";
 
 export interface DownloadResult {
   /**
-   * Maps original absolute URL → relative path from project root (e.g.
-   * "public/assets/images/hero.jpg").
+   * Maps the original absolute URL to the site-absolute path the built asset is served from (e.g.
+   * "/assets/images/hero.jpg") — NOT the path it is written to on disk, which keeps the public/
+   * prefix the compiler copies from.
    */
   rewriteMap: Map<string, string>;
   /** URLs that failed to download. */
@@ -172,7 +173,11 @@ export async function downloadAssets(
     usedNames.set(nameKey, count + 1);
 
     const destPath = join(assetsDir, subdir, filename);
-    const relativePath = `public/assets/${subdir}/${filename}`;
+    // The site-absolute path the built asset is served from. `public/` is the compiler's static
+    // ROOT — its contents land at dist/<path>, so the "public/" segment must not survive into a
+    // Reference, and the leading slash must be there or a reference from /components/x.js or a
+    // Nested route resolves against the wrong base.
+    const relativePath = `/assets/${subdir}/${filename}`;
 
     try {
       const headers: Record<string, string> = {
