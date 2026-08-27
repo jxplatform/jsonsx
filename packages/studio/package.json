@@ -107,15 +107,15 @@
     "lit": "^3.3.3",
     "lit-html": "^3.3.3",
     "monaco-editor": "^0.56.0",
-    "tabulator-tables": "^6.5",
+    "tabulator-tables": "^6.5.2",
     "yaml": "^2.9.0"
   },
   "devDependencies": {
-    "@happy-dom/global-registrator": "^20.11.6",
+    "@happy-dom/global-registrator": "^20.11.8",
     "@types/mdast": "^4.0.4",
-    "@webref/css": "^8.7.2",
-    "@webref/elements": "^2.7.1",
-    "@webref/idl": "^3.82.2"
+    "@webref/css": "^8.7.3",
+    "@webref/elements": "^2.8.0",
+    "@webref/idl": "^3.83.0"
   },
   "//vue-reactivity": "Exact pin required — must match @jxsuite/runtime to avoid cross-boundary proxy bugs"
 }

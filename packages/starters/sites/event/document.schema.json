@@ -2629,6 +2629,20 @@
                 }
               ]
             },
+            "onconfigurationchange": {
+              "description": "Event handler for the \"configurationchange\" event.",
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/v1/$defs/RefObject"
+                },
+                {
+                  "$ref": "#/$defs/v1/$defs/ExpressionEntry"
+                },
+                {
+                  "$ref": "#/$defs/v1/$defs/FunctionDef"
+                }
+              ]
+            },
             "onconnect": {
               "description": "Event handler for the \"connect\" event.",
               "oneOf": [
@@ -5473,6 +5487,20 @@
             },
             "onstorage": {
               "description": "Event handler for the \"storage\" event.",
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/v1/$defs/RefObject"
+                },
+                {
+                  "$ref": "#/$defs/v1/$defs/ExpressionEntry"
+                },
+                {
+                  "$ref": "#/$defs/v1/$defs/FunctionDef"
+                }
+              ]
+            },
+            "onstream": {
+              "description": "Event handler for the \"stream\" event.",
               "oneOf": [
                 {
                   "$ref": "#/$defs/v1/$defs/RefObject"
@@ -22840,6 +22868,7 @@
             "body",
             "br",
             "button",
+            "camera",
             "canvas",
             "caption",
             "circle",
@@ -22936,6 +22965,7 @@
             "meter",
             "mfrac",
             "mi",
+            "microphone",
             "mmultiscripts",
             "mn",
             "mo",
@@ -23024,6 +23054,7 @@
             "u",
             "ul",
             "use",
+            "usermedia",
             "var",
             "video",
             "view",

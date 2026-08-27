@@ -45,17 +45,17 @@
     "upgrade": "bun update --latest && bun install"
   },
   "dependencies": {
-    "@apidevtools/json-schema-ref-parser": "^16.0.0",
+    "@apidevtools/json-schema-ref-parser": "^16.0.1",
     "@jxsuite/create": "workspace:^",
     "@jxsuite/runtime": "workspace:^",
     "@jxsuite/schema": "workspace:^",
     "@vue/reactivity": "3.5.41",
     "esbuild": "^0.28.2",
     "lit-html": "^3.3.3",
-    "sharp": "^0.35.3"
+    "sharp": "^0.35.4"
   },
   "devDependencies": {
-    "@happy-dom/global-registrator": "^20.11.6",
+    "@happy-dom/global-registrator": "^20.11.8",
     "@jxsuite/connector": "workspace:^",
     "@jxsuite/parser": "workspace:^",
     "@types/mdast": "^4.0.4"
