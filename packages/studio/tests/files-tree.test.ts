@@ -10,6 +10,7 @@ import {
   installMockPlatform,
   key,
   pointer,
+  promptFormatOptions,
   renderInto,
   testFile,
 } from "./harness";
@@ -444,10 +445,10 @@ describe("file tree listing", () => {
 
 describe("createNewFile (toolbar + context menu)", () => {
   /** Open the New File dialog from the toolbar and answer it (null cancels). */
-  async function clickNewFile(out: HTMLElement, answer: string | null) {
+  async function clickNewFile(out: HTMLElement, answer: string | null, pick?: string) {
     pointer(out.querySelector('sp-action-button[label="New File"]')!, "click");
     await flush();
-    await answerPromptDialog(answer);
+    await answerPromptDialog(answer, pick);
   }
 
   test("opens a Spectrum prompt dialog rather than a native prompt", async () => {
@@ -464,7 +465,13 @@ describe("createNewFile (toolbar + context menu)", () => {
     expect(wrapper).not.toBeNull();
     expect(wrapper!.getAttribute("headline")).toBe("New File");
     expect(wrapper!.getAttribute("confirm-label")).toBe("Create");
-    expect(wrapper!.querySelector("sp-textfield")!.getAttribute("value")).toBe("untitled.json");
+    // A NAME, not a file name: the picker beside it owns the extension.
+    expect(wrapper!.querySelector("sp-textfield")!.getAttribute("value")).toBe("untitled");
+    expect(promptFormatOptions()).toEqual([
+      [".json", "JSON (.json)"],
+      [".md", "Markdown (.md)"],
+      ["__other__", "Other…"],
+    ]);
 
     await answerPromptDialog(null);
   });
@@ -508,7 +515,7 @@ describe("createNewFile (toolbar + context menu)", () => {
     const { counters, ctx } = makeTreeCtx();
     const out = await renderInto(renderFilesTemplate(ctx), host);
 
-    await clickNewFile(out, "untitled.json");
+    await clickNewFile(out, "untitled", ".json");
 
     expect(JSON.parse(state.files.get("untitled.json")!)).toEqual({
       children: [{ children: [], tagName: "p" }],
@@ -524,7 +531,7 @@ describe("createNewFile (toolbar + context menu)", () => {
     const { ctx } = makeTreeCtx();
     const out = await renderInto(renderFilesTemplate(ctx), host);
 
-    await clickNewFile(out, "note.md");
+    await clickNewFile(out, "note", ".md");
 
     expect(state.files.get("note.md")).toBe("---\ntitle: Untitled\n---\n\n");
   });
@@ -536,7 +543,7 @@ describe("createNewFile (toolbar + context menu)", () => {
     const { ctx } = makeTreeCtx();
     const out = await renderInto(renderFilesTemplate(ctx), host);
 
-    await clickNewFile(out, "  spaced.md  ");
+    await clickNewFile(out, "  spaced  ", ".md");
 
     expect(state.files.has("spaced.md")).toBe(true);
   });
@@ -549,7 +556,7 @@ describe("createNewFile (toolbar + context menu)", () => {
     const { ctx } = makeTreeCtx();
     const out = await renderInto(renderFilesTemplate(ctx), host);
 
-    await clickNewFile(out, "bare.md");
+    await clickNewFile(out, "bare", ".md");
 
     expect(state.files.get("bare.md")).toBe("");
   });
@@ -568,7 +575,7 @@ describe("createNewFile (toolbar + context menu)", () => {
     const { counters, ctx } = makeTreeCtx();
     const out = await renderInto(renderFilesTemplate(ctx), host);
 
-    await clickNewFile(out, "fail.json");
+    await clickNewFile(out, "fail", ".json");
 
     expect(state.files.has("fail.json")).toBe(false);
     expect(counters.left).toBe(0);
@@ -587,7 +594,7 @@ describe("createNewFile (toolbar + context menu)", () => {
     await flush();
 
     expect(dialogWrapper()?.textContent).toContain("Creating in pages/");
-    await answerPromptDialog("inner.md");
+    await answerPromptDialog("inner", ".md");
 
     expect(state.files.get("pages/inner.md")).toBe("---\ntitle: Untitled\n---\n\n");
   });

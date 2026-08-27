@@ -14,6 +14,7 @@ import {
   argsSchema,
   booleanArg,
   booleanProperty,
+  derivedEnumProperty,
   enumArg,
   stringArg,
   stringProperty,
@@ -31,6 +32,7 @@ import { invalidateReferenceEntries } from "../ui/form-controls";
 import { reloadDraftAwareGrids } from "../grid/sources/content-source";
 import { setIncludeDrafts } from "./draft-state";
 import { collectionOfPath, entryCollection, entryCollections, seedEntry } from "./entry-model";
+import { LOCALE_PLACEHOLDER, collectionForDirectory } from "./collection-match";
 import { openEntryEditor, setEntryDraft } from "./entry-editor";
 import { errorMessage } from "@jxsuite/schema/parse";
 import type { EntryCollection } from "./entry-model";
@@ -40,32 +42,6 @@ import type { Tab } from "../tabs/tab";
 /** Collection names a New Entry can be created in — the `enum` behind `content.newEntry`. */
 function creatableCollections(): string[] {
   return entryCollections().map((collection) => collection.name);
-}
-
-/**
- * An enum property whose values are derived WHEN THE SCHEMA IS READ, not when the record is
- * defined.
- *
- * `enumProperty(creatableCollections(), …)` looks identical and is wrong here, and the difference
- * is invisible in a unit test: a command record is built at module scope —
- * `commands/app-commands.ts` and `studio.ts` both call {@link contentCommands} before a project is
- * open — so the array is frozen at `[]`, and `panels/quick-search.ts`'s `paletteArgs` offered an
- * empty choice list forever after. `run` re-derived the list, which is why the programmatic call
- * worked and the palette did not: two answers to "which collections exist", one of them a snapshot
- * of the empty boot state.
- *
- * A getter is the whole fix — the palette reads `property.enum` when it opens the prompt, the AI
- * tool's parameters serialise it when the tool list is built, and `scripts/check-shot-contract.ts`
- * reads it in a bare Bun process where the honest answer really is "none declared".
- */
-function derivedEnumProperty(declared: () => readonly string[], description: string): object {
-  return {
-    description,
-    get enum() {
-      return [...declared()];
-    },
-    type: "string",
-  };
 }
 
 /**
@@ -106,9 +82,17 @@ async function seedText(collection: EntryCollection): Promise<string> {
  * created in, and a **body seeded from the schema**, so the entry is valid the moment it exists
  * instead of being a pile of absent required fields.
  *
+ * `opts.dir` names a directory INSIDE the collection — the Files tree creating in a subdirectory of
+ * the source root. It is checked by MEMBERSHIP (`collectionForDirectory` must answer with this same
+ * collection) rather than by string prefix, because `collection.dir` may still carry a `{locale}`
+ * placeholder, and a prefix test against a template rejects every real directory it stands for.
+ *
  * @returns The created path, or null when the author cancelled or the write failed.
  */
-export async function createEntry(collectionName: string): Promise<string | null> {
+export async function createEntry(
+  collectionName: string,
+  opts: { dir?: string } = {},
+): Promise<string | null> {
   const collection = entryCollection(collectionName);
   if (!collection) {
     notify.error(`No content collection named "${collectionName}" to create an entry in.`, {
@@ -135,11 +119,36 @@ export async function createEntry(collectionName: string): Promise<string | null
     return null;
   }
 
+  /*
+   * Where the entry lands.
+   *
+   * A localized collection's `dir` is `content/exhibitions/{locale}` — a path nobody has. Creating
+   * there makes a directory literally named `{locale}`, which is what `content.newEntry` from the
+   * palette and the `new_content_entry` tool have been doing. There is no default locale to pick on
+   * the author's behalf (choosing one silently files the entry under a language), so this refuses
+   * and names the gesture that works.
+   */
+  const requested = opts.dir;
+  const destination =
+    requested !== undefined && collectionForDirectory(requested)?.name === collection.name
+      ? requested
+      : collection.dir;
+  if (destination.includes(LOCALE_PLACEHOLDER)) {
+    notify.error(`"${collection.name}" is a localized collection.`, {
+      detail:
+        `Its entries live in one directory per language (${collection.dir}). Open the folder for ` +
+        "the language you are writing in and create the entry there.",
+      path: collection.dir,
+      source: "Content",
+    });
+    return null;
+  }
+
   const { createFileIn } = await import("../files/files");
   const created = await createFileIn({
     content,
-    dir: collection.dir,
-    ext: collection.ext,
+    dir: destination,
+    format: { ext: collection.ext, kind: "fixed" },
     source: "Content",
     suggestedName: "untitled",
     title: `New ${collection.name} entry`,

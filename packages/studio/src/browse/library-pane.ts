@@ -42,6 +42,7 @@ import { invalidateUsages } from "../services/references";
 import { confirmFileDelete, renamePromptMessage } from "../files/file-ops";
 import { createFileIn, openFileInTab } from "../files/files";
 import { createEntry } from "../content/entry-commands";
+import { formatByExtension, formatSerialize } from "../format/format-host";
 import { entryCollections } from "../content/entry-model";
 import { uploadAccept, uploadAssets } from "../files/media-upload";
 import { localeLabel } from "@jxsuite/schema/locale";
@@ -70,6 +71,7 @@ import {
   tableRowsTpl,
 } from "./library-layouts";
 import type { ActivityHandle } from "../panels/activity-panel";
+import type { FormatChoice } from "../files/files";
 import type { EffectScope } from "@vue/reactivity";
 import type { LibraryFile, LibraryLayout } from "./library-model";
 import type { LibrarySource } from "./library-source";
@@ -602,10 +604,60 @@ export function libraryNewEntries(): LibraryNewEntry[] {
  * `createEntry` is called rather than reimplemented; a second seeder here would drift from the one
  * the palette's `content.newEntry` uses within a release.
  *
- * A **document kind** keeps `files.ts`'s verbatim name field, deliberately: a page may be a `.md`
- * as easily as a `.json`, so the extension the author types is a real choice and forcing one here
- * would remove it. A collection's extension is not a choice — it is the collection's.
+ * A **document kind** gets the format PICKER, which is the same argument the verbatim name field
+ * used to make: a page may be a `.md` as easily as a `.json`, so the extension is a real choice —
+ * now offered rather than left to be typed from memory. A collection's extension is not a choice;
+ * it is the collection's, and `createEntry` supplies it.
+ *
+ * **A layout is not a choice either, and that is not a policy.** Both readers of a layout parse it
+ * as JSON and neither dispatches through the format registry — `site/layout-resolver.ts` throws and
+ * `site-context.ts` returns null — so a `.md` layout is a file the build cannot load. There is no
+ * `"layout"` document kind for a format to declare, so this is stated here rather than derived.
+ *
+ * A **component** keeps the picker: a format whose `$studio.documentMode.componentWhen` promotes a
+ * frontmatter `tagName` (Markdown's does) can express one perfectly well. What it cannot do is
+ * express one from a `newFileTemplate` that carries no `tagName`, so the seed below supplies it —
+ * through the format's own serializer, because this module knows no format's syntax.
  */
+/** How each document kind's extension is settled. Anything else falls back to the full picker. */
+const FORMAT_CHOICE_BY_KIND: Record<string, FormatChoice> = {
+  component: { defaultExt: ".json", docKind: "component", kind: "choose" },
+  layout: { ext: ".json", kind: "fixed" },
+  page: { defaultExt: ".json", docKind: "page", kind: "choose" },
+};
+
+/**
+ * The body a new component starts as, when the reader picked a format rather than `.json`.
+ *
+ * `.json` answers `undefined` and takes the shared blank document. A format answers with its OWN
+ * serialization of `{ tagName }` — never a hand-written `---\ntagName: …\n---`, which would put one
+ * format's syntax in the Library. Without the `tagName` the file satisfies neither
+ * `$studio.documentMode.componentWhen` nor the build's tag registration, and is a component nothing
+ * loads. A stem that is not a valid custom-element name (no hyphen) cannot carry one, so it falls
+ * back to the format's own template and the author names the tag themselves.
+ */
+async function componentSeed(ext: string, fileName: string): Promise<string | undefined> {
+  const format = formatByExtension(ext);
+  if (!format?.capabilities.serialize) {
+    return undefined;
+  }
+  const tagName = fileName.slice(0, fileName.length - ext.length);
+  if (!/^[a-z][\d.a-z]*-[\d.a-z-]*$/.test(tagName)) {
+    return undefined;
+  }
+  try {
+    return await formatSerialize(
+      format.name,
+      { children: [], tagName },
+      { frontmatter: true, mode: "roundtrip" },
+    );
+  } catch {
+    // The serializer is the project's, so its failure is not a reason to refuse the creation —
+    // The format's own template still produces a file the author can finish by hand.
+    return undefined;
+  }
+}
+
 export async function createLibraryEntry(key: string): Promise<string | null> {
   const entry = libraryNewEntries().find((row) => row.key === key);
   if (!entry) {
@@ -614,7 +666,9 @@ export async function createLibraryEntry(key: string): Promise<string | null> {
   const created =
     entry.collection === undefined
       ? await createFileIn({
+          ...(entry.key === "component" ? { content: componentSeed } : {}),
           dir: entry.dir,
+          format: FORMAT_CHOICE_BY_KIND[entry.key] ?? { defaultExt: ".json", kind: "choose" },
           source: "Library",
           suggestedName: "untitled",
           title: `New ${entry.label}`,

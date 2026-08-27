@@ -394,8 +394,15 @@ export function topDialog(): HTMLElement | null {
 /**
  * Drive an open `showPromptDialog()`: type `value` into its field and confirm, or pass `null` to
  * cancel. Returns the dialog element it acted on, or null when no dialog is open.
+ *
+ * `pick` selects a row in the dialog's format picker BEFORE typing, which is the order a reader
+ * works in and the order that matters: the picker re-runs `validate` against the composed name, so
+ * picking after typing and picking before it exercise different code.
  */
-export async function answerPromptDialog(value: string | null): Promise<HTMLElement | null> {
+export async function answerPromptDialog(
+  value: string | null,
+  pick?: string,
+): Promise<HTMLElement | null> {
   const wrapper = topDialog();
   if (!wrapper) {
     return null;
@@ -403,15 +410,37 @@ export async function answerPromptDialog(value: string | null): Promise<HTMLElem
   if (value === null) {
     wrapper.dispatchEvent(new Event("cancel"));
   } else {
-    const field = wrapper.querySelector("sp-textfield") as HTMLInputElement | null;
+    if (pick !== undefined) {
+      await pickPromptFormat(pick);
+    }
+    const field = (topDialog() ?? wrapper).querySelector("sp-textfield") as HTMLInputElement | null;
     if (field) {
       field.value = value;
       field.dispatchEvent(new Event("input", { bubbles: true }));
     }
-    wrapper.dispatchEvent(new Event("confirm"));
+    (topDialog() ?? wrapper).dispatchEvent(new Event("confirm"));
   }
   await flush();
-  return wrapper;
+  return topDialog() ?? wrapper;
+}
+
+/** Select a row in the open prompt dialog's picker, the way `sp-picker` reports one. */
+export async function pickPromptFormat(value: string): Promise<void> {
+  const picker = topDialog()?.querySelector("sp-picker") as HTMLInputElement | null;
+  if (!picker) {
+    return;
+  }
+  picker.value = value;
+  picker.dispatchEvent(new Event("change", { bubbles: true }));
+  await flush();
+}
+
+/** The open prompt dialog's picker rows, as `[value, label]` pairs. */
+export function promptFormatOptions(): [string, string][] {
+  return [...(topDialog()?.querySelectorAll("sp-picker sp-menu-item") ?? [])].map((el) => [
+    el.getAttribute("value") ?? "",
+    el.textContent?.trim() ?? "",
+  ]);
 }
 
 // ─── New Project modal field accessors ───────────────────────────────────────

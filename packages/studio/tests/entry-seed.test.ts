@@ -80,7 +80,7 @@ beforeEach(() => {
 describe("a format-class collection", () => {
   test("takes its extension from the format and serializes the seed through it", async () => {
     await createEntry("blog");
-    expect(created[0]?.ext).toBe(".md");
+    expect(created[0]?.format).toEqual({ ext: ".md", kind: "fixed" });
     expect(serialized[0]?.name).toBe("Markdown");
     // The seed IS the frontmatter; `children` is the empty body the format needs to round-trip.
     expect(serialized[0]?.doc).toEqual({ children: [], draft: false, title: "" });
@@ -97,7 +97,7 @@ describe("a format-class collection", () => {
     await createEntry("blog");
     // The extension and the serializer come off the same lookups: no format class means `.json`,
     // And `.json` is native. There is no state where a Markdown file gets a JSON body.
-    expect(created[0]?.ext).toBe(".json");
+    expect(created[0]?.format).toEqual({ ext: ".json", kind: "fixed" });
     expect(serialized).toHaveLength(0);
     expect(created[0]?.content).toBe("{}");
   });

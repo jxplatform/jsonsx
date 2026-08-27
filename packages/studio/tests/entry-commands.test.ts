@@ -104,7 +104,7 @@ describe("createEntry", () => {
     // The extension is what makes the file an entry of the collection it was created in — the
     // Predecessor wrote `content/blog/untitled`, matched by no format and therefore by no
     // Collection.
-    expect(request.ext).toBe(".json");
+    expect(request.format).toEqual({ ext: ".json", kind: "fixed" });
     expect(request.source).toBe("Content");
     expect(JSON.parse(request.content as string)).toEqual({ draft: false, title: "" });
   });
@@ -132,6 +132,51 @@ describe("createEntry", () => {
   test("refuses a collection the project does not declare", async () => {
     expect(await createEntry("nope")).toBeNull();
     expect(notifications[0]?.message).toContain("nope");
+  });
+
+  /**
+   * A localized collection's `dir` is `content/exhibitions/{locale}` — a path nobody has. Creating
+   * there makes a directory literally named `{locale}`, which is what the palette's New Entry and
+   * the `new_content_entry` tool did on the museum starter. There is no default locale to pick on
+   * the author's behalf, because choosing one silently files the entry under a language.
+   */
+  test("refuses a localized collection with no directory, and names the gesture that works", async () => {
+    resetStudioState({
+      projectConfig: {
+        content: {
+          shows: { format: "json", schema: {}, source: "./content/shows/{locale}/" },
+        },
+        i18n: { locales: ["en", "fr"] },
+      },
+    });
+    expect(await createEntry("shows")).toBeNull();
+    expect(created).toHaveLength(0);
+    expect(notifications[0]?.message).toContain("localized collection");
+  });
+
+  test("but honours a locale directory it is handed", async () => {
+    resetStudioState({
+      projectConfig: {
+        content: {
+          shows: { format: "json", schema: {}, source: "./content/shows/{locale}/" },
+        },
+        i18n: { locales: ["en", "fr"] },
+      },
+    });
+    await createEntry("shows", { dir: "content/shows/fr" });
+    expect(created[0]?.dir).toBe("content/shows/fr");
+  });
+
+  test("a destination outside the collection falls back to the collection's own", async () => {
+    // Membership, not a string prefix: `collection.dir` may still be a `{locale}` template, and a
+    // Prefix test against a template rejects every real directory it stands for.
+    await createEntry("blog", { dir: "pages" });
+    expect(created[0]?.dir).toBe("content/blog");
+  });
+
+  test("and a subdirectory of it is honoured", async () => {
+    await createEntry("blog", { dir: "content/blog/2026" });
+    expect(created[0]?.dir).toBe("content/blog/2026");
   });
 });
 

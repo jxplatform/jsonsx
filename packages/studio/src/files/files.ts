@@ -61,19 +61,21 @@ import {
 } from "../workspace/workspace";
 import { openCsvGridTab, openPagesGrid } from "../grid/grid-open";
 import { isViewableMedia, openMediaTab } from "../media/media-open";
-import { collectionDirs } from "../grid/sources/content-source";
 import { activeRegistry } from "../commands/active-registry";
 import { collectionOfPath } from "../content/entry-model";
 import { confirmFileDelete, parseSourceForPath, renamePromptMessage } from "./file-ops";
 import { invalidateUsages } from "../services/references";
 import {
   documentExtensions,
+  formatByExtension,
   formatForPath,
   loadFormats,
   noFormatError,
   refreshExtensionUi,
   refreshFormats,
 } from "../format/format-host";
+import { convertTargets, creationFormats, knownDocumentExtensions } from "../format/format-choices";
+import { collectionForDirectory } from "../content/collection-match";
 import { markSessionRestored, persistedSession, resetProjectShell, setActivityTab } from "../shell";
 import { restoreSession } from "../workspace/session";
 import { cleanupGitPanel } from "../panels/git-panel";
@@ -87,6 +89,7 @@ import {
 import type { TemplateResult } from "lit-html";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import type { ResolvedI18n } from "@jxsuite/schema/locale";
+import type { ChoiceOption } from "../ui/choice-field";
 import type { DirEntry, RenameResult } from "../types";
 import type { ListWindowWatch } from "../ui/virtual-window";
 import { rectOf } from "../utils/geometry";
@@ -175,7 +178,14 @@ export async function loadProject() {
     if (info.isSiteProject) {
       addRecentProject(requireProjectState().name, meta.root);
       await autoSyncProjectOnOpen();
-      await ensureDependenciesInstalled();
+      if (await ensureDependenciesInstalled()) {
+        // The registry above was fetched from a project with no `node_modules`, and `loadFormats`
+        // Memoises — so without this the picker, the convert targets and every parse in the session
+        // Are answered by the empty registry a fresh clone had.
+        refreshFormats();
+        await loadFormats();
+        refreshExtensionUi(platform);
+      }
       await loadDirectory(".");
       await loadComponentRegistry();
       await openLastSessionOrHome();
@@ -241,7 +251,12 @@ export async function openProject({
     setWorkspaceProject(handle.root, config);
 
     await autoSyncProjectOnOpen();
-    await ensureDependenciesInstalled();
+    if (await ensureDependenciesInstalled()) {
+      // See the note in `probeRootProject`: the registry was fetched before the install ran.
+      refreshFormats();
+      await loadFormats();
+      refreshExtensionUi(platform);
+    }
     await loadDirectory(".");
     await loadComponentRegistry();
 
@@ -1316,14 +1331,28 @@ interface FileMenuItem {
 function fileRowFacts(entry: { path: string; type: string }): Record<string, unknown> {
   const facts: Record<string, unknown> = {};
   if (entry.type === "directory") {
-    const collection = collectionDirs().find(
-      ({ dir }) => entry.path === dir || entry.path.endsWith(`/${dir}`),
-    );
-    if (collection) {
+    // The collection's own SOURCE ROOT, not any directory beneath it: "Edit Collection in Grid"
+    // Opens the whole collection, so offering it on `content/posts/2026` would be a row whose label
+    // Says one thing and whose action does another.
+    const collection = collectionForDirectory(entry.path);
+    if (collection?.isSourceRoot === true && !collection.fileBacked) {
       facts.name = collection.name;
     }
-  } else if (collectionOfPath(entry.path)) {
+    return facts;
+  }
+  if (collectionOfPath(entry.path)) {
     facts.path = entry.path;
+  }
+  /*
+   * `source`, and deliberately not `path`.
+   *
+   * The bag is keyed by ARGUMENT NAME, and `path` already means one specific thing here — "an entry
+   * of a collection" — which is what keeps "Open Entry Form" off `styles/main.css`. A convert
+   * command reusing that key would state it for every convertible file and put the entry form on
+   * all of them. A different question gets a different name.
+   */
+  if (convertTargets(entry.path).length > 0) {
+    facts.source = entry.path;
   }
   return facts;
 }
@@ -1490,6 +1519,29 @@ const BLANK_DOCUMENT = JSON.stringify(
 );
 
 /**
+ * The picker row meaning "I will type the whole name myself".
+ *
+ * It is what keeps the format picker from being a cage. `New File…` is the only generic
+ * file-creation affordance in Studio and both backends create intermediate directories on write, so
+ * without this row `styles/main.css`, `public/robots.txt`, `.gitignore` and a `credits.txt` beside
+ * a collection's images all become uncreatable — and the picker would have taken away more than it
+ * gave. The picker stays the authority on the extension; this is one of its answers.
+ */
+export const OTHER_FORMAT = "__other__";
+
+/** How the extension of a new file is settled. */
+export type FormatChoice =
+  /** Picker over every creatable format, plus Other…. The field is a NAME, taken verbatim. */
+  | { kind: "choose"; defaultExt?: string; docKind?: "page" | "component" | "content" }
+  /**
+   * Picker holding ONE format, plus Other… — the collection's own extension. The field is a NAME.
+   * `because` is the sentence a refusal quotes when Other… would smuggle a foreign document in.
+   */
+  | { kind: "locked"; ext: string; because: string }
+  /** No picker. The field is a DISPLAY NAME, slugified, and `ext` is appended. */
+  | { kind: "fixed"; ext: string };
+
+/**
  * One creation, named.
  *
  * `dir` is required and has no default. That is the whole point of the type: the Library used to
@@ -1502,85 +1554,241 @@ export interface NewFileRequest {
   dir: string;
   /** Dialog title — "New File", "New Page", "New Post". Defaults to "New File". */
   title?: string;
-  /** Pre-filled value; its stem is selected so typing replaces the name and keeps the extension. */
+  /** Pre-filled value. In picker modes it is a STEM; the picker supplies the extension. */
   suggestedName?: string;
   /**
-   * When set, the field asks for a DISPLAY NAME and this extension is appended to its slug — "My
-   * First Post" becomes `my-first-post.md`. When absent, the field asks for a file name and takes
-   * it verbatim, which is what the Files tree has always done.
+   * How the extension is settled. Absent means the field asks for a whole file name and takes it
+   * verbatim with no picker at all — which is what a caller that already knows the name wants
+   * (`i18n.createTranslation` composes `about.json` from the file it is translating).
    */
-  ext?: string;
-  /** Body to write. Defaults to the resolved format's `newFileTemplate`. */
-  content?: string;
+  format?: FormatChoice;
+  /**
+   * Body to write. A function is called with the extension the reader settled on and the composed
+   * file name, which is the only way a caller can seed a body whose FORMAT — or whose own tag name
+   * — it does not know until the dialog resolves. Defaults to the resolved format's
+   * `newFileTemplate`.
+   */
+  content?:
+    | string
+    | ((ext: string, fileName: string) => string | undefined | Promise<string | undefined>);
   /** Who is creating, for the Problem's `source` line. Defaults to "Files". */
   source?: string;
 }
 
+/** A display name, reduced to a file stem. Lowercase by design: this is a slug. */
+function slugify(input: string): string {
+  return input
+    .trim()
+    .toLowerCase()
+    .replaceAll(/\s+/g, "-")
+    .replaceAll(/[^a-z\d-]/g, "");
+}
+
+/** The extension of a file name, including the dot, or `""`. */
+function extensionOfName(name: string): string {
+  const dot = name.lastIndexOf(".");
+  return dot > 0 ? name.slice(dot) : "";
+}
+
+/** The two picker modes — the ones where the field asks for a NAME and the picker owns the suffix. */
+type PickerChoice = Extract<FormatChoice, { kind: "choose" } | { kind: "locked" }>;
+
+/** The picker's rows for a request, with the Other… sentinel set apart by a divider. */
+function formatRowsFor(choice: PickerChoice): ChoiceOption[] {
+  const rows =
+    choice.kind === "locked"
+      ? [
+          {
+            ext: choice.ext,
+            label: `${formatByExtension(choice.ext)?.name ?? choice.ext} (${choice.ext})`,
+          },
+        ]
+      : creationFormats(choice.docKind);
+  return [
+    ...rows.map((row) => ({ label: row.label, value: row.ext })),
+    { dividerBefore: true, label: "Other…", value: OTHER_FORMAT },
+  ];
+}
+
 /**
- * Create one file, from the one flow both the Files tree and the Library use.
+ * Which row starts selected: the caller's stated default, else the extension its prefill already
+ * carries when that is a row, else the first row. A `locked` choice has one format row, so it
+ * always lands there.
+ */
+function initialPickFor(choice: PickerChoice, rows: ChoiceOption[], suggested: string): string {
+  const stated = choice.kind === "choose" ? choice.defaultExt : choice.ext;
+  if (stated !== undefined && rows.some((row) => row.value === stated)) {
+    return stated;
+  }
+  const fromPrefill = extensionOfName(suggested);
+  if (fromPrefill !== "" && rows.some((row) => row.value === fromPrefill)) {
+    return fromPrefill;
+  }
+  return rows[0]?.value ?? OTHER_FORMAT;
+}
+
+/**
+ * Create one file, from the one flow the Files tree, the Library and the content collections use.
  *
- * Two behaviours the callers used to disagree about, settled here:
+ * Three behaviours the callers used to disagree about, settled here:
  *
+ * - **The extension is CHOSEN, not typed.** The project's format registry is what the picker is built
+ *   from, so a project that installs a markdown extension offers markdown here with no edit to this
+ *   file — and one that installs nothing offers `JSON` and `Other…`, which is the truth. `Other…`
+ *   restores the verbatim field for everything that is not a Jx document.
  * - **A name that is already taken is refused in the FIELD**, not discovered afterwards. Both
  *   predecessors called `writeFile` straight onto the composed path, so creating `about.md` in a
  *   directory that had one silently replaced it — with no undo, because the file was never open.
  *   The destination is listed once before the prompt so `validate` can say so while it can still be
- *   fixed.
+ *   fixed. The comparison is case-INSENSITIVE, because APFS and NTFS are and the write clobbers.
  * - **A failure is a Problem carrying the path**, not a toast that scrolls away, since the thing the
  *   author must do next is about that path.
  *
  * @returns The created path, or `null` when the author cancelled or the write failed.
  */
 export async function createFileIn(request: NewFileRequest): Promise<string | null> {
-  const { dir, ext, source = "Files" } = request;
+  const { dir, format: choice, source = "Files" } = request;
   await loadFormats();
 
   // One listing, before the field opens: the names it must refuse are known while typing.
   let taken = new Set<string>();
   try {
     const listing = await getPlatform().listDirectory(dir);
-    taken = new Set(listing.map((entry) => entry.name));
+    taken = new Set(listing.map((entry) => entry.name.toLowerCase()));
   } catch {
     // A directory that cannot be listed is usually one that does not exist yet — the write below
     // Is the authority on whether that is a problem, and it reports with the real reason.
   }
 
-  const fileNameFor = (input: string) =>
-    ext === undefined
-      ? input.trim()
-      : `${input
-          .trim()
-          .toLowerCase()
-          .replaceAll(/\s+/g, "-")
-          .replaceAll(/[^a-z\d-]/g, "")}${ext}`;
+  const picker = choice !== undefined && choice.kind !== "fixed" ? choice : null;
+  const rows = picker === null ? null : formatRowsFor(picker);
+  const initialPick =
+    picker === null || rows === null
+      ? ""
+      : initialPickFor(picker, rows, request.suggestedName ?? "");
 
+  /**
+   * The file name a field value and a pick compose to — three modes, not two.
+   *
+   * The verbatim STEM mode is not a convenience. The slugifier lowercases and strips everything
+   * outside `[a-z0-9-]`, which turns `[slug]` into `slug` — and eight shipped starters carry
+   * `pages/[slug].json`, `[sku].json`, `[...slug].json`. A picker that slugified would make a
+   * dynamic route uncreatable and would say nothing about it.
+   */
+  const fileNameFor = (input: string, picked: string) => {
+    const trimmed = input.trim();
+    if (choice === undefined || picked === OTHER_FORMAT) {
+      return trimmed;
+    }
+    if (choice.kind === "fixed") {
+      const slug = slugify(trimmed);
+      return slug === "" ? "" : `${slug}${choice.ext}`;
+    }
+    return trimmed.toLowerCase().endsWith(picked.toLowerCase()) ? trimmed : `${trimmed}${picked}`;
+  };
+
+  const known = knownDocumentExtensions();
+
+  const validate = (value: string, picked: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return choice?.kind === "fixed" ? "Enter a name." : "Enter a file name.";
+    }
+    if (choice?.kind === "fixed" && slugify(trimmed) === "") {
+      return "Enter at least one letter or number.";
+    }
+    const normalized = trimmed.replaceAll("\\", "/");
+    if (normalized.startsWith("/") || normalized.endsWith("/")) {
+      return "Enter a name, not a path that starts or ends with a slash.";
+    }
+    if (normalized.split("/").includes("..")) {
+      return "A name cannot step outside the destination folder.";
+    }
+    // A slash is the tree's ONLY way to make a directory — both backends create them on write — so
+    // It is allowed exactly where the field is a whole file name, and refused where it is a name.
+    if (normalized.includes("/") && choice !== undefined && picked !== OTHER_FORMAT) {
+      return `Pick Other… to create a file in a subfolder of ${dir === "." ? "the project root" : dir}.`;
+    }
+    /* A name whose extension MATCHES the pick is fine and is composed once, never doubled;
+       refusing every trailing extension would reject this dialog's own `untitled.json` default.
+       A name ending in an extension no format claims is a stem that happens to have a dot. */
+    const typedExt = extensionOfName(normalized);
+    if (
+      picked !== "" &&
+      picked !== OTHER_FORMAT &&
+      typedExt !== "" &&
+      typedExt.toLowerCase() !== picked.toLowerCase() &&
+      known.has(typedExt.toLowerCase())
+    ) {
+      const label = rows?.find((row) => row.value === picked)?.label ?? picked;
+      return `You picked ${label}; this name ends in ${typedExt}.`;
+    }
+    if (choice?.kind === "locked" && picked === OTHER_FORMAT) {
+      const foreign = typedExt !== "" && typedExt.toLowerCase() !== choice.ext.toLowerCase();
+      if (foreign && known.has(typedExt.toLowerCase())) {
+        return choice.because;
+      }
+    }
+    const candidate = fileNameFor(value, picked);
+    if (!candidate) {
+      return "Enter at least one letter or number.";
+    }
+    return taken.has(candidate.toLowerCase()) ? `${candidate} already exists in ${dir}/.` : "";
+  };
+
+  let picked = initialPick;
   const entered = await showPromptDialog(request.title ?? "New File", {
+    ...(rows === null
+      ? {}
+      : {
+          choice: {
+            initial: initialPick,
+            label: "Format",
+            onChange: (next: string) => {
+              picked = next;
+            },
+            options: () => rows,
+          },
+        }),
     confirmLabel: "Create",
     message: dir === "." ? "Creating in the project root." : `Creating in ${dir}/`,
     ...(request.suggestedName === undefined ? {} : { placeholder: request.suggestedName }),
-    select: "stem",
-    validate: (value) => {
-      if (!value.trim()) {
-        return ext === undefined ? "Enter a file name." : "Enter a name.";
-      }
-      const candidate = fileNameFor(value);
-      if (!candidate || candidate === ext) {
-        return "Enter at least one letter or number.";
-      }
-      return taken.has(candidate) ? `${candidate} already exists in ${dir}/.` : "";
-    },
+    // With a picker there is no extension in the field to preserve, so the whole name is the stem.
+    select: rows === null ? "stem" : "all",
+    validate,
     value: request.suggestedName ?? "untitled.json",
   });
   if (!entered) {
     return null;
   }
 
-  const fileName = fileNameFor(entered);
+  const fileName = fileNameFor(entered, picked);
   const path = dir === "." ? fileName : `${dir}/${fileName}`;
   markLocalMutation(path);
   const format = formatForPath(fileName);
+  const suppliedBody =
+    typeof request.content === "function"
+      ? await request.content(extensionOfName(fileName), fileName)
+      : request.content;
+  /*
+   * What a new file starts as, in precedence order.
+   *
+   * The `.json` split is the one thing the picker changed. A `.json` the reader CHOSE from the
+   * format picker is a Jx document and gets one; a `data.json` typed through Other… is not, and
+   * gets `{}` — which is at least openable, where the `""` a non-document extension gets would be a
+   * file that reports "no format" the moment it is clicked.
+   */
+  const chosenAsDocument = choice !== undefined && picked !== OTHER_FORMAT;
   const content =
-    request.content ?? format?.studio?.newFileTemplate ?? (format ? "" : BLANK_DOCUMENT);
+    suppliedBody ??
+    format?.studio?.newFileTemplate ??
+    (format
+      ? ""
+      : fileName.toLowerCase().endsWith(".json")
+        ? chosenAsDocument
+          ? BLANK_DOCUMENT
+          : "{}\n"
+        : "");
   try {
     await getPlatform().writeFile(path, content);
     await loadDirectory(dir);
@@ -1596,8 +1804,66 @@ export async function createFileIn(request: NewFileRequest): Promise<string | nu
   }
 }
 
+/**
+ * The tree's New File, which asks the destination what it is before it asks the reader for a name.
+ *
+ * Four answers, and the difference between them is what feature 3 is:
+ *
+ * - A **content collection's own source root** routes to `content/entry-commands.ts`'s `createEntry`,
+ *   which supplies the collection's extension AND a body seeded from its schema, then opens the
+ *   entry form. Reimplementing any of that here would be a second seeder drifting from the one the
+ *   Library and the palette already use;
+ * - A **subdirectory** of a collection, or a collection with no `schema`, is CONSTRAINED but not
+ *   rerouted. Discovery is recursive so a document there really is an entry, but co-located media
+ *   lives there too (`site-architecture.md` §6.5) and `createEntry` writes to ONE directory — so
+ *   rerouting would silently relocate the file, and seeding a schema-less collection would seed
+ *   nothing anyway;
+ * - A collection whose declared `format` names a class the project has not registered gets the FULL
+ *   picker and a Problem naming that class. Locking to a guessed extension would be a stated lie
+ *   plus an enforced refusal, which is worse than not constraining at all;
+ * - Anywhere else opens the full picker.
+ *
+ * The context-menu label does NOT change for a collection folder. The tree's own verbs are what the
+ * TREE does, and the dialog itself names the destination.
+ */
 async function createNewFile(dirPath: string, renderLeftPanel: () => void) {
-  const created = await createFileIn({ dir: dirPath, suggestedName: "untitled.json" });
+  await loadFormats();
+  const collection = collectionForDirectory(dirPath);
+
+  if (collection?.unresolvedFormat != null) {
+    notify.error(`New files in ${dirPath}/ cannot be constrained to the collection's format.`, {
+      detail:
+        `The "${collection.name}" content type declares format "${collection.unresolvedFormat}", ` +
+        "which no installed extension provides. Install the extension that supplies it, or correct " +
+        "the name in Project Settings › Content Types.",
+      path: dirPath,
+      source: "Files",
+    });
+  }
+
+  const constrained = collection?.ext != null && collection.unresolvedFormat === null;
+  const seedable = constrained && collection.isSourceRoot && collection.def.schema !== undefined;
+
+  let created: string | null;
+  if (seedable) {
+    const { createEntry } = await import("../content/entry-commands");
+    created = await createEntry(collection.name, { dir: dirPath });
+  } else {
+    created = await createFileIn({
+      dir: dirPath,
+      format:
+        constrained && collection.ext !== null
+          ? {
+              because:
+                `${collection.name} entries are ${collection.ext} files, so a document of another ` +
+                "format here would not be one.",
+              ext: collection.ext,
+              kind: "locked",
+            }
+          : { defaultExt: ".json", kind: "choose" },
+      suggestedName: "untitled",
+    });
+  }
   if (created !== null) {
     renderLeftPanel();
   }
@@ -1645,6 +1911,42 @@ function reloadRewrittenTabs(report: RenameResult, skipPath: string): void {
   }
 }
 
+/** The directory holding a path, project-relative. `"."` for a file at the project root. */
+export function parentDirOf(path: string): string {
+  const normalized = path.replaceAll("\\", "/");
+  return normalized.includes("/") ? normalized.slice(0, normalized.lastIndexOf("/")) : ".";
+}
+
+/**
+ * Everything the app has to catch up on once a file has MOVED — shared by the rename and by the
+ * format conversion, which is a rename with the bytes rewritten on the way.
+ *
+ * It is one function because the two must not drift: the refactor pass has just rewritten
+ * references project-wide, `markLocalMutation` has suppressed the watcher echo that would otherwise
+ * say so, and every consequence of that has to be replayed by hand. A converter that forgot
+ * `invalidateUsages` would leave the next delete dialog quoting a count from before the move.
+ *
+ * The tab is NOT reopened here. A rename keeps its document and only re-keys the tab; a conversion
+ * has to rebuild it, because the format changed. That difference belongs to the callers.
+ *
+ * @param from - The path before the move.
+ * @param to - The path after it.
+ * @param report - What the backend's refactor pass rewrote.
+ */
+export async function settleRename(from: string, to: string, report: RenameResult): Promise<void> {
+  invalidateUsages();
+  const fromDir = parentDirOf(from);
+  const toDir = parentDirOf(to);
+  await loadDirectory(fromDir);
+  if (toDir !== fromDir) {
+    await loadDirectory(toDir);
+  }
+  if (requireProjectState().selectedPath === from) {
+    requireProjectState().selectedPath = to;
+  }
+  reloadRewrittenTabs(report, to);
+}
+
 async function renameFile(
   entry: { name: string; path: string; type: string },
   renderLeftPanel: () => void,
@@ -1653,26 +1955,16 @@ async function renameFile(
   if (!newName || newName === entry.name) {
     return;
   }
-  const entryPath = entry.path.replaceAll("\\", "/");
-  const parentDirPath = entryPath.includes("/")
-    ? entryPath.slice(0, entryPath.lastIndexOf("/"))
-    : ".";
+  const parentDirPath = parentDirOf(entry.path);
   const newPath = parentDirPath === "." ? newName : `${parentDirPath}/${newName}`;
   markLocalMutation(entry.path, newPath);
   try {
     const platform = getPlatform();
     const report = await platform.renameFile(entry.path, newPath);
-    // The refactor pass just rewrote references project-wide, and `markLocalMutation` suppresses
-    // The watcher echo that would otherwise say so — hence the explicit drop.
-    invalidateUsages();
-    await loadDirectory(parentDirPath);
-    if (requireProjectState().selectedPath === entry.path) {
-      requireProjectState().selectedPath = newPath;
-    }
     if (workspace.tabs.has(entry.path)) {
       renameTab(entry.path, newPath, newPath);
     }
-    reloadRewrittenTabs(report, newPath);
+    await settleRename(entry.path, newPath, report);
     renderLeftPanel();
     notify.success(renameStatus(newName, report));
   } catch (error) {
@@ -1826,6 +2118,19 @@ export async function openFileInTab(path: string, opts: OpenFileOpts = {}) {
   try {
     const content = await platform.readFile(path);
     if (!content) {
+      /*
+       * An empty file still has to answer for itself.
+       *
+       * Returning silently was defensible while every file the tree could create was a seeded
+       * document. The format picker's "Other…" row makes an empty `main.css` or `.gitignore` an
+       * ordinary thing to create, and clicking one and having NOTHING happen — no tab, no error, no
+       * toast — reads as a broken tree rather than as a file Studio has no editor for. An empty
+       * file the studio CAN open (a `.json`, or one a format claims) is still nothing to report.
+       */
+      await loadFormats();
+      if (!formatForPath(path) && !path.toLowerCase().endsWith(".json")) {
+        throw noFormatError(path);
+      }
       return;
     }
 
