@@ -36,13 +36,15 @@ import type { CommandContext } from "../src/commands/context";
  * it. The double is what makes "runs the converter" a claim with a witness.
  *
  * And it keeps the converter's COVERAGE. Bun 1.4.0 loses a source file's coverage record entirely
- * when one test file fires two or more un-awaited `import()`s of it and another test file, running
- * later, loads it for real — the later file's tests still pass against the real module, and the
- * module is simply absent from the report (jxsuite/jx#240, reduced to a five-file standalone case
- * and reported upstream). This file was the only one still letting those real dynamic imports fire;
- * its siblings `context-menu.test.ts` and `settings-key-scope.test.ts` already double it. Which of
- * the two files runs first is `readdir` order, so the same tree flips between recording and not
- * with no change to any code — which is why it read as a CI-only defect for weeks.
+ * when two or more dynamic `import()`s of it are in flight AT ONCE — the module still evaluates and
+ * its exports still work, only the record goes (jxsuite/jx#240;
+ * `scripts/repro/bun-coverage-drop.sh` shows it in four files with no jx code). The two `run()`
+ * calls below did exactly that: the first floating import had not settled when the second started.
+ * This file was the only one still letting real imports of the converter overlap — its siblings
+ * `context-menu.test.ts` and `settings-key-scope.test.ts` already double it — and the file that
+ * then loads the converter for real is a different one, whose `readdir` position decides whether it
+ * runs before or after. That is why the same tree flipped between recording and not with no change
+ * to any code, and why it read as a CI-only defect for weeks.
  *
  * Removing this double is therefore not a style choice. It deletes an assertion and re-arms a
  * coverage drop that `scripts/check-coverage-manifest.ts` then has to spend a second pass proving.

@@ -1,81 +1,124 @@
 #!/usr/bin/env bash
-# Standalone reproduction of a Bun 1.4.0 (+34cbb9a40) coverage defect: a source file that IS
-# loaded and executed is omitted from `bun test --isolate --coverage` output.
+# Reproduction of a Bun 1.4.0 (+34cbb9a40) coverage defect: `bun test --coverage` omits a source
+# file from BOTH the lcov and the printed table when two or more dynamic `import()`s of that module
+# are in flight at once. The module body evaluates exactly once and its exports work; only the
+# coverage RECORD is lost.
 #
-# Kept in the tree because it is the evidence behind a rule in CLAUDE.md and behind the
-# adjudication in ../check-coverage-manifest.ts, and because it is what an upstream fix should
-# be checked against. It writes only under its own scratch directory and needs nothing from
-# this repo — no node_modules, no jx packages, five files in total.
+# The severity is worse than a missing row. An omitted file is ABSENT rather than reported at 0%,
+# so no per-file `coverageThreshold` can fire on it and the aggregate is computed as though it did
+# not exist — a coverage gate silently turned into a no-op for that file. That is what
+# `scripts/check-coverage-manifest.ts` is standing in front of.
 #
-# jxsuite/jx#240 is the report; the trigger is gone from this repo (see
-# packages/studio/tests/commands-defaults.test.ts), so this script is the only place the defect
-# can still be observed here.
+# Two cases, because the second is the shape that actually bit this repo (jxsuite/jx#240):
 #
-# Conditions, all three required:
-#   1. test file A runs BEFORE test file B (bun IGNORES CLI argument order and uses the
-#      tests/ directory's readdir order, so the only lever is readdir position);
-#   2. A triggers TWO OR MORE un-awaited dynamic `import("M")` calls, in separate tests;
-#   3. B imports M for real and asserts against it.
-# Result: M is absent from coverage/lcov.info AND from the printed coverage table, while
-# B's tests pass against the real M. One fire in A is not enough; two is.
+#   A. Concurrency, minimal. `Promise.all([import(M), import(M)])` drops it; the same two imports
+#      awaited in sequence do not. One test file, no ordering, no jx code.
+#   B. The same defect reached indirectly, which is how it looks in real code. A command record
+#      whose `run()` fires `void import(M).then(...)` and never awaits it, invoked from two tests:
+#      the first floating import has not settled when the second starts, so they overlap.
 #
-# usage: synthetic-repro.sh [dir]   (default /tmp/bun-coverage-drop)
+# Case B is why `packages/studio/tests/commands-defaults.test.ts` doubles its converter with
+# `mock.module()` — a double resolves from the registry, so no two real imports ever overlap.
+#
+# Needs nothing from this repo: no node_modules, no jx packages. Writes only under its own scratch
+# directory. usage: bun-coverage-drop.sh [dir]   (default /tmp/bun-coverage-drop)
 set -u
 root=${1:-/tmp/bun-coverage-drop}
+evidence=$root/.module-body-ran
 
-build() { # $1=root  $2=which test file to create LAST  $3=number of lazy fires
-  local r=$1 last=$2 fires=$3
-  rm -rf "$r"; mkdir -p "$r/src" "$r/tests"
-  printf '{ "name": "bun-coverage-drop", "private": true, "type": "module" }\n' > "$r/package.json"
-  printf '[test]\ncoverageReporter = ["text", "lcov"]\ncoverageSkipTestFiles = true\n' > "$r/bunfig.toml"
-  cat > "$r/src/target.ts" <<'T'
-export async function target(): Promise<string> {
-  const parts: string[] = [];
-  for (let i = 0; i < 3; i += 1) parts.push(`p${i}`);
-  return parts.join("-");
+scaffold() {
+  rm -rf "$root"
+  mkdir -p "$root/src" "$root/tests"
+  printf '{ "name": "bun-coverage-drop", "private": true, "type": "module" }\n' >"$root/package.json"
+  printf '[test]\ncoverageReporter = ["text", "lcov"]\n' >"$root/bunfig.toml"
+  cat >"$root/src/target.ts" <<T
+// The oracle: this line proves the module body executed, whatever coverage decides to report.
+import { appendFileSync } from "node:fs";
+
+appendFileSync("$evidence", "ran\\n");
+
+export function target(): string {
+  return "REAL";
 }
 T
-  cat > "$r/src/holder.ts" <<'H'
-export interface Rec { id: string; run: () => void }
-export const records: readonly Rec[] = [
-  { id: "repeat_node", run: () => { void import("./target").then(({ target }) => target()); } },
-];
-H
-  { echo 'import { expect, test } from "bun:test";'
-    echo 'import { records } from "../src/holder";'
-    for i in $(seq 1 "$fires"); do
-      echo "test(\"lazy fire $i\", () => { void records[0]!.run(); expect(1).toBe(1); });"
-    done
-  } > /tmp/.h4_decl.ts
-  cat > /tmp/.h4_load.ts <<'L'
-import { expect, test } from "bun:test";
-const { target } = await import("../src/target");
-test("target runs for real", async () => { expect(await target()).toBe("p0-p1-p2"); });
-L
-  # tmpfs prepends on create, btrfs/ext4 append -- so "created last" lands first on tmpfs and
-  # last elsewhere. Both branches are run below, so whichever the local fs does, both orders
-  # get measured.
-  if [ "$last" = declarer ]; then
-    cp /tmp/.h4_load.ts "$r/tests/b-loader.test.ts"; cp /tmp/.h4_decl.ts "$r/tests/a-declarer.test.ts"
-  else
-    cp /tmp/.h4_decl.ts "$r/tests/a-declarer.test.ts"; cp /tmp/.h4_load.ts "$r/tests/b-loader.test.ts"
-  fi
+  cat >"$root/src/command.ts" <<'T'
+// A command record shaped like the real thing: `run` starts a flow and returns, so the import it
+// fires is floating. Nothing downstream can await it.
+export const record = {
+  id: "repeat_node",
+  run: () => {
+    void import("./target").then(({ target }) => target());
+  },
+};
+T
 }
 
-run() {
-  cd "$root" || exit 2
-  rm -rf coverage
-  bun test --isolate --coverage --reporter=junit --reporter-outfile=/tmp/.h4_j.xml >/tmp/.h4_o.txt 2>&1
-  local order
-  order=$(grep -o 'file="[^"]*"' /tmp/.h4_j.xml | sed 's/file="//;s/"//' | awk '!seen[$0]++' | tr '\n' ' ')
-  printf '  %-56s src/target.ts in lcov: %s   (%s)\n' "$order" \
-    "$(grep -c 'SF:src/target.ts' coverage/lcov.info)" \
-    "$(grep -E '^ [0-9]+ pass' /tmp/.h4_o.txt | tr -d '\n' | tr -s ' ')"
+# $1 = human label, $2 = the test file body
+measure() {
+  printf '%s\n' "$2" >"$root/tests/only.test.ts"
+  rm -rf "$root/coverage"
+  rm -f "$evidence"
+  (cd "$root" && bun test --coverage >/dev/null 2>&1)
+  # `grep -c` prints 0 AND exits non-zero on no match, so an `|| echo 0` fallback would double it.
+  local ran records
+  ran=$(wc -l <"$evidence" 2>/dev/null) || ran=0
+  records=$(grep -c '^SF:src/target.ts' "$root/coverage/lcov.info" 2>/dev/null) || true
+  printf '  %-46s body ran: %s   lcov records: %s\n' "$1" "${ran:-0}" "${records:-0}"
 }
 
-echo "bun $(bun --revision)   fs: $(stat -f -c %T "$(dirname "$root")")"
-for fires in 1 2; do
-  echo "with $fires un-awaited lazy import(s) in the declarer:"
-  build "$root" declarer "$fires"; run
-  build "$root" loader   "$fires"; run
-done
+scaffold
+echo "bun $(bun --revision)"
+echo
+echo "A. directly — two imports of one module, overlapping vs not:"
+measure "Promise.all([import(M), import(M)])  BUG" 'import { expect, test } from "bun:test";
+
+test("concurrent", async () => {
+  const [a, b] = await Promise.all([import("../src/target"), import("../src/target")]);
+  expect(a.target()).toBe("REAL");
+  expect(b.target()).toBe("REAL");
+});'
+measure "await import(M); await import(M)  control" 'import { expect, test } from "bun:test";
+
+test("sequential", async () => {
+  const a = await import("../src/target");
+  const b = await import("../src/target");
+  expect(a.target()).toBe("REAL");
+  expect(b.target()).toBe("REAL");
+});'
+
+echo
+echo "B. indirectly — a command whose run() fires a floating import, called from N tests:"
+measure "run() from two tests  BUG" 'import { expect, test } from "bun:test";
+import { record } from "../src/command";
+
+test("fire one", () => {
+  record.run();
+  expect(1).toBe(1);
+});
+test("fire two", () => {
+  record.run();
+  expect(1).toBe(1);
+});
+test("let them settle", async () => {
+  await new Promise((done) => {
+    setTimeout(done, 50);
+  });
+  expect(1).toBe(1);
+});'
+measure "run() from one test  control" 'import { expect, test } from "bun:test";
+import { record } from "../src/command";
+
+test("fire one", () => {
+  record.run();
+  expect(1).toBe(1);
+});
+test("let it settle", async () => {
+  await new Promise((done) => {
+    setTimeout(done, 50);
+  });
+  expect(1).toBe(1);
+});'
+
+echo
+echo "In every row the module body ran exactly once. A 0 in the last column is the defect:"
+echo "the file is absent from the report, not present at 0%, so no threshold can fire on it."
