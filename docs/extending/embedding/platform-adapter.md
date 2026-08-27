@@ -72,23 +72,37 @@ Everything else on the interface is optional, and each optional member maps to a
 | Formats/schemas    | `listFormats`, `listExtensions`, `fetchProjectSchemas`, `formatAction`, `resolveClass`                                      | Only `.json` documents open; editors fall back to bundled schemas                                                                             |
 | Data + secrets     | `dataConnections`, `dataConnectionTest`, `dataPush`, `dataRows`, row CRUD, `listSecrets`, `setSecrets`                      | The Data grid and connection/push/secret controls hide                                                                                        |
 | Publish            | `cfConnection`, `cfConnect`, `cfApi`, `createPullRequest`                                                                   | Publish panel explains git-push publishing; PRs go via user token                                                                             |
-| Site preview       | `buildSite`                                                                                                                 | **Open in Browser** reports that this target cannot build a preview                                                                           |
+| Site preview       | `previewSite`, `setPreviewOverlay`, `clearPreviewOverlay`                                                                   | **Open in Browser** falls back to `buildSite`; without the overlay pair a preview shows the last saved state                                  |
+| Site build         | `buildSite`                                                                                                                 | **Build Site** reports that this target cannot build                                                                                          |
 | Desktop shell      | `getAppInfo`, `openProjectInNewWindow`, `pickProject`, `newWindow`, `setWindowProject`, `getProjectRoot`, recents, settings | Single-window; recents and settings persist in `localStorage`                                                                                 |
 | Cloud identity     | `getUser`, `getAccountStatus`, `listRepos`, `importProject`                                                                 | No signed-in identity or repository picker                                                                                                    |
 
 Studio always checks for presence before calling an optional member, so an omitted member is never an error. The [protocol route reference](/docs/extending/reference/studio-routes) is the complete degradation catalogue.
 
 :::doc-tip
-**`buildSite` may build or may render, and it says which.** The contract is "produce something
-browsable at real routes on an origin of your own, and name it in `url`", not "run the compiler".
-An adapter that cannot build at all (a hosted backend runs no project JS and has no bundler, image
-pipeline or filesystem) can still serve the working tree as a site and let `@jxsuite/runtime`
-assemble each page in the reader's browser. Report `mode: "live"` when it does, and Studio's toast
-tells the author what they are looking at; omit `mode`, or send `"built"`, for compiler output.
+**`previewSite` is what **Open in Browser** reaches first, and it does not build.** The contract is
+"serve the working tree as a site at real routes on an origin of your own, and name it in `url`".
+Compose each page from the project's files as it is asked for and let `@jxsuite/runtime` assemble it
+in the reader's browser. That is what makes it appear at once and show the author what they are
+looking at rather than what they last saved.
 
-A live preview carries none of what the compiler emits: no prerendered HTML, no optimized images, no
-islands, no `sitemap.xml` or `_headers`, no `timing: "server"` results. It carries one thing a build
-cannot, which is the working tree as it stands, including edits nobody has saved.
+**Honour `reused`.** Answer `true` when a client already holding this project's preview took the
+route you were given, and Studio opens nothing. A caller that opens a tab anyway leaves the author
+with two tabs on one project, which is the thing retargeting exists to prevent. Answer it only once
+a client has actually acknowledged: a frozen or back/forward-cached tab looks connected and will not
+act, and reporting `true` for one of those is a button that silently does nothing.
+
+**Take the overlay if you can hold it.** `setPreviewOverlay(path, contents)` carries the bytes a save
+would write for a document the author has not saved, and a preview that reads them before the file
+is the whole difference between showing the canvas and showing the disk. Hold them in memory, prefer
+them at every read, and drop them on `clearPreviewOverlay`. An adapter that omits the pair still
+previews; it previews the last save.
+
+`buildSite` is now a separate action, **Build Site**, and still means "run the compiler". An adapter
+that cannot build at all (a hosted backend runs no project JS and has no bundler, image pipeline or
+filesystem) may answer it by rendering instead, reporting `mode: "live"`; omit `mode`, or send
+`"built"`, for compiler output. A live answer carries none of what the compiler emits: no prerendered
+HTML, no optimized images, no islands, no `sitemap.xml` or `_headers`.
 :::
 
 :::doc-note
@@ -187,7 +201,7 @@ The NixOS build runs Studio in a Chromium `--app` window and talks to its launch
 
 Two lessons from it generalize to any adapter:
 
-- **A member you do not implement is a feature the user does not get, silently.** Studio probes for methods and does not ask what kind of host you are, so the launcher answered `buildSite` over RPC for months while its adapter never exposed the method. **Open in Browser** reported that this backend could not build a preview. If you add a backend handler, add the member in the same change.
+- **A member you do not implement is a feature the user does not get, silently.** Studio probes for methods and does not ask what kind of host you are, so the launcher answered `buildSite` over RPC for months while its adapter never exposed the method. **Open in Browser** reported that this backend could not preview the site. If you add a backend handler, add the member in the same change.
 - **Not every absent member is a gap.** This adapter deliberately omits the updater family (the system package manager owns updates, so there is no feed to report on) and `windowControls` (the desktop environment decorates the window, so Studio must not draw its own buttons). Omission is how you say "not here"; the alternative is a control that does nothing.
 
 Its transport also carries messages the launcher sends **unprompted**: a frame with a `method` and no request id. That is how `subscribeFileEvents` is fed, and how another window asks this one to come forward. If your host can push, a subscription member is a local handler plus a dispatch line. No polling needed.

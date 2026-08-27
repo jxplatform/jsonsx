@@ -20,7 +20,7 @@ Everything in Jx Studio happens in one window. This page is your map: what each 
 
 ## The Command Bar
 
-The top row. It holds the **⬢ menu** (opening and creating projects, Preferences, and everything else without a permanent button), the **layout tabs** (**Write · Design · Build · Ship**), the **Command Center pill**, the four buttons worth keeping in reach (**Save**, **Open in Browser**, **Undo**, **Redo**), and a toggle for each of the three docks. Read more in **[The workspace](/docs/studio/interface)**.
+The top row. It holds the **⬢ menu** (opening and creating projects, Preferences, and everything else without a permanent button), the **layout tabs** (**Write · Design · Build · Ship**), the **Command Center pill**, the four buttons worth keeping in reach (**Save**, **Open in Browser**, **Undo**, **Redo**), and a toggle for each of the three docks. **Open in Browser** shows the page you're editing in your own browser, at the address it will really have, updating as you type. Read more in **[The workspace](/docs/studio/interface)**.
 
 ## The Command Center
 

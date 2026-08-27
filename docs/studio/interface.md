@@ -8,6 +8,7 @@ spec:
   - studio.md#18
 code:
   - packages/studio/src/panels/toolbar.ts
+  - packages/studio/src/preview/preview-overlay.ts
   - packages/studio/src/panels/activity-bar.ts
   - packages/studio/src/panels/left-panel.ts
   - packages/studio/src/files/files.ts
@@ -40,9 +41,15 @@ From left to right:
 
 In the desktop app, the window's minimize, maximize and close controls also live in this row.
 
-**Open in Browser** (:kbd[⇧⌘O] on macOS, :kbd[Ctrl+Shift+O] on Windows/Linux) opens the page you're editing in your own browser, the fastest way to check the actual page instead of the canvas's approximation of it. Studio **builds the site first**, so what opens is what you are looking at, and the page opens **at the route it will be published at** on a local address of its own (a small server that serves your built site and nothing else). Styles, scripts and images load the way they will in production, and every link on the page goes where it will go once the site is live, so you can click through the whole thing. If the build reports problems the page still opens and the problems are named beside it.
+**Open in Browser** (:kbd[⇧⌘O] on macOS, :kbd[Ctrl+Shift+O] on Windows/Linux) opens the page you're editing in your own browser, the fastest way to check the actual page instead of the canvas's approximation of it. It opens **at the route it will be published at**, on a local address of its own, so styles, scripts and images load the way they will in production and every link goes where it will go once the site is live. You can click through the whole thing.
+
+Nothing is compiled on the way there. Your project's own files are served as a site and each page is assembled as it's asked for, which is why it appears at once, and why it shows **the work in progress rather than the last save**. Keep typing and the page reloads as you go, including edits to a layout or a component you have open in another tab. Save, and it reloads once more against the file you just wrote.
+
+Press it again and you get **the same tab**, moved to whatever page you're on now. One project, one preview tab, however many times you press it. Your browser won't come forward on its own when that happens, because a page can't raise a tab you're not looking at, so Studio tells you which page it moved to and you switch over when you're ready. Close the tab and the next press opens a fresh one.
 
 It is always there. When the open file has no route it's disabled and its tooltip says why: a component isn't a page, a `[slug]` route needs a value picked in the pane context bar's **resolving with** popover first, and a project that doesn't build a site has nothing to serve.
+
+**Build Site** is the other half, and it answers a different question: not "what does this page look like?" but "does my site build?" It's in the ⬢ menu and the Command Center. It runs the real compiler (bundling, image variants, the sitemap and the rest) and reports what it produced. That's the one to reach for before you publish; Open in Browser is the one for everything else.
 
 :::doc-tip
 A layout reconfigures the workspace; it never takes anything away. Every panel stays on the rail, on its shortcut and in the palette after any layout is applied.

@@ -31,6 +31,8 @@
  * save WOULD write, per dirty document, and every read here prefers them. They are held in memory
  * and never written anywhere: there is no file to go stale, so a crash leaves a preview showing the
  * saved state, which is the right answer rather than a stale one.
+ *
+ * @docs framework/build/dev-server
  */
 
 import { existsSync } from "node:fs";

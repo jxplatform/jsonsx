@@ -27,6 +27,8 @@
  * **Armed, not always on.** Serializing dirty documents on every edit is not free, and before the
  * author has ever opened a preview there is nothing to publish to. Nothing happens until a preview
  * origin exists.
+ *
+ * @docs studio/interface
  */
 
 import { effect, effectScope } from "../reactivity";

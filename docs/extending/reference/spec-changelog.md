@@ -77,6 +77,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `desktop.md`
 
+- **0.4.4-draft** (2026-08-27) — Both launchers preview the working tree live at real routes; Build Site keeps the compiler, and leaving the webview is stated to be one-way.
 - **0.4.3-draft** (2026-08-26) — Typechecking resolves the ElectroBun SDK from the pinned vendor/electrobun submodule; .hutch/devkit stays the build sysroot.
 - **0.4.2-draft** (2026-08-26) — Packages capability row: the registry seam is `packageVersions?` (each dependency's own latest), not `outdatedPackages?`.
 - **0.4.1-draft** (2026-08-26) — the Import source hands its brief to the assistant, which runs the import; the git-init obligation moves to whatever creates the project (§4.5).
@@ -232,6 +233,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `server.md`
 
+- **0.2.15** (2026-08-27) — The live site preview origin: an origin per project serving the working tree, with the overlay, the shared reload stream and its own resolver credential.
 - **0.2.14** (2026-08-26) — Packages family: `GET /__studio/packages/versions` reports every dependency's newest published version, behind or not, replacing the outdated-only check.
 - **0.2.13** (2026-08-26) — the import stream's done line carries the run summary, and accepts an opt-in verify pass (§4).
 - **0.2.12** (2026-08-25) — §3: the static-file order now matches a build — public/ precedes the project root, which survives as a compatibility lane that warns.
@@ -451,6 +453,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `studio.md`
 
+- **0.9.51-draft** (2026-08-27) — Open in Browser previews the working tree through the runtime; Build Site keeps the compiler under its own verb.
 - **0.9.50-draft** (2026-08-26) — the gear's project rows disable rather than hide, and the menu is bottom-anchored to its trigger's region.
 - **0.9.49-draft** (2026-08-26) — the rail foot is a Settings menu over both settings families; styles.open names the Project Styles editor.
 - **0.9.48-draft** (2026-08-26) — buildSite may serve a live rendering of the working tree rather than build output; SiteBuildResult.mode says which.
