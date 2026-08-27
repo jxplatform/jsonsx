@@ -42,6 +42,10 @@ A file that belongs to a content collection can open as a form built from that c
 
 Library is the project's browser: every page, layout, component, content entry and media file, filtered by category and searchable, in whichever layout suits what you are looking at (**Table**, **Cards**, **Media**, **Calendar** or **Board**). **Open Library**, from the **⬢ menu** or the palette, opens it as a document in a pane. It sits in the strip alongside your files rather than over the top of them, and you can keep it beside a page in a [split](/docs/studio/interface/tabs#two-panes). Full guide: **[The Library](/docs/studio/projects/browse)**.
 
+## Media
+
+An image, video, audio file, font or PDF opens in a viewer rather than an editor. It shows the file itself — the picture at full size, media with playback controls, a font set as a specimen — plus what Studio knows about it, the URL a document references it by, and which documents use it. Clicking a file in the Files panel or a tile in the Library is all it takes. Full guide: **[Media](/docs/studio/projects/media#open-a-media-file)**.
+
 ## Code
 
 Code shows the file as raw source in a full code editor with syntax highlighting, the same editor VS Code uses. It is the escape hatch when you want to see exactly what Studio wrote, and the **Export** button at the right of the context bar saves a copy of the file elsewhere. Everything you can do here you can also do visually; see **[Logic](/docs/studio/logic)** for where code fits in Studio.
@@ -71,6 +75,8 @@ Every file opens in its natural editor and view, and the two controls offer only
 | Markdown pages and content (`.md`) | **Canvas** · Edit  | **Code**                     | **Design**, **Preview** |
 | Components and pages (`.json`)     | **Canvas** · Edit  | **Code**, **Project Styles** | **Design**, **Preview** |
 | Spreadsheets (`.csv`)              | **Grid**           | **Code**                     | —                       |
+| Images, video, audio, fonts, PDFs  | **Media**          | —                            | —                       |
+| Vector images (`.svg`)             | **Media**          | **Code**                     | —                       |
 | The project file (`project.json`)  | **Project Styles** | **Code**                     | —                       |
 
 Opening `project.json` from the Files tree lands on **Project Styles**; **Open Project Settings** puts that same document into its settings editor, and **Open Project Styles** puts it back. All three are in the **Settings** menu at the foot of the rail.

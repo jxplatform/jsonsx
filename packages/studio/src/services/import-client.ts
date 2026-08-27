@@ -3,13 +3,21 @@
  * streaming fetch to some URL" — the dev server posts to its own origin, the desktop platforms post
  * to their token-gated loopback servers — so the request/parse/settle logic lives here once.
  *
- * The endpoint emits one JSON object per line: `progress` lines (forwarded to onProgress),
+ * The endpoint emits one JSON object per line: `progress` lines (forwarded to onProgress), a
+ * `ready` line the moment the destination is an openable project (forwarded to onReady),
  * `heartbeat` keep-alives (ignored), and a terminal `done` ({root, config, result}) or `error`
  * line. `result` is optional — a backend that does not send one is not broken, and every caller
- * treats its absence as "the run happened, and it did not say what it found".
+ * treats its absence as "the run happened, and it did not say what it found". `ready` is optional
+ * for the same reason: an older backend simply never sends one, and the caller opens the project at
+ * the end as it always did.
  */
 
-import type { ImportProgressEvent, ImportSiteOptions, ImportSiteSummary } from "../types";
+import type {
+  ImportProgressEvent,
+  ImportReadyEvent,
+  ImportSiteOptions,
+  ImportSiteSummary,
+} from "../types";
 import type { ProjectConfig } from "@jxsuite/schema/types";
 
 /**
@@ -40,12 +48,16 @@ interface StreamLine {
  * @param {ImportSiteOptions} opts — the import request; `apiKey`/`baseUrl` travel as headers
  * @param {(evt: ImportProgressEvent) => void} onProgress
  * @param {AbortSignal} [signal]
+ * @param {(evt: ImportReadyEvent) => void} [onReady] — fires once, as soon as the destination holds
+ *   an openable project. Minutes before `done` on a real crawl, which is the whole reason it
+ *   exists.
  */
 export async function streamImport(
   endpoint: string,
   opts: ImportSiteOptions,
   onProgress: (evt: ImportProgressEvent) => void,
   signal?: AbortSignal,
+  onReady?: (evt: ImportReadyEvent) => void,
 ): Promise<{ root: string; config: ProjectConfig; result?: ImportSiteSummary }> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (opts.apiKey) {
@@ -62,6 +74,7 @@ export async function streamImport(
       depth: opts.depth,
       maxPages: opts.maxPages,
       aiComponents: opts.aiComponents,
+      ...(opts.breakpoints === undefined ? {} : { breakpoints: opts.breakpoints }),
       ...(opts.model === undefined ? {} : { aiModel: opts.model }),
       ...(opts.verify === undefined ? {} : { verify: opts.verify }),
       ...(opts.verifyThreshold === undefined ? {} : { verifyThreshold: opts.verifyThreshold }),
@@ -121,6 +134,8 @@ export async function streamImport(
         ...(parsed.current === undefined ? {} : { current: parsed.current }),
         ...(parsed.total === undefined ? {} : { total: parsed.total }),
       });
+    } else if (parsed.type === "ready" && parsed.root !== undefined) {
+      onReady?.({ root: parsed.root });
     } else if (parsed.type === "done" && parsed.root !== undefined && parsed.config) {
       result = {
         root: parsed.root,

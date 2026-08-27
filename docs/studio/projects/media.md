@@ -16,6 +16,8 @@ code:
   - packages/studio/src/editor/file-drop-action.ts
   - packages/studio/src/canvas/asset-refs.ts
   - packages/studio/src/canvas/asset-resolve.ts
+  - packages/studio/src/media/media-pane.ts
+  - packages/studio/src/media/media-open.ts
 ---
 
 # Media
@@ -82,6 +84,22 @@ Some hosts cap the size of a single upload. When yours does, Studio refuses an o
 
 :::doc-note
 Uploads never overwrite. If a file of the same name is already there, the new one becomes `hero-1.jpg`, then `hero-2.jpg`, and so on. The original is left alone. A batch doesn't collide with itself either.
+:::
+
+## Open a media file
+
+Click an image in the Files panel, or a tile in the Library, and it opens in a tab of its own — the same as a page or a component, keyed by the same path. What that tab shows depends on the file: an image at full size, a video or audio file with playback controls, a font set as a specimen at five sizes, a PDF embedded. A format Studio has no viewer for says so plainly and notes that the file is still in the project and still builds.
+
+Beside the file, three things:
+
+- **What it is** — its kind, its pixel dimensions once the image has loaded, its size on disk, and when it was last modified. Anything Studio hasn't been told is left out rather than shown as a zero.
+- **How to reference it** — the URL a document actually writes for this file, with a **Copy** button. This is worth having in front of you: a file at `public/hero.jpg` is referenced `/hero.jpg`, a string that shares no part of its path, and writing the path instead is the commonest way an image goes missing from a page.
+- **Used by** — every document that references it, with a count each. Click one to open it.
+
+The viewer is read-only. Renaming, deleting and revealing a file belong to the Files panel, where you already do them for everything else.
+
+:::doc-tip
+This is the fastest way to check what an [imported site](/docs/studio/projects/create) actually brought in. Open `public/assets/images/` in the Files panel and click through — you'll see the real dimensions of every asset the crawl downloaded, and which of your new pages uses each one.
 :::
 
 ## What Studio knows about a file

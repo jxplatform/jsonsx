@@ -7,6 +7,8 @@ code:
   - packages/studio/src/new-project/import-tab.ts
   - packages/studio/src/services/ai-import-tools.ts
   - packages/studio/src/services/import-seed.ts
+  - packages/import/src/strip-classes.ts
+  - packages/import/src/emit.ts
 ---
 
 # Create a project
@@ -74,24 +76,47 @@ There is no default location. Studio never picks a folder for you and never fall
 
 ### What the Import tab asks for
 
-Beyond the site's URL, the Import tab has four options, and a fifth that appears with the fourth:
+Beyond the site's URL, the Import tab has five options, and a sixth that appears with the fifth:
 
 1. **Crawl Depth**: how far from the starting page to follow links. `0` imports that one page and nothing else, on a much faster path that skips the crawl entirely.
 2. **Max Pages**: the ceiling on how many pages to capture.
-3. **AI component naming**: let the model name the repeated pieces it finds (a `Card`, a `PricingRow`) instead of numbering them. It costs one model call per component found, so it's worth turning off on a wide crawl.
-4. **Check fidelity against the original**: after the import, build the new project, screenshot every page, and compare it against the site it came from. It roughly doubles the run, and it's the only thing that tells you how well the clone actually came out instead of what got skipped. Off by default.
+3. **Breakpoints**: how many of the site's own breakpoints your project ends up with. See below.
+4. **AI component naming**: let the model name the repeated pieces it finds (a `Card`, a `PricingRow`) instead of numbering them. It costs one model call per component found, so it's worth turning off on a wide crawl.
+5. **Check fidelity against the original**: after the import, build the new project, screenshot every page, and compare it against the site it came from. It roughly doubles the run, and it's the only thing that tells you how well the clone actually came out instead of what got skipped. Off by default.
 
    The assistant reports the percentage per page, and alongside it the two things a percentage can't tell you: requests the rendered page made and didn't get, and any errors from building the project. A page that scores badly because fifteen images 404 is a different problem from one whose layout came out wrong, and only the first of those is quick to fix.
 
-5. **Minimum fidelity**: appears once the fidelity check is on, and is the average below which the assistant tells you the clone did not match the original. It defaults to `25`, and it's a floor rather than a target: a faithful import of a complicated site still lands well under 100 for reasons no importer can fix, like a hero that rotates between screenshots or a font that renders a hair differently. What it catches is the other case, the clone that came out at 8% and would otherwise be reported like any other. Set it to `0` to see the score without it being judged.
+6. **Minimum fidelity**: appears once the fidelity check is on, and is the average below which the assistant tells you the clone did not match the original. It defaults to `25`, and it's a floor rather than a target: a faithful import of a complicated site still lands well under 100 for reasons no importer can fix, like a hero that rotates between screenshots or a font that renders a hair differently. What it catches is the other case, the clone that came out at 8% and would otherwise be reported like any other. Set it to `0` to see the score without it being judged.
 
    Missing the bar doesn't cancel anything. The project is written and opened either way; the assistant says so plainly and offers to look at what went wrong. (The `jx-import` command-line tool turns the same number into an exit code, because a script running in a pipeline has nobody to tell.)
+
+#### Choosing the breakpoints
+
+A site declares as many breakpoints as it has accumulated frameworks over the years. Nine is ordinary: `520`, `600`, `767`, `781`, `782`, `960`, `1024`, `1025`, `1390` came out of one real import, and every one of them would become a canvas size in Studio and a column in every style editor. Nobody writes CSS against nine breakpoints, and nobody picked these nine.
+
+So the Import tab asks. There are three answers:
+
+- **Limit to** a number (three by default): keep that many, spaced evenly across the widths the site declares. Three gives you the narrowest, the widest, and the one in the middle.
+- **Custom widths**: name the widths your project should have, like `640, 1024, 1440`. Each one is backed by the declared width nearest it, because that's where the site's own rules actually change.
+- **Keep all**: every breakpoint the site declares, which is what imports did before this option existed.
+
+The first two also take a **rounding rule** (nearest, round down, or round up) deciding which declared width backs a kept one. A width that isn't kept is folded into the kept one nearest it, so nothing the site expressed is thrown away; the import's log says which widths went where.
+
+You can change all of this afterwards in **[Project settings › Contexts](/docs/studio/projects/settings)**.
+
+:::doc-note
+Class names from the source site are not carried into your project. The import rebuilds every style from what the browser actually computed, and never emits the original stylesheets, so a `class="hero grid-cols-3"` left on a page would name rules that don't exist. The styles are all there; the class attributes are not.
+:::
 
 Under those, a **Model** picker and a box asking what the assistant should do with the site. Both are optional. The model here is for this import only, so it doesn't change the model the assistant uses for everything else. Leave the box empty and the assistant simply gets the site ready for you to work on; fill it in ("keep the layout but modernise the typography") and it carries straight on into that once the import lands.
 
 ### While an import runs
 
-The dialog closes as soon as you click **Import Site**. The import doesn't run in the wizard. It runs in the [AI assistant](/docs/studio/ai), which opens in the Inspector and reports as it goes: the phase it's in, the page it's on, and the last few lines of its log. When it finishes, the project opens in the same window, and the assistant tells you how many pages it captured, what it had to skip, which pages didn't render faithfully, and, when the fidelity check ran, what those pages failed to load.
+The dialog closes as soon as you click **Import Site**. The import doesn't run in the wizard. It runs in the [AI assistant](/docs/studio/ai), which opens in the Inspector and reports as it goes.
+
+**The project opens straight away**, a few seconds in, long before the crawl finishes. That's deliberate: an import takes minutes, and watching a log against an empty welcome screen tells you very little. Instead the destination is created and opened immediately, and the Files panel fills up as the pipeline works: `public/assets/` gains the images and fonts it downloads, then `pages/`, `layouts/` and `components/` appear as it writes them. You can click into any of it while the run continues.
+
+When it finishes, the assistant tells you how many pages it captured, what it had to skip, which pages didn't render faithfully, and, when the fidelity check ran, what those pages failed to load.
 
 That's also why it can stop and ask you something. An import guesses at a lot: which pages matter, whether three similar blocks are one component, what to do about a page robots.txt kept it out of. When one of those is genuinely your call, the assistant asks you there in the Inspector and waits for your answer (see **[When the assistant asks you something](/docs/studio/ai/chat)**).
 

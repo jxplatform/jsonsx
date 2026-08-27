@@ -768,6 +768,14 @@
   font-size: var(--spectrum-font-size-75, 12px);
   color: var(--danger);
 }
+/* A problem the file already had, said once at section level. Deliberately not `-error`: it did not
+   refuse anything and it belongs to no control, so it is a warning about the file rather than a
+   rejection of an edit — §16.1's distinction, in the one place a settings section can make it. */
+.settings-section-notice {
+  margin: 6px 0 0;
+  font-size: var(--spectrum-font-size-75, 12px);
+  color: var(--warning);
+}
 .settings-site-name,
 .settings-site-url {
   width: 100%;
@@ -1020,6 +1028,35 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
+}
+/* Breakpoints: a mode picker, whichever value control that mode takes, and the rounding rule. It
+   wraps rather than scrolls — the widths field is the one that needs room, and it should get it. */
+.new-project-import-breakpoints {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.new-project-breakpoint-mode {
+  min-width: 132px;
+}
+.new-project-breakpoint-rounding {
+  min-width: 132px;
+}
+.new-project-breakpoint-count,
+.new-project-min-fidelity {
+  width: 96px;
+}
+.new-project-breakpoint-widths {
+  flex: 1;
+  min-width: 160px;
+}
+/* One line under a control saying what it will do. Not an error and not a label — the sentence a
+   reader needs to predict the outcome before the run rather than after it. */
+.new-project-hint {
+  font-size: var(--spectrum-font-size-75, 12px);
+  color: var(--fg-dim);
+  line-height: 1.5;
 }
 .new-project-import-progress {
   display: flex;
@@ -2783,4 +2820,152 @@
   max-height: min(60vh, 480px);
   overflow-y: auto;
   overscroll-behavior: contain;
+/* ─── Media viewer ────────────────────────────────────────────────────────────
+   A pane that SHOWS a file rather than editing one (`media/media-pane.ts`). The stage takes the
+   room and the details column stays a fixed width, so the asset is the thing you are looking at
+   and the facts about it are beside it rather than on top of it. It scrolls itself — a wheel over
+   an image is a scroll, not a zoom, which is why `media` is in shortcuts.ts's self-scrolling set. */
+.media-viewer {
+  height: 100%;
+  display: flex;
+  gap: 16px;
+  padding: 16px;
+  overflow-y: auto;
+  background: var(--bg-panel);
+}
+.media-stage {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+/* Never larger than its own pixels: an upscaled thumbnail is a lie about the asset, and judging
+   whether an imported image is big enough is the whole reason somebody opens this. */
+.media-image {
+  max-width: 100%;
+  height: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-input);
+}
+.media-video,
+.media-embed {
+  width: 100%;
+  max-height: 70vh;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-input);
+}
+.media-audio {
+  width: 100%;
+}
+.media-specimen {
+  width: 100%;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-input);
+  color: var(--fg);
+}
+.media-specimen-line {
+  margin: 0 0 12px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.media-unviewable {
+  padding: 24px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  color: var(--fg-dim);
+  text-align: center;
+}
+.media-note {
+  font-size: var(--spectrum-font-size-75, 12px);
+  color: var(--fg-dim);
+}
+.media-details {
+  flex: 0 0 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.media-name {
+  margin: 0;
+  font-size: var(--spectrum-font-size-100, 14px);
+  color: var(--fg);
+  overflow-wrap: anywhere;
+}
+.media-facts {
+  margin: 0;
+  font-size: var(--spectrum-font-size-75, 12px);
+  color: var(--fg-dim);
+}
+/* The reference a document writes for this file — `/hero.jpg` for `public/hero.jpg`, which shares
+   not one segment with it. Getting this wrong is the commonest way an image goes missing. */
+.media-ref {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.media-ref-value {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 3px 6px;
+  overflow-wrap: anywhere;
+}
+.media-usage {
+  display: flex;
+  flex-direction: column;
+}
+.media-usage-title {
+  margin: 0 0 4px;
+  font-size: var(--spectrum-font-size-75, 12px);
+  font-weight: 500;
+  color: var(--fg-dim);
+}
+.media-usage-headline {
+  margin: 0;
+  font-size: var(--spectrum-font-size-75, 12px);
+  color: var(--fg-dim);
+}
+.media-usage-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.media-usage-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: var(--spectrum-font-size-75, 12px);
+}
+.media-usage-link {
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+  overflow-wrap: anywhere;
+}
+.media-usage-link:hover {
+  text-decoration: underline;
+}
+.media-usage-count {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--fg-dim);
 }

@@ -1456,13 +1456,16 @@ Shipped:
   decoded it — so a caption never costs a second download
 - **Delete** — the confirmation states the reference count, computed on the authored ref, and says
   **unknown** rather than zero when a lane cannot be counted (`files/file-ops.ts`)
-
-Still planned:
-
-- **Usage tracking as a SURFACE.** The query ships (`files/media-usage.ts`) and is correct; what is
-  missing is a reader other than the delete confirmation. No column, panel or field answers "which
-  pages use this image?" until you try to remove it — so the answer arrives at the one moment the
-  author has already decided.
+- **Viewing** — clicking a media file in the Files tree or the Library opens it in a tab of its own
+  (`studio.md` §4.2's Media mode). It shows the asset at full size — an image, a video or audio with
+  controls, a font as a specimen, a PDF embedded — with its kind and dimensions, the site URL a
+  document would reference it by, and the list of documents that do. Before it, opening a media file
+  was not merely unsupported: it produced an error telling the author to add a format class to
+  `project.json`, which is not advice about a PNG.
+- **Usage tracking as a surface** — the Media view is that reader. The query already shipped and was
+  already correct; what was missing was anywhere to see it outside the delete confirmation, so the
+  answer to "which pages use this image?" arrived at the one moment the author had already decided.
+  A failed count still reads **unknown**, never zero.
 
 ---
 

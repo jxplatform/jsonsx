@@ -41,6 +41,7 @@ import { parseSourceForPath, serializeDocument } from "../files/file-ops";
 import { detachGridPanel, gridPanelMounted, renderGridMode } from "../grid/grid-panel";
 import { detachLibraryPane, libraryPaneMounted, renderLibraryMode } from "../browse/library-pane";
 import { detachEntryPane, entryPaneMounted, renderEntryMode } from "../content/entry-editor";
+import { detachMediaPane, mediaPaneMounted, renderMediaMode } from "../media/media-pane";
 import {
   detachSettingsPane,
   renderSettingsPane,
@@ -370,6 +371,7 @@ function resetCanvasView(surface: CanvasSurface) {
   detachGridPanel(paneId);
   detachLibraryPane(paneId);
   detachEntryPane(paneId);
+  detachMediaPane(paneId);
   detachSettingsPane(paneId);
   disposeSourceCollab(surface);
   disposeSourceEditor(surface);
@@ -883,6 +885,12 @@ function renderCanvasImpl(surface: CanvasSurface) {
     return;
   }
 
+  // Media fast-path, same shape: the viewer owns its own effect, so learning an image's dimensions
+  // Repaints that panel and nothing reaches the canvas pipeline.
+  if (canvasMode === "media" && mediaPaneMounted(surface.paneId, tab) && !modeChanged) {
+    return;
+  }
+
   // Settings fast-path, same shape: the Project Settings editor subscribes to the section registry
   // And to its own chosen section, so a mounted editor needs nothing from the canvas pipeline.
   if (canvasMode === "settings" && settingsPaneMounted(surface) && !modeChanged) {
@@ -952,6 +960,9 @@ function renderCanvasImpl(surface: CanvasSurface) {
 
     // Same for the entry form, whose effect scope subscribes to the document's frontmatter
     detachEntryPane(surface.paneId);
+
+    // And for the media viewer, whose effect scope subscribes to the tab's path
+    detachMediaPane(surface.paneId);
 
     // Same for the Project Settings editor, which holds a registry subscription
     detachSettingsPane(surface.paneId);
@@ -1065,6 +1076,15 @@ function renderCanvasImpl(surface: CanvasSurface) {
     canvasWrap.style.padding = "0";
     canvasWrap.style.display = "block";
     renderEntryMode(surface, tab);
+    return;
+  }
+
+  /* Media mode: an image, a video, a font specimen — a file the studio can SHOW but has no document
+     model for (`media/media-pane.ts`). Same non-iframe-editor pattern as the four above. */
+  if (canvasMode === "media") {
+    canvasWrap.style.padding = "0";
+    canvasWrap.style.display = "block";
+    renderMediaMode(surface, tab);
     return;
   }
 
@@ -1508,6 +1528,7 @@ setSurfaceTeardown((surface) => {
   detachGridPanel(surface.paneId);
   detachLibraryPane(surface.paneId);
   detachEntryPane(surface.paneId);
+  detachMediaPane(surface.paneId);
   detachSettingsPane(surface.paneId);
   attachDocumentHeaderHost(surface.paneId, null);
   disposeSourceCollab(surface);

@@ -8,6 +8,12 @@
  * directly and so cannot tell whether anything else does. `tests/app-commands-composition.test.ts`
  * closed the command-factory half of that by pattern; this closes the rest by construction.
  *
+ * Three of that original four are now wired: the media viewer (`media/media-pane.ts`) is the
+ * surface `peekMediaUsages` and `mediaUsageHeadline` were written for, and it reads `loadMediaMeta`
+ * for the size and dimensions it shows. `site-architecture.md` §9.4 had listed the missing reader
+ * as a known gap for as long as they sat here — the ledger and the spec were saying the same thing
+ * in two places, and both stop saying it in the same change.
+ *
  * The analysis is in `./reachability.ts` — a call graph over the TypeScript checker's own symbol
  * resolution, walked from the bundle entrypoints, the package's published exports, and the repo
  * scripts that import studio source. Tests are not roots, which is the entire point.
@@ -174,25 +180,12 @@ const KNOWN_UNREACHABLE: Record<string, Record<string, string>> = {
       "adapter and the tree, so the browser file picker has no entry point — it is the fallback " +
       "for a host with no adapter, and no such host exists",
   },
-  "files/media-meta.ts": {
-    loadMediaMeta:
-      "one file's size and dimensions, request-coalesced. The media surfaces render from the " +
-      "directory listing they already hold; nothing yet shows per-file metadata",
-  },
-  "files/media-paths.ts": {
-    dirName:
-      "the directory half of the media path helpers. Its caller would be the media MOVE the media " +
-      "panel does not offer",
-  },
   "files/media-usage.ts": {
-    mediaUsageHeadline:
-      'the RENDERING half of media reference counting — "Counting references…", a count, or ' +
-      '**unknown**, which is deliberately a different fact from "unused". `loadMediaUsages` is ' +
-      "wired (`file-ops.ts` reads it before a delete); the surface that would DISPLAY a count is " +
-      "not built. Named in this file's own P7 list at the top and still unresolved",
-    peekMediaUsages:
-      "see `mediaUsageHeadline` — the synchronous read that surface would paint from",
-    retryMediaUsages: "see `mediaUsageHeadline` — the Retry behind the failed count it would show",
+    retryMediaUsages:
+      "the Retry behind a FAILED reference count. The media viewer displays the count now " +
+      "(`media/media-pane.ts`), which is what retired the three entries that used to sit beside " +
+      "this one — but it renders a failure as the word **unknown** and offers no button to ask " +
+      "again, so this half is still built and unreachable",
   },
   "format/constraints.ts": {
     createNestingValidator:

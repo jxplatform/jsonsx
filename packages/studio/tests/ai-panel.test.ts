@@ -856,6 +856,7 @@ describe("a turn suspended on a question", () => {
 describe("the New Project Import hand-off", () => {
   const BRIEF = {
     aiComponents: true,
+    breakpoints: { count: 3, mode: "limit" as const, rounding: "nearest" as const },
     depth: 1,
     directory: "/home/dev/Sites/example",
     maxPages: 20,

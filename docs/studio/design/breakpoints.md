@@ -6,6 +6,7 @@ code:
   - packages/studio/src/panels/pane-context.ts
   - packages/studio/src/utils/canvas-media.ts
   - packages/studio/src/utils/inherited-style.ts
+  - packages/import/src/breakpoint-plan.ts
 ---
 
 # Breakpoints
@@ -70,6 +71,20 @@ Every choice in that popover is also a command, so you can make it without reach
 :::doc-note
 Breakpoints are stored as a `$media` map in `project.json`. A single document may also carry a `$media` map of its own, which merges over the project's at render time. Per-breakpoint styles nest under the breakpoint's name inside each element's `style`, as described in **[Styling](/docs/framework/concepts/styling)**.
 :::
+
+## Breakpoints in an imported site
+
+When you [import an existing site](/docs/studio/projects/create), its breakpoints come from whatever CSS it happens to ship — which on a site that has been through two or three frameworks means a lot of them. Nine is ordinary: `520`, `600`, `767`, `781`, `782`, `960`, `1024`, `1025`, `1390` came out of one real import. Kept literally, that's nine canvases in Design mode and nine columns in every style editor.
+
+So the Import tab asks how many you want before it starts. By default it keeps **three**, spaced evenly across the widths the site declares — the narrowest, the widest, and the one in the middle. You can raise or lower that number, name the widths yourself (`640, 1024, 1440`), or keep every one.
+
+Whichever you choose, a width that isn't kept is **folded** into the kept one nearest it, so nothing the site expressed disappears — the styles it carried arrive at the breakpoint your project actually has. A rounding rule (nearest, round down, round up) decides which declared width backs a kept one, because the site's rules flip where its CSS says they do. The import's log names the result:
+
+```
+9 breakpoints declared, keeping 3: --520 (+600), --767 (+781, 782, 960, 1024, 1025), --1390
+```
+
+Imports also write a **Base width**, taken from the viewport the pages were captured at. Everything is editable afterwards in Settings › Contexts like any other project's.
 
 ## Next
 

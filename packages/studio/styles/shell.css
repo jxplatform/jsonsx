@@ -647,12 +647,12 @@
   color: var(--fg-dim);
   line-height: 1.5;
 }
-/* A running import, under the chip that started it. It reports for minutes, so it gets a head
-   line that stays put and a short tail of log below it rather than an unbounded scroller. */
+/* An import, under the chip that started it. It reports for minutes and then stays: the summary
+   line is the run's outcome once it has one, and the log below is a scroller the reader owns —
+   it follows the newest line until they scroll away from it, and stops following while they read.
+   It was a fixed six-line tail that ellipsed every message and vanished the moment the run
+   finished, which is to say the account of a successful import was destroyed by its success. */
 .ai-import-progress {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
   align-self: stretch;
   background: var(--bg-input);
   border: 1px solid var(--border);
@@ -665,12 +665,25 @@
   gap: 6px;
   font-size: var(--spectrum-font-size-50, 11px);
   color: var(--fg);
+  cursor: pointer;
+  list-style: none;
+}
+.ai-import-head::-webkit-details-marker {
+  display: none;
 }
 .ai-import-message {
+  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* How many lines are folded away, so a collapsed run still says how much it has to show. */
+.ai-import-count {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--fg-dim);
 }
 .ai-import-phase {
   color: var(--fg-dim);
@@ -679,15 +692,20 @@
   margin-right: 4px;
 }
 .ai-import-log {
+  margin-top: 4px;
+  max-height: 40vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   font-family: var(--font-mono);
   font-size: 10px;
   line-height: 1.6;
   color: var(--fg-dim);
 }
+/* Wraps rather than ellipses: a phase line names a page, a count or a file, and the end of it is
+   usually the part worth reading. */
 .ai-import-log-line {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 .ai-msg-tool-error {
   background: var(--hover-bg);

@@ -11,6 +11,7 @@ import type { ImportBrief } from "../src/services/import-seed";
 
 const BRIEF: ImportBrief = {
   aiComponents: true,
+  breakpoints: { count: 3, mode: "limit" as const, rounding: "nearest" as const },
   depth: 1,
   directory: "/home/dev/Sites/example",
   maxPages: 20,

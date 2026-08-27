@@ -3,7 +3,7 @@
  * project. A sibling of `create_project` with a different backend, and two refusals of its own: it
  * will not invent a destination the wizard already collected, and it will not run twice.
  */
-import { clearSeededSettings, installMockPlatform, seedSettings } from "./harness";
+import { clearSeededSettings, flush, installMockPlatform, seedSettings } from "./harness";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { createToolRegistry } from "@jxsuite/ai";
 import { registerImportTools, resetImportGuard } from "../src/services/ai-import-tools";
@@ -16,6 +16,7 @@ import type { ImportBrief } from "../src/services/import-seed";
 
 const BRIEF: ImportBrief = {
   aiComponents: true,
+  breakpoints: { count: 3, mode: "limit" as const, rounding: "nearest" as const },
   depth: 1,
   directory: "/home/dev/Sites/example",
   maxPages: 20,
@@ -31,6 +32,8 @@ const BRIEF: ImportBrief = {
 let captured: {
   opts: ImportSiteOptions;
   onProgress: (evt: ImportProgressEvent) => void;
+  /** The early-adoption hook — fires the moment the destination is an openable project. */
+  onReady: ((evt: { root: string }) => void) | undefined;
   resolve: (r: { root: string; config: object; result?: ImportSiteSummary }) => void;
   reject: (e: Error) => void;
   signal?: AbortSignal | undefined;
@@ -51,9 +54,10 @@ function harness(
             o: ImportSiteOptions,
             onProgress: (evt: ImportProgressEvent) => void,
             signal?: AbortSignal,
+            onReady?: (evt: { root: string }) => void,
           ) =>
             new Promise((resolve, reject) => {
-              captured = { onProgress, opts: o, reject, resolve, signal };
+              captured = { onProgress, onReady, opts: o, reject, resolve, signal };
             })) as never,
         } as never),
   );
@@ -192,6 +196,7 @@ describe("import_site — the run", () => {
 
     expect(captured!.opts).toMatchObject({
       aiComponents: true,
+      breakpoints: { count: 3, mode: "limit" as const, rounding: "nearest" as const },
       apiKey: "sk-import",
       baseUrl: "http://llm.local/v1",
       depth: 1,
@@ -450,6 +455,9 @@ describe("import_site — the run", () => {
       maxPages: 5,
       name: "example.com",
     });
+    /* Nothing asked for a policy, so none is sent and the pipeline's own default applies. Sending
+       one here would put a decision in the request that neither the model nor the user made. */
+    expect(captured!.opts.breakpoints).toBeUndefined();
     captured!.resolve({ config: {}, root: "/home/dev/Sites/scratch" });
     await running;
   });
@@ -547,5 +555,111 @@ describe("import_site — the run", () => {
 
     const { pendingImportBrief } = await import("../src/services/import-seed");
     expect(pendingImportBrief()).toBeNull();
+  });
+});
+
+// ─── Opening the project while the crawl is still running ────────────────────
+
+describe("import_site — the project opens before the run ends", () => {
+  /*
+   * A crawl takes minutes, and the tool used to spend all of them with the author on the welcome
+   * screen: it adopted the project once `importSite` RESOLVED. The pipeline now says the moment the
+   * destination holds an openable `project.json` — seconds in — and adoption happens there, so the
+   * Files tree fills with pages, components and assets as they are written.
+   */
+  test("adopts on the ready signal, long before the run resolves", async () => {
+    const adopt = landing();
+    const { registry } = harness({ adoptProject: adopt });
+    const running = registry.execute("import_site", {
+      directory: "/home/dev/Sites/early",
+      url: "https://example.com/",
+    });
+
+    expect(adopt).not.toHaveBeenCalled();
+    captured!.onReady!({ root: "/home/dev/Sites/early" });
+    await flush();
+    expect(adopt).toHaveBeenCalledWith("/home/dev/Sites/early");
+
+    captured!.resolve({ config: {}, root: "/home/dev/Sites/early" });
+    const res = await running;
+    expect(res.success).toBe(true);
+    // Adopted once. A second adoption at the end would tear down and rebuild every tab the author
+    // Had opened while they watched.
+    expect(adopt).toHaveBeenCalledTimes(1);
+  });
+
+  test("a backend that never signals still opens the project at the end", async () => {
+    // An older backend sends no `ready` line. That is not a broken backend; it is an older one.
+    const adopt = landing();
+    const { registry } = harness({ adoptProject: adopt });
+    const running = registry.execute("import_site", {
+      directory: "/home/dev/Sites/late",
+      url: "https://example.com/",
+    });
+    captured!.resolve({ config: {}, root: "/home/dev/Sites/late" });
+
+    const res = await running;
+    expect(res.success).toBe(true);
+    expect(adopt).toHaveBeenCalledWith("/home/dev/Sites/late");
+  });
+
+  test("a repeated ready signal adopts once", async () => {
+    const adopt = landing();
+    const { registry } = harness({ adoptProject: adopt });
+    const running = registry.execute("import_site", {
+      directory: "/home/dev/Sites/twice",
+      url: "https://example.com/",
+    });
+    captured!.onReady!({ root: "/home/dev/Sites/twice" });
+    captured!.onReady!({ root: "/home/dev/Sites/twice" });
+    await flush();
+    captured!.resolve({ config: {}, root: "/home/dev/Sites/twice" });
+    await running;
+    expect(adopt).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ─── Breakpoints ─────────────────────────────────────────────────────────────
+
+describe("import_site — the breakpoint policy", () => {
+  async function policyFor(args: Record<string, unknown>): Promise<unknown> {
+    const { registry } = harness({ adoptProject: landing() });
+    const running = registry.execute("import_site", {
+      directory: "/home/dev/Sites/bp",
+      url: "https://example.com/",
+      ...args,
+    });
+    const policy = captured!.opts.breakpoints;
+    captured!.resolve({ config: {}, root: "/home/dev/Sites/bp" });
+    await running;
+    return policy;
+  }
+
+  test("a count becomes a limit", async () => {
+    expect(await policyFor({ maxBreakpoints: 4 })).toEqual({
+      count: 4,
+      mode: "limit",
+      rounding: "nearest",
+    });
+  });
+
+  test("zero is how a count says keep them all", async () => {
+    expect(await policyFor({ maxBreakpoints: 0 })).toEqual({ mode: "all" });
+  });
+
+  test("a width list wins over a count, because it says more", async () => {
+    expect(await policyFor({ breakpointWidths: [640, 1024], maxBreakpoints: 4 })).toEqual({
+      mode: "explicit",
+      rounding: "nearest",
+      widths: [640, 1024],
+    });
+  });
+
+  test("the rounding rule is carried when the model names one", async () => {
+    expect(await policyFor({ breakpointRounding: "down", maxBreakpoints: 2 })).toEqual({
+      count: 2,
+      mode: "limit",
+      rounding: "down",
+    });
   });
 });

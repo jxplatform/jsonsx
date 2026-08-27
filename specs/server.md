@@ -2,7 +2,7 @@
 
 ## Development Server with Live Reload, Proxy Resolution, and Studio API
 
-**Version:** 0.2.14
+**Version:** 0.2.15
 **Status:** Implemented
 **Updated:** 2026-08-26
 **License:** MIT
@@ -177,6 +177,8 @@ Both server entry points share one set of primitives (`src/net-guard.ts`), appli
 - **Two-root activation**: filesystem operations go through `assertAccessible(filePath, root, activeProjectRoot)` — the path must sit under the server root **or** the active project root Studio bound via `POST /__studio/activate`, which itself only accepts a root contained under the server root, an explicit `allowedRoots` entry, a project this server just created (below), or **a project the account already owns** — an absolute directory holding a `project.json` somewhere under the user's home directory (`isOwnedProjectDir`). That last clause is what makes an _existing_ project openable at all: projects live outside the server root as a matter of course, so `?project=/abs/path`, the Open Project picker and the recent-projects list would otherwise be able to bind nothing but a project inside the served checkout. Requiring both the `project.json` and home containment keeps a hostile page on the loopback origin from binding the server to `/etc` or to another account's files. A refused activation is an **error the client must surface**, never a silent fallback: the endpoints that take no `dir` (the git surface especially) resolve against `activeProjectRoot || root`, so a swallowed refusal would silently run against whatever tree the server is serving
 - **The import stream's terminal line reports the run, not just its location.** `POST /__studio/import-site` streams progress and ends with the new root, the project configuration, AND a summary of what the pipeline produced: the pages it emitted, the file count, the soft failures it recorded, and — when `verify` was requested — a per-page fidelity score against the original. Every field is optional, so a backend that sends none is conformant and an older client ignores them; no protocol version moves. It matters because the pipeline computed all of it and the endpoint used to discard it, leaving a caller able to say that an import had happened and nothing about what it found. `verify` is opt-in: it compiles the emitted project and drives a second browser pass, roughly doubling the run.
 
+- **The stream also names the destination before the run finishes.** A crawl takes minutes, and a caller that has to wait for the terminal line to learn WHERE the project is spends all of them with nothing to show. The pipeline creates the destination and gives it a valid `project.json` before it launches a browser, and the endpoint re-emits that as a line of its own: `{"type":"ready","root":"…"}`, with the root in the platform's own form. It is a separate line rather than a field on a progress message because a root parsed out of prose breaks when the prose is reworded, and because the two answer different questions — _where is it_ and _what did it find_. Optional in both directions: a backend that never sends one is conformant, and a client that ignores it opens the project at the end as before. The emit phase rewrites that file completely, so nothing on the `ready` line is a claim about the result.
+
 - **Project creation is the one deliberate exception to root containment.** A new project belongs wherever the user pointed the New Project modal's Location field (specs/desktop.md §4.5), which is normally _outside_ the server root — containing it there would mean scaffolding into whatever tree the dev server happens to serve. `POST /__studio/create-project` and `POST /__studio/import-site` therefore take an explicit absolute parent and check it with `assertCreatableParent(parent, root, allowedRoots)` instead of `assertAccessible`. That guard **requires** an absolute path (a request without a destination is a 400 — the server never falls back to its own root) and admits only the server root, a configured `allowedRoots` entry, or the account's home directory, so a hostile page on the loopback origin cannot scaffold into system paths. Roots created this way are remembered for the duration of the process so the very next `/__studio/activate` can open them; the create response reports a root-relative path when the project landed under the server root and an absolute one otherwise
 
 **Fetch Metadata.** `Sec-Fetch-Site` states the requester's intent directly, which `Origin` cannot: a same-origin GET omits `Origin` entirely, so the gate has to accept an absent one — a hole `Sec-Fetch-Site` does not have. The predicate is folded into `originHostGate`, so it reaches every gated surface without a single new call site.
@@ -338,6 +340,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.2.15** (2026-08-26) — the import stream names its destination on a ready line, before the crawl finishes (§4.2).
 - **0.2.14** (2026-08-26) — Packages family: `GET /__studio/packages/versions` reports every dependency's newest published version, behind or not, replacing the outdated-only check.
 - **0.2.13** (2026-08-26) — the import stream's done line carries the run summary, and accepts an opt-in verify pass (§4).
 - **0.2.12** (2026-08-25) — §3: the static-file order now matches a build — public/ precedes the project root, which survives as a compatibility lane that warns.
@@ -366,4 +369,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/server` Specification v0.2.14_
+_`@jxsuite/server` Specification v0.2.15_

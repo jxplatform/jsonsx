@@ -199,6 +199,18 @@ Resolution is render-only in either space: the tab's source document keeps the a
 | Stylebook | Design token management and component gallery                       |
 | Preview   | Clean preview without editing chrome — a TOGGLE, not a peer (below) |
 | Source    | Raw JSON/code view                                                  |
+| Media     | An image, video, audio file, font or PDF, shown rather than edited  |
+
+**Media is a mode because a media file is not a document.** Every other mode above draws a document
+tree; there is no tree behind a PNG, and the open path used to prove it by throwing — a file that
+matched no format class and was not `.json` produced _"No format class imported for … — add one to
+project.json imports"_, which is not advice about a binary asset. Video, audio, fonts and PDFs failed
+identically, as did every tile in the Library, which opens through the same function. So a media file
+opens a real tab keyed by its path, in a mode that shows the file and says three things about it: its
+kind and dimensions, the site URL a document would reference it by — `public/hero.jpg` is written
+`/hero.jpg`, a string sharing no segment with the file — and which documents use it. It is read-only:
+rename, delete and reveal belong to the file tree, and a second set of them here would be a second
+place to keep right. `.svg` keeps a Source alternate, being the one media format that is also text.
 
 Design and Content are both **editable modes** and behave identically for text: the canvas carries a
 live caret (§8.2). They differ only in what the document is — Content mode opens a format-backed
@@ -593,6 +605,13 @@ question the agent raises renders in the same transcript, as that call's own car
 becomes its answer field — the next send answers the question instead of opening a new turn. Both
 contracts are `ai.md` §3.4–§3.5; what this section fixes is that they are drawn HERE, in a tab that
 is usable before any project exists.
+
+**A long run's log is a feed the reader owns, and it outlives the run.** It is a scroll region that
+follows the newest line until the reader scrolls away from it and stops following while they read —
+not a fixed tail, which showed six lines of a forty-line run and dropped every warning above the cut.
+When the run ends the panel collapses to its outcome and keeps the log behind it, because "the
+account survives the run" is not satisfied by an account that is discarded on success. That is the
+same failure the hand-off from the wizard to the assistant was made to fix, one layer in.
 
 ### 6.1 Property Panel
 
@@ -1333,6 +1352,8 @@ All file operations go through the Platform Abstraction Layer, which maps to `@j
 
 > **Status: Implemented.** Adding media to a project is a direct gesture from wherever the author already is. Every surface funnels through one upload core (`packages/studio/src/files/media-upload.ts`); they differ only in how the destination directory is chosen.
 
+**And every media file can be OPENED, in the Media mode of §4.2.** Adding one was a direct gesture from anywhere; looking at one was impossible from anywhere, because the open path reads a file as text and no format class claims a PNG. Clicking an asset in the Files tree or a tile in the Library opens it in a tab keyed by its path, showing the file, what it is, the site URL a document references it by, and which documents use it — the answer `site-architecture.md` §9.4 lists as having had no reader outside the delete confirmation, so the only way to learn what an image was for was to try removing it.
+
 #### Surfaces
 
 | Surface                                            | Gesture                                         | Destination                                                                                       |
@@ -1780,7 +1801,7 @@ and `activeTab`. Predicates read it; nothing writes to it from a predicate.
 | `project`    | `open`, `isSite`, `isRepo`, `isMultilingual`                                                                                   |
 | `git`        | `ahead`, `behind`, `dirtyCount`                                                                                                |
 | `document`   | `open`, `dirty`, `mode`, `canUndo`, `canRedo`                                                                                  |
-| `editor`     | `kind` — `canvas` \| `grid` \| `code` \| `diff` \| `library` \| `config` \| `none`                                             |
+| `editor`     | `kind` — `canvas` \| `grid` \| `code` \| `diff` \| `library` \| `config` \| `entry` \| `media` \| `none`                       |
 | `canvas`     | `view` — `edit` \| `design` \| `preview`                                                                                       |
 | `pane`       | `count`, `derived`                                                                                                             |
 | `selection`  | `count`, `kind`, `isRoot`, `isComponentInstance`, `isLayoutNode`                                                               |

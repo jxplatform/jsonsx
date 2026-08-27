@@ -35,11 +35,12 @@ import {
   recordImportProgress,
 } from "./import-run";
 import { adoptCreatedProject } from "./project-adoption";
+import type { AdoptOutcome } from "./project-adoption";
 import { currentToolCallId, turnSignal } from "./ai-turn-signal";
 
 import type { ToolRegistry } from "@jxsuite/ai/tools";
 import type { Tab } from "../tabs/tab";
-import type { ImportSiteSummary } from "../types";
+import type { ImportBreakpointPolicy, ImportReadyEvent, ImportSiteSummary } from "../types";
 
 /** The same bounds `packages/server/src/import-api.ts` clamps to. */
 const MAX_DEPTH = 5;
@@ -74,6 +75,39 @@ export interface ImportToolsCtx {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, Math.trunc(value)));
+}
+
+/**
+ * The breakpoint policy for this run: what the model asked for, else what the wizard collected.
+ *
+ * The model may narrow this — it is the one option a person is likely to have an opinion about
+ * after seeing the crawl — but it never invents an override the user did not ask for, because the
+ * wizard's control is already the answer to "how many breakpoints should this project have".
+ *
+ * @param {object} args - The model's `maxBreakpoints` / `breakpointWidths` / `breakpointRounding`
+ * @param {ImportBreakpointPolicy | undefined} fromBrief - What the wizard collected, if anything
+ * @returns {ImportBreakpointPolicy | undefined}
+ */
+function breakpointPolicyFor(
+  args: { maxBreakpoints?: unknown; widths?: unknown; rounding?: unknown },
+  fromBrief: ImportBreakpointPolicy | undefined,
+): ImportBreakpointPolicy | undefined {
+  const rounding =
+    args.rounding === "down" || args.rounding === "up" || args.rounding === "nearest"
+      ? args.rounding
+      : (fromBrief?.rounding ?? "nearest");
+
+  if (Array.isArray(args.widths) && args.widths.length > 0) {
+    return { mode: "explicit", rounding, widths: args.widths.map(Number) };
+  }
+  if (typeof args.maxBreakpoints === "number" && Number.isFinite(args.maxBreakpoints)) {
+    // Zero is the only spelling a count has for "keep all", and it is worth accepting: it is what
+    // A model reaches for when a person says "keep them all".
+    return args.maxBreakpoints <= 0
+      ? { mode: "all" }
+      : { count: Math.trunc(args.maxBreakpoints), mode: "limit", rounding };
+  }
+  return fromBrief;
 }
 
 /** Absolute on POSIX or Windows — the test `create_project` already applies to its `location`. */
@@ -239,11 +273,43 @@ export function registerImportTools(
               "Refine component and prop names with the model. Costs one model call per extracted " +
               "component, so it is worth asking about on a wide crawl. Default true.",
           },
+          maxBreakpoints: {
+            type: "number",
+            description:
+              "How many of the site's declared breakpoints to keep, evenly spaced across its " +
+              "range (1-12). A real site declares as many as it has accumulated frameworks, and " +
+              "each one is a canvas size and a column in every style editor. Default 3; pass 0 to " +
+              "keep every one. Ignored when breakpointWidths is given.",
+          },
+          breakpointWidths: {
+            type: "array",
+            items: { type: "number" },
+            description:
+              "Keep these widths instead of a count, e.g. [640, 1024, 1440]. Each is backed by " +
+              "the declared width nearest it, because the styles flip where the site says they " +
+              "do. Ask the user before choosing widths they did not name.",
+          },
+          breakpointRounding: {
+            type: "string",
+            enum: ["nearest", "down", "up"],
+            description: "How a kept width matches a declared one. Default nearest.",
+          },
         },
         required: ["url"],
       },
       async execute(args) {
-        const { url, directory, depth, maxPages, aiComponents, verify, minFidelity } = args as {
+        const {
+          url,
+          directory,
+          depth,
+          maxPages,
+          aiComponents,
+          verify,
+          minFidelity,
+          maxBreakpoints,
+          breakpointWidths,
+          breakpointRounding,
+        } = args as {
           url?: unknown;
           directory?: unknown;
           depth?: unknown;
@@ -251,6 +317,9 @@ export function registerImportTools(
           aiComponents?: unknown;
           verify?: unknown;
           minFidelity?: unknown;
+          maxBreakpoints?: unknown;
+          breakpointWidths?: unknown;
+          breakpointRounding?: unknown;
         };
 
         if (workspace.projectRoot) {
@@ -318,6 +387,32 @@ export function registerImportTools(
         const baseUrl = getBaseUrl();
         const model = brief?.model || preferredModel();
 
+        const breakpoints = breakpointPolicyFor(
+          { maxBreakpoints, rounding: breakpointRounding, widths: breakpointWidths },
+          brief?.breakpoints,
+        );
+
+        /*
+         * Adoption happens the moment the destination is a project, not when the run ends.
+         *
+         * A crawl takes minutes, and it used to spend all of them with the author on the welcome
+         * screen — the tool opened the project once `importSite` resolved, so the one view of what
+         * the import was doing was a log in the sidebar. Opening at `ready` puts them IN the project
+         * while it fills: the Files tree gets each page, component and asset as the pipeline writes
+         * it, through the watcher that is already running.
+         *
+         * It runs at most once (a backend may send the line once, and only one can be first), and a
+         * failure here is not the run's failure: the import continues either way, and the terminal
+         * path below reports honestly on whichever state the window ended up in.
+         */
+        let adoption: Promise<AdoptOutcome> | null = null;
+        const onReady = ({ root }: ImportReadyEvent) => {
+          adoption ??= adoptCreatedProject(root, {
+            getTab,
+            ...(adoptProject ? { adopt: adoptProject } : {}),
+          });
+        };
+
         let result: { root: string; result?: ImportSiteSummary };
         try {
           result = await platform.importSite(
@@ -329,6 +424,7 @@ export function registerImportTools(
               maxPages: clamp(Number(maxPages ?? brief?.maxPages ?? 20) || 1, 1, MAX_PAGES),
               name: brief?.name || target.hostname.replace(/^www\./, ""),
               url: target.href,
+              ...(breakpoints === undefined ? {} : { breakpoints }),
               ...(typeof verify === "boolean"
                 ? { verify }
                 : brief?.verify === undefined
@@ -347,6 +443,7 @@ export function registerImportTools(
             },
             (evt) => recordImportProgress(id, evt),
             signal,
+            onReady,
           );
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
@@ -371,10 +468,13 @@ export function registerImportTools(
         imported = true;
         clearPendingImportBrief();
 
-        const { adopted, error: adoptionError } = await adoptCreatedProject(result.root, {
-          getTab,
-          ...(adoptProject ? { adopt: adoptProject } : {}),
-        });
+        /* The early adoption if there was one, otherwise adopt now: a backend that sends no `ready`
+           line is not broken, it is older, and the project must still open. */
+        const { adopted, error: adoptionError } = await (adoption ??
+          adoptCreatedProject(result.root, {
+            getTab,
+            ...(adoptProject ? { adopt: adoptProject } : {}),
+          }));
         if (adopted) {
           onProjectAdopted?.(result.root);
           return toolSuccess(
