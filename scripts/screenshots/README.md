@@ -162,9 +162,33 @@ Both run after boot, after every step, and before every capture.
 
 Also fixed, and each was a real source of churn: the animation freeze is installed via `evaluateOnNewDocument` + `frameattached` (so a canvas rebuilt by a later step is still frozen); one fresh `BrowserContext` per shot (the HTTP cache is context-scoped, so shot warmth used to depend on running order); `--force-color-profile=srgb --font-render-hinting=none --disable-lcd-text`; `TZ=UTC` and `LANG=C.UTF-8` in the browser's environment; pointer and focus reset before every capture.
 
-`DIFF_THRESHOLD = 0.0002` decides whether committed bytes are rewritten. It is a COUNT of pixels whose channels moved more than `CHANNEL_TOLERANCE` (16), at native resolution. (It was a mean-absolute difference over 32×32 THUMBNAILS, at which size a 3840×2400 frame's whole status bar is a fraction of one pixel row; a rail that lost two buttons scored 0.07 % and the stale bytes were kept.) Per §13.4 it is for **review presentation** and is no longer load-bearing for identity.
+`DIFF_THRESHOLD = 0.01` decides whether committed bytes are rewritten. It is a COUNT of pixels whose channels moved more than `CHANNEL_TOLERANCE` (16), at native resolution. (It was a mean-absolute difference over 32×32 THUMBNAILS, at which size a 3840×2400 frame's whole status bar is a fraction of one pixel row; a rail that lost two buttons scored 0.07 % and the stale bytes were kept.) Per §13.4 it is for **review presentation** and is no longer load-bearing for identity.
 
-The number is sized against measurement. Of the 21 images the lane pushed across 24 consecutive `chore(screenshots)` commits, every one was nondeterminism rather than a UI change: the rail's git badge (11, 0.010–0.014 %), a `data-grid` cell's range outline (5, 0.089 %), `blog-grid`'s collection row order (3, 0.12–0.16 %) and `media-upload`'s drop-zone indicator (2, 0.038 %). 0.0002 clears the first band and deliberately stops there: a status bar going from empty to three fields scores ~0.1 %, so a threshold that also swallowed the rest would sit above the very regression this gate exists to catch. **The other bands are fixed where they are caused, not absorbed here**, and no whole-frame pixel metric could separate them anyway, since a 1206×76 row swap and a 3840×24 status bar have the same area.
+The number is sized against measurement, and it was re-sized once the measurement became honest. The first sample (21 rewrites across 24 `chore(screenshots)` commits) was taken while the lane still passed `--force`, so `writeIfChanged` never ran and the sample recorded Chromium's encoder rather than this threshold. `--force` left the lane in `7ce93986`; the ten days after it are 51 commits and 181 rewrites, every delta recomputed from the committed blobs.
+
+| Δ              | rewrites | the shots that dominate it                    |
+| -------------- | -------- | --------------------------------------------- |
+| ≤ 0.02 %       | 29       | the rail's git badge: `mode-*`, `state-panel` |
+| (0.02, 0.05 %] | 29       | `media-upload`'s drop-zone indicator ×19      |
+| (0.05, 0.10 %] | 25       | a `data-grid` cell's range outline ×13        |
+| (0.10, 0.25 %] | 43       | `blog-grid`'s collection row order ×12        |
+| (0.25, 1 %]    | 11       | mixed                                         |
+| (1, 5 %]       | 16       | single-occurrence, every one of them          |
+| > 5 %          | 28       | unambiguously real                            |
+
+Two signatures separate noise from change, and 1 % is where they part. **Noise repeats at a stable small value**: `mode-manage` 22 times at a median 0.075 %, `media-upload` 21 times at 0.038 %. **A real edit happens once and is large**: `elements-panel` at 68 %, `new-project-modal` at 46 %. All sixteen rewrites between 1 % and 5 % carry the second signature, which is why the threshold stops at 1 % rather than the 5 % that would suppress them too.
+
+**The four bands named above were defects, and they were fixed where they are caused rather than absorbed here**. `mode-manage`, `media-upload`, `data-grid` and `blog-grid` accounted for 74 of the 181 rewrites between them. Each was diagnosed from the committed blobs, by taking the changed-pixel bounding box of every historical rewrite rather than by re-running anything:
+
+| band                          | shots                         | what it actually was                                                          |
+| ----------------------------- | ----------------------------- | ----------------------------------------------------------------------------- |
+| body copy re-rendering        | `mode-manage`, `media-upload` | a webfont race the frame predicate could not see (`frameBlockers` in shot.ts) |
+| a cell outline present/absent | `data-grid`                   | the grid called itself settled on the range MODEL (`grid-view.ts`'s probe)    |
+| rows swapping places          | `blog-grid`                   | an unsorted directory listing (`byPathOrder` in `studio-api.ts`)              |
+
+The font one is worth stating in full, because the same shape will recur. CSS font loading is **lazy**: a declared `@font-face` is fetched when layout first matches text to it, not when the stylesheet parses. So a frame passes through a state where the stylesheet has arrived, nothing is in flight, no face reports `loading`, and `document.fonts.status` reads `"loaded"` over a set that has not begun, and the runner declared that quiet while the body copy was still in the fallback face. The evidence is three-sided and none of it needed a browser: the changed pixels are the body copy while every heading is byte-identical; the only two churning projects (`restaurant`, `real-estate`) are the ones that fetch Google Fonts, each declaring one display family and one body family; and the fixture-backed shots, which fetch no remote font, never churned on text at all. `frameBlockers` now calls `load()` on any face still `unloaded`, which moves it to `loading` synchronously and so blocks the very poll that found it.
+
+This trade gives up the ~0.1 % status-bar regression 0.0002 was sized to catch, deliberately. At 0.0002 the gate reported that regression alongside 152 other rewrites in ten days, so nobody read it, and `docs/images` grew to 90 % of the repository's pack: 567 of 634 MiB, 1,401 blob versions of 64 files. A gate nobody reads catches nothing either.
 
 ## The overlay
 

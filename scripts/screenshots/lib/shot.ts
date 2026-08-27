@@ -45,29 +45,45 @@ import type {
  * checked-in screenshots don't churn in git on every run. Per §13.4 this is for REVIEW PRESENTATION
  * and is no longer load-bearing for identity — the capture lock's `sha256` is.
  *
- * Sized against MEASUREMENT, not intuition. Every one of the 21 image rewrites the lane pushed
- * across 24 consecutive `chore(screenshots)` commits was NONDETERMINISM rather than a UI change,
- * and they fell into four bands:
+ * Sized against MEASUREMENT, not intuition — and RE-sized against a second one, because the first
+ * measured the wrong thing. That sample was 21 rewrites across 24 `chore(screenshots)` commits, and
+ * it was taken while the lane still passed `--force`: `writeIfChanged` never ran, so it recorded
+ * Chromium's encoder rather than anything this constant decides. `--force` left the lane in
+ * 7ce93986. The ten days after it are the first honest sample — 51 commits, 181 rewrites, every
+ * delta recomputed from the committed blobs with `changedPixelRatio` at `CHANNEL_TOLERANCE`:
  *
- * | churn                                | rewrites | Δ             |
- * | ------------------------------------ | -------- | ------------- |
- * | the rail's git badge (36×32 px)      | 11       | 0.010–0.014 % |
- * | a `data-grid` cell's range outline   | 5        | 0.089 %       |
- * | `blog-grid`'s collection row order   | 3        | 0.12–0.16 %   |
- * | `media-upload`'s drop-zone indicator | 2        | 0.038 %       |
+ * | Δ              | rewrites | the shots that dominate it                |
+ * | -------------- | -------- | ----------------------------------------- |
+ * | ≤ 0.02 %       | 29       | the rail's git badge: mode-*, state-panel |
+ * | (0.02, 0.05 %] | 29       | `media-upload`'s drop-zone indicator ×19  |
+ * | (0.05, 0.10 %] | 25       | a `data-grid` cell's range outline ×13    |
+ * | (0.10, 0.25 %] | 43       | `blog-grid`'s collection row order ×12    |
+ * | (0.25, 1 %]    | 11       | mixed                                     |
+ * | (1, 5 %]       | 16       | single-occurrence, every one of them      |
+ * | > 5 %          | 28       | unambiguously real                        |
  *
- * 0.0002 clears the first band — the majority — and stops there ON PURPOSE. The regression this
- * gate exists to catch is a thin surface being rewritten, and the status bar going from empty to
- * three fields scores ~0.1 %: a threshold that also swallowed the other three bands would sit ABOVE
- * that and re-blind the gate exactly the way its 32×32-thumbnail predecessor did.
+ * The four bands were fixed WHERE THEY ARE CAUSED rather than absorbed here — between them
+ * `mode-manage`, `media-upload`, `data-grid` and `blog-grid` were 74 of the 181 rewrites. Each was
+ * diagnosed from the committed blobs, by taking the changed-pixel bounding box of every historical
+ * rewrite: body copy re-rendering while every heading stayed byte-identical (a webfont race, see
+ * {@link frameBlockers}), a cell outline present in one capture and absent in the next (the grid
+ * called itself settled on the range MODEL, `grid/grid-view.ts`), and rows swapping places (an
+ * unsorted directory listing, `byPathOrder` in `server/src/studio-api.ts`). None of that is
+ * something a threshold could have separated from a real edit: their deltas are stable and small,
+ * so a value that hid them would hide everything they are indistinguishable from.
  *
- * So the other three are fixed WHERE THEY ARE CAUSED — a self-contained overlay repo
- * ({@link materialiseCopy}), a grid that reports its own layout as in-flight (`grid` in
- * `services/idle.ts`), and a sorted collection read. No whole-frame pixel metric could have
- * separated them from the regression anyway: a 1206×76 row swap and a 3840×24 status bar have the
- * same area.
+ * 0.01 is where the distribution stops looking like noise, and the two signatures are what separate
+ * them. Noise REPEATS at a stable small value — `mode-manage` 22 times at a median 0.075 %,
+ * `media-upload` 21 times at 0.038 %. A real edit happens ONCE and is large — `elements-panel` at
+ * 68 %, `new-project-modal` at 46 %. All sixteen rewrites between 1 % and 5 % carry the second
+ * signature, which is why this stops at 1 % instead of the 5 % that would suppress them too.
+ *
+ * This DOES give up the ~0.1 % status-bar regression 0.0002 was sized to catch, and that is the
+ * trade, made deliberately: at 0.0002 the gate reported that regression alongside 152 other
+ * rewrites in ten days, so nobody read it, and `docs/images` grew to 90 % of the repository's pack
+ * — 567 of 634 MiB, 1,401 blob versions of 64 files. A gate nobody reads catches nothing either.
  */
-const DIFF_THRESHOLD = 0.0002;
+const DIFF_THRESHOLD = 0.01;
 
 /**
  * How far one channel may move before a pixel counts as different.
@@ -85,13 +101,15 @@ const DIFF_THRESHOLD = 0.0002;
  * appeared, moved or changed its words moves many pixels a lot. `DIFF_THRESHOLD` is the fraction of
  * the frame that may do so and still count as noise.
  *
- * That fraction stays SMALL — 0.0002 is ~1,840 px of a 3840x2400 frame. The surfaces this pipeline
- * exists to keep honest are thin: the whole 24px status bar is 2 % of the frame and its glyphs
- * cover a tenth of that, so a bar that went from empty to three fields scores about 0.1 %. A
- * threshold generous enough to absorb "noise" at that scale is generous enough to absorb the status
- * bar, which is how a stale picture got attested twice. Churn is the cheaper failure: a re-captured
- * image that did not need re-capturing costs a diff, and a kept image that did costs a
- * documentation page that lies.
+ * This tolerance is the half of the pair that did NOT move: 16 is wide enough that anti-aliasing
+ * and font-hinting jitter never register, and narrow enough that a redrawn control always does.
+ * `DIFF_THRESHOLD` went from 0.0002 to 0.01 instead — and the argument that used to close this
+ * paragraph is the thing measurement overturned. It read: "churn is the cheaper failure — a
+ * re-captured image that did not need re-capturing costs a diff, and a kept image that did costs a
+ * documentation page that lies." At 0.0002 a diff is not what churn cost. It cost 1,401 blob
+ * versions of 64 images, 90 % of this repository's pack, and a report of 181 rewrites in ten days
+ * that no reviewer could triage — which is the same blindness by a different route. Both failures
+ * are real; the one actually suffered here was the cheap-sounding one.
  */
 const CHANNEL_TOLERANCE = 16;
 
@@ -266,11 +284,35 @@ export function trackRequests(page: Page): RequestTracker {
  * for focus to be STABLE is correct in both worlds — where nothing claims focus the blur stands and
  * no ring is photographed, and where a focus trap claims it the ring is photographed every time.
  */
-function frameBlockers(): string[] {
+export function frameBlockers(): string[] {
   const blocked: string[] = [];
+  /* CSS font loading is LAZY, and that laziness is a hole this predicate used to fall through.
+     A declared @font-face is not fetched when the stylesheet parses; it is fetched when layout
+     first matches rendered text to it. So a frame passes through a state where the stylesheet has
+     arrived, no request is in flight, no face reports `loading`, `document.fonts.status` is
+     "loaded" over a set that has not started — and the frame is declared quiet while its body copy
+     is still painted in the fallback face. The real face swaps in a frame later.
+
+     Measured, that is the single largest source of screenshot churn in this repository:
+     `mode-manage` (22 rewrites) and `media-upload` (21) are starter sites whose body font is
+     remote, and the changed pixels are the body copy alone — every heading, in a face already
+     resident, is byte-identical. The network condition cannot see it either, because at the moment
+     it is asked there is genuinely nothing in flight.
+
+     Triggering the declared-but-unstarted faces closes the window: `load()` moves a face to
+     "loading" synchronously, so this same poll reports blocked, the runner keeps waiting, and the
+     next poll sees either a loaded face or a failed one. A face that cannot load resolves to
+     "error" and stops blocking, so an offline container still terminates — it just photographs the
+     fallback deliberately instead of racing it. */
+  const unstarted = [...document.fonts].filter((f) => f.status === "unloaded");
+  for (const face of unstarted) {
+    void face.load().catch(() => {
+      // An unreachable face is not one the capture can wait for; "error" stops blocking below.
+    });
+  }
   const loading = [...document.fonts].filter((f) => f.status === "loading").length;
-  if (loading > 0 || document.fonts.status === "loading") {
-    blocked.push(`${loading || 1} font face(s) loading`);
+  if (loading > 0 || unstarted.length > 0 || document.fonts.status === "loading") {
+    blocked.push(`${Math.max(loading, unstarted.length, 1)} font face(s) loading`);
   }
   const running = document.getAnimations().filter((a) => a.playState === "running").length;
   if (running > 0) {

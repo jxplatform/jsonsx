@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { bootUrl, DOCK_COMMAND, matchState, OPEN_COMMANDS } from "./shot";
+import { bootUrl, DOCK_COMMAND, frameBlockers, matchState, OPEN_COMMANDS } from "./shot";
 import { resolveShot, validateManifest } from "./types";
 import type { ShotContext } from "./shot";
 import type { Manifest, ResolvedOpen } from "./types";
@@ -135,5 +135,77 @@ describe("resetPointerAndFocus", () => {
     expect(source).not.toContain("mouse.move(-1, -1)");
     expect(source).toContain("viewport.width - 1");
     expect(source).toContain("viewport.height - 1");
+  });
+});
+
+// ─── frameBlockers ────────────────────────────────────────────────────────────
+
+/**
+ * A stand-in for one `@font-face` in a frame's `document.fonts`.
+ *
+ * `load()` moving the face to "loading" synchronously is the behaviour the predicate leans on, and
+ * it is what the CSS Font Loading spec requires of an unloaded face, so the fake owes it too.
+ */
+class FakeFace {
+  status: string;
+  loads = 0;
+  constructor(status: string) {
+    this.status = status;
+  }
+  load(): Promise<unknown> {
+    this.loads += 1;
+    if (this.status === "unloaded") {
+      this.status = "loading";
+    }
+    return Promise.resolve(this);
+  }
+}
+
+/** Install the three globals `frameBlockers` reads, as a frame would present them. */
+function installFrame(faces: FakeFace[], setStatus = "loaded"): void {
+  const g = globalThis as Record<string, unknown>;
+  g.document = {
+    activeElement: null,
+    fonts: { status: setStatus, [Symbol.iterator]: () => faces[Symbol.iterator]() },
+    getAnimations: () => [],
+  };
+  g.window = {};
+}
+
+/** Only the font clause; the focus clause reports once on first sight by design. */
+const fontLines = () => frameBlockers().filter((line) => line.includes("font face"));
+
+describe("frameBlockers", () => {
+  test("triggers a declared-but-unstarted face and blocks on it", () => {
+    const face = new FakeFace("unloaded");
+    installFrame([face]);
+
+    // The window the runner used to fall through: the stylesheet has parsed, nothing is in flight,
+    // And `document.fonts.status` reads "loaded" over a set that has not begun.
+    expect(fontLines()).toEqual(["1 font face(s) loading"]);
+    expect(face.loads).toBe(1);
+    expect(face.status).toBe("loading");
+  });
+
+  test("keeps blocking while a face is loading", () => {
+    installFrame([new FakeFace("loading")]);
+    expect(fontLines()).toEqual(["1 font face(s) loading"]);
+  });
+
+  test("clears once every face has resolved", () => {
+    installFrame([new FakeFace("loaded"), new FakeFace("loaded")]);
+    expect(fontLines()).toEqual([]);
+  });
+
+  test("a face that cannot load stops blocking, so an offline container terminates", () => {
+    // "error" is where an unreachable webfont lands. Blocking on it would hang the shot until the
+    // Idle timeout and then fail a capture that was never going to get its font.
+    installFrame([new FakeFace("error")]);
+    expect(fontLines()).toEqual([]);
+  });
+
+  test("honours the set's own aggregate status", () => {
+    installFrame([], "loading");
+    expect(fontLines()).toEqual(["1 font face(s) loading"]);
   });
 });
