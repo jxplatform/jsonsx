@@ -6,7 +6,7 @@
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { join, resolve } from "node:path";
-import { mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createDevServer } from "../src/server.ts";
 import { createCollabRegistry } from "../src/collab.ts";
 import { createWsCollabConnection } from "@jxsuite/collab/client";
@@ -234,6 +234,63 @@ describe("watcher-driven resets", () => {
     } finally {
       connection.destroy();
       watched.stop(true);
+      rmSync(dir, { force: true, recursive: true });
+    }
+  });
+});
+
+/**
+ * A rename moves a file out from under a live room, and the room is keyed by PATH.
+ *
+ * Left alone the room survives the move holding pre-rename content, and `stop()`'s
+ * graceful-shutdown flush writes it back — RECREATING the file the rename deleted. `pendingPersist`
+ * receives a path on the room's seed transaction, so a clean editor is no protection either. This
+ * is the whole reason the rename route reports the move to the collab registry.
+ */
+describe("renames reach the collaboration registry", () => {
+  test("a rename resets the old path's room, and shutdown does not resurrect the file", async () => {
+    const dir = resolve(import.meta.dir, "_collab_rename_fixtures");
+    rmSync(dir, { force: true, recursive: true });
+    mkdirSync(join(dir, "pages"), { recursive: true });
+    writeFileSync(join(dir, "project.json"), JSON.stringify({ name: "rename-demo" }));
+    writeFileSync(join(dir, "pages/movable.md"), "# Before\n");
+    const renamed = (await createDevServer({
+      builds: [],
+      port: 0,
+      root: dir,
+      studio: true,
+      watch: false,
+    })) as unknown as { port: number; stop: (force?: boolean) => void };
+    const connection = createWsCollabConnection({
+      openTimeoutMs: 5000,
+      url: `ws://localhost:${renamed.port}/__studio/collab`,
+    });
+    try {
+      const handle = await connection.openDoc("pages/movable.md");
+      expect(handle).not.toBeNull();
+      await handle!.whenSynced;
+      let resets = 0;
+      handle!.onReset(() => {
+        resets += 1;
+      });
+
+      const res = await fetch(`http://localhost:${renamed.port}/__studio/file/rename`, {
+        body: JSON.stringify({ from: "pages/movable.md", to: "pages/moved.md" }),
+        method: "POST",
+      });
+      expect(res.ok).toBe(true);
+      await until(() => resets === 1, 10_000);
+
+      // The flush on shutdown must find no room for the old path, so the moved file stays moved.
+      renamed.stop(true);
+      await new Promise((resolveSleep) => {
+        setTimeout(resolveSleep, 100);
+      });
+      expect(existsSync(join(dir, "pages/moved.md"))).toBe(true);
+      expect(existsSync(join(dir, "pages/movable.md"))).toBe(false);
+    } finally {
+      connection.destroy();
+      renamed.stop(true);
       rmSync(dir, { force: true, recursive: true });
     }
   });

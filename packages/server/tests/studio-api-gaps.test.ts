@@ -1044,6 +1044,34 @@ describe("file endpoints — error paths", () => {
     const res = await callApi(req, url);
     expect(res.status).toBe(500);
   });
+
+  /**
+   * A live collaboration room is keyed by PATH, and a rename moves the file out from under it. Left
+   * alone, the room survives holding pre-rename content and the graceful-shutdown flush writes it
+   * back — recreating the file the rename deleted. `pendingPersist` receives a path on the room's
+   * seed transaction, so a clean editor is no protection either.
+   */
+  test("a successful rename tells the host the OLD path moved", async () => {
+    writeFileSync(join(ROOT, "moved-src.json"), "{}");
+    const moved: string[] = [];
+    const { req, url } = jsonReq("/__studio/file/rename", "POST", {
+      from: "moved-src.json",
+      to: "moved-dst.json",
+    });
+    const res = await callApi(req, url, ROOT, null, { onFileMoved: (p) => moved.push(p) });
+    expect(res.status).toBe(200);
+    expect(moved).toEqual([join(ROOT, "moved-src.json")]);
+  });
+
+  test("a rename that never happened tells it nothing", async () => {
+    const moved: string[] = [];
+    const { req, url } = jsonReq("/__studio/file/rename", "POST", {
+      from: "not-here-at-all.json",
+      to: "nor-here.json",
+    });
+    await callApi(req, url, ROOT, null, { onFileMoved: (p) => moved.push(p) });
+    expect(moved).toEqual([]);
+  });
 });
 
 // ─── format endpoints — error paths ──────────────────────────────────────────
