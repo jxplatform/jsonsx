@@ -37,11 +37,18 @@ const captureStyles = mock(() =>
 );
 void mock.module("../src/style-capture.ts", () => ({ captureStyles }));
 
-const extractMedia = mock(() =>
-  Promise.resolve({
-    breakpoints: { "--md": "(max-width: 768px)" } as Record<string, string>,
-    deltas: {},
-  }),
+const extractMedia = mock(
+  (
+    _page?: unknown,
+    _base?: unknown,
+    _uaDefaults?: unknown,
+    _queries?: readonly string[],
+    _options?: Record<string, unknown>,
+  ) =>
+    Promise.resolve({
+      breakpoints: { "--md": "(max-width: 768px)" } as Record<string, string>,
+      deltas: {},
+    }),
 );
 void mock.module("../src/media-extract.ts", () => ({ extractMedia }));
 
@@ -68,7 +75,7 @@ const downloadAssets = mock(() =>
 void mock.module("../src/asset-download.ts", () => ({ downloadAssets }));
 
 const emitMultiPageProject = mock((_opts: Record<string, unknown>) =>
-  Promise.resolve({ files: ["project.json", "a", "b"] }),
+  Promise.resolve({ classesStripped: 0, files: ["project.json", "a", "b"] }),
 );
 void mock.module("../src/emit.ts", () => ({ emitMultiPageProject }));
 
@@ -187,6 +194,8 @@ const { importSite } = await import("../src/run.ts");
 interface ProgressEvent {
   phase: string;
   message: string;
+  /** Present on the `seed` event alone — the root a host can open straight away. */
+  root?: string;
 }
 
 function freshOutDir(): string {
@@ -237,6 +246,51 @@ describe("importSite — validation", () => {
     await expect(importSite({ url: "https://x.example", outDir: dir })).rejects.toThrow(
       "is not empty",
     );
+  });
+
+  test("tolerates its OWN seed, so a re-entered run is not refused by its first statement", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "jx-run-seeded-"));
+    writeFileSync(join(dir, "project.json"), '{ "name": "x" }');
+    const result = await importSite({ url: "https://site.example/", outDir: dir, maxDepth: 0 });
+    expect(result.outDir).toBe(dir);
+  });
+});
+
+describe("importSite — the seed", () => {
+  test("creates the destination and announces the root before the browser launches", async () => {
+    const events: ProgressEvent[] = [];
+    const outDir = freshOutDir();
+    await importSite({ url: "https://www.site.example/", outDir, maxDepth: 0 }, (e) => {
+      events.push(e);
+    });
+
+    expect(events[0]).toEqual({
+      message: `Created ${outDir}`,
+      phase: "seed",
+      root: outDir,
+    });
+    // The seed lands before anything that could take minutes, which is the point of it.
+    expect(events.findIndex((e) => e.phase === "seed")).toBeLessThan(
+      events.findIndex((e) => e.phase === "launch"),
+    );
+    const seeded = await Bun.file(join(outDir, "project.json")).json();
+    expect(seeded.name).toBe("site.example");
+  });
+
+  test("falls back to a placeholder name when the URL has no readable hostname", async () => {
+    const outDir = freshOutDir();
+    capturePage.mockResolvedValueOnce({
+      url: "https://site.example/",
+      title: "Example Site",
+      bodyHtml: "<div></div>",
+      links: [],
+      page: { close: pageClose },
+    });
+    // `importSite` has already accepted the scheme; this is the belt-and-braces branch for a URL
+    // That parses at the guard and not at `new URL` — an empty authority.
+    await importSite({ url: "https://", outDir, maxDepth: 0 });
+    const seeded = await Bun.file(join(outDir, "project.json")).json();
+    expect(seeded.name).toBe("Imported Site");
   });
 });
 
@@ -311,6 +365,91 @@ describe("importSite — single-page mode", () => {
       breakpoints?: Record<string, string>;
     };
     expect(emitOpts.breakpoints).toEqual({ "--md": "(max-width: 768px)" });
+  });
+
+  test("names the breakpoints it kept and the widths that folded into them", async () => {
+    captureStyles.mockResolvedValueOnce({
+      elements: [],
+      uaDefaults: {},
+      mediaQueries: [
+        "(max-width: 520px)",
+        "(min-width: 600px)",
+        "(max-width: 767px)",
+        "(min-width: 782px)",
+        "(min-width: 1390px)",
+      ],
+      customProperties: {},
+      documentStyles: {},
+    });
+    const events: ProgressEvent[] = [];
+    await importSite({ url: "https://site.example/", outDir: freshOutDir(), maxDepth: 0 }, (e) => {
+      events.push(e);
+    });
+    const line = events.map((e) => e.message).find((m) => m.includes("breakpoints declared"));
+    expect(line).toBe("5 breakpoints declared, keeping 3: --520 (+600), --767 (+782), --1390");
+  });
+
+  test("says so when it is keeping every declared breakpoint", async () => {
+    captureStyles.mockResolvedValueOnce({
+      elements: [],
+      uaDefaults: {},
+      mediaQueries: ["(max-width: 520px)", "(min-width: 1390px)"],
+      customProperties: {},
+      documentStyles: {},
+    });
+    const events: ProgressEvent[] = [];
+    await importSite({ url: "https://site.example/", outDir: freshOutDir(), maxDepth: 0 }, (e) => {
+      events.push(e);
+    });
+    expect(events.map((e) => e.message)).toContain("Keeping all 2 declared breakpoints");
+  });
+
+  test("warns about width queries it could not read, naming them", async () => {
+    captureStyles.mockResolvedValueOnce({
+      elements: [],
+      uaDefaults: {},
+      mediaQueries: ["(min-width: 48rem)", "(hover: hover)"],
+      customProperties: {},
+      documentStyles: {},
+    });
+    const result = await importSite({
+      url: "https://site.example/",
+      outDir: freshOutDir(),
+      maxDepth: 0,
+    });
+    expect(result.warnings.some((w) => w.includes("(min-width: 48rem)"))).toBe(true);
+    // A query with no width in it is not a lost breakpoint and must not be reported as one.
+    expect(result.warnings.some((w) => w.includes("(hover: hover)"))).toBe(false);
+  });
+
+  test("honours an explicit breakpoint policy", async () => {
+    captureStyles.mockResolvedValueOnce({
+      elements: [],
+      uaDefaults: {},
+      mediaQueries: ["(max-width: 767px)", "(min-width: 1390px)"],
+      customProperties: {},
+      documentStyles: {},
+    });
+    await importSite({
+      url: "https://site.example/",
+      outDir: freshOutDir(),
+      maxDepth: 0,
+      breakpoints: { mode: "explicit", rounding: "nearest", widths: [768] },
+    });
+    const options = extractMedia.mock.calls.at(-1)?.[4] as { policy?: unknown } | undefined;
+    expect(options?.policy).toEqual({ mode: "explicit", rounding: "nearest", widths: [768] });
+  });
+
+  test("reports what the class strip removed", async () => {
+    emitMultiPageProject.mockResolvedValueOnce({
+      classesStripped: 42,
+      files: ["project.json"],
+    });
+    const events: ProgressEvent[] = [];
+    await importSite({ url: "https://site.example/", outDir: freshOutDir(), maxDepth: 0 }, (e) => {
+      events.push(e);
+    });
+    expect(events.map((e) => e.message)).toContain("Wrote 1 files, stripped 42 source class names");
   });
 
   test("reports sub-kilobyte download sizes and skipped tracking URLs", async () => {

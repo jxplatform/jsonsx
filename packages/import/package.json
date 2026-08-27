@@ -21,7 +21,8 @@
     "./to-jx": "./src/to-jx.ts",
     "./emit": "./src/emit.ts",
     "./run": "./src/run.ts",
-    "./verify": "./src/verify.ts"
+    "./verify": "./src/verify.ts",
+    "./breakpoint-plan": "./src/breakpoint-plan.ts"
   },
   "publishConfig": {
     "provenance": true

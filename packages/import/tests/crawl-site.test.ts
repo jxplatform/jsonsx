@@ -48,11 +48,18 @@ const captureStyles = mock(() =>
 );
 void mock.module("../src/style-capture.ts", () => ({ captureStyles }));
 
-const extractMedia = mock(() =>
-  Promise.resolve({
-    breakpoints: { "--md": "(max-width: 768px)" } as Record<string, string>,
-    deltas: {},
-  }),
+const extractMedia = mock(
+  (
+    _page?: unknown,
+    _base?: unknown,
+    _uaDefaults?: unknown,
+    _queries?: readonly string[],
+    _options?: Record<string, unknown>,
+  ) =>
+    Promise.resolve({
+      breakpoints: { "--md": "(max-width: 768px)" } as Record<string, string>,
+      deltas: {},
+    }),
 );
 void mock.module("../src/media-extract.ts", () => ({ extractMedia }));
 
@@ -88,6 +95,7 @@ let robotsBody: string | null = "";
 beforeEach(() => {
   capturePage.mockClear();
   captureStyles.mockClear();
+  extractMedia.mockClear();
   collectAssets.mockClear();
   downloadAssets.mockClear();
   robotsBody = "";
@@ -318,6 +326,77 @@ describe("crawlSite", () => {
     });
     expect(extractMedia).toHaveBeenCalled();
     expect(result.breakpoints).toBeUndefined();
+  });
+
+  test("plans the breakpoints once, reports the plan, and reuses it on every later page", async () => {
+    seedSite();
+    const declared = [
+      "(max-width: 520px)",
+      "(min-width: 600px)",
+      "(max-width: 767px)",
+      "(min-width: 782px)",
+      "(min-width: 1390px)",
+    ];
+    /* Only the FIRST page declares these. Later pages fall back to the shared mock's single
+       `(max-width: 768px)` — and must still be captured under page 1's plan, which is the property
+       this test exists for. */
+    captureStyles.mockResolvedValueOnce({
+      elements: [],
+      uaDefaults: {},
+      mediaQueries: declared,
+      customProperties: {},
+      documentStyles: {},
+    });
+    const messages: string[] = [];
+    const result = await crawlSite({
+      url: HOME,
+      outDir: outDir(),
+      maxDepth: 1,
+      maxPages: 5,
+      maxNodesPerPage: 5000,
+      skipStyles: false,
+      skipAssets: true,
+      respectRobots: false,
+      onProgress: (msg) => messages.push(msg),
+    });
+
+    expect(result.pages.length).toBeGreaterThan(1);
+    expect(messages.join("")).toContain("5 breakpoints declared, keeping 3: --520, --767, --1390");
+
+    /* Every page gets the SAME plan. Planning per page would let page 2 keep a width page 1 folded
+       away, so `$media` would end up the union of several plans — the very thing a limit is for. */
+    const plans = extractMedia.mock.calls.map(
+      (call) => (call[4] as { plan?: { name: string }[] } | undefined)?.plan,
+    );
+    expect(plans.length).toBeGreaterThan(1);
+    for (const plan of plans) {
+      expect(plan?.map((bp) => bp.name)).toEqual(["--520", "--767", "--1390"]);
+    }
+  });
+
+  test("stays quiet when the policy keeps everything the site declared", async () => {
+    seedSite();
+    captureStyles.mockResolvedValueOnce({
+      elements: [],
+      uaDefaults: {},
+      mediaQueries: ["(max-width: 520px)", "(min-width: 1390px)"],
+      customProperties: {},
+      documentStyles: {},
+    });
+    const messages: string[] = [];
+    await crawlSite({
+      url: HOME,
+      outDir: outDir(),
+      maxDepth: 0,
+      maxPages: 1,
+      maxNodesPerPage: 5000,
+      skipStyles: false,
+      skipAssets: true,
+      respectRobots: false,
+      breakpoints: { mode: "all" },
+      onProgress: (msg) => messages.push(msg),
+    });
+    expect(messages.join("")).not.toContain("breakpoints declared");
   });
 
   test("survives asset-collection failures with a warning", async () => {

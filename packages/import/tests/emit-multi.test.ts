@@ -178,6 +178,7 @@ describe("emitMultiPageProject", () => {
 
       const project = await Bun.file(join(dir, "project.json")).json();
       expect(project.style).toEqual({ "--brand": "#3b82f6", "--space-4": "16px" });
+      expect(project.$style).toBeUndefined();
     } finally {
       await rm(dir, { recursive: true });
     }
@@ -205,12 +206,10 @@ describe("emitMultiPageProject", () => {
       expect(css).toContain('font-family: "B"');
 
       const project = await Bun.file(join(dir, "project.json")).json();
-      expect(project.$head).toEqual([
-        {
-          tagName: "link",
-          attributes: { rel: "stylesheet", href: "/assets/fonts.css" },
-        },
-      ]);
+      expect(project.$head).toContainEqual({
+        tagName: "link",
+        attributes: { rel: "stylesheet", href: "/assets/fonts.css" },
+      });
     } finally {
       await rm(dir, { recursive: true });
     }

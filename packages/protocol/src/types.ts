@@ -536,6 +536,40 @@ export interface ImportProgressEvent {
   total?: number;
 }
 
+/**
+ * How many of a site's declared breakpoints the imported project keeps.
+ *
+ * A real site declares as many as it has accumulated frameworks — nine is ordinary — and each one
+ * becomes a canvas size in Studio and a column in every style editor. `limit` is the default
+ * because that is the complaint it answers; `explicit` is for an author who already knows the
+ * widths their project should have. `rounding` decides which DECLARED width backs a kept one, since
+ * the styles flip where the site says they do, not where the author wishes they did.
+ */
+export type BreakpointRounding = "nearest" | "down" | "up";
+
+export interface ImportBreakpointPolicy {
+  mode: "all" | "limit" | "explicit";
+  /** `limit` only — how many to keep, evenly spaced across the declared range. */
+  count?: number;
+  /** `explicit` only — the widths the project should have, in CSS pixels. */
+  widths?: number[];
+  /** `limit` and `explicit` — how a kept width matches a declared one. */
+  rounding?: BreakpointRounding;
+}
+
+/**
+ * The line the import stream sends the moment the destination exists and holds a `project.json`.
+ *
+ * It is what makes an import watchable. The emit phase rewrites that file completely, so nothing
+ * here is a guess about the result — it says the directory is now a PROJECT, so the caller can open
+ * it and see the pages, components and assets arrive in its own file tree over the several minutes
+ * a crawl takes, rather than facing a welcome screen until the run ends.
+ */
+export interface ImportReadyEvent {
+  /** The project root, in the platform's own form. */
+  root: string;
+}
+
 /** Options for the import-site pipeline (StudioPlatform.importSite). */
 export interface ImportSiteOptions {
   /** The live site to clone; must be http(s). */
@@ -548,6 +582,8 @@ export interface ImportSiteOptions {
   depth: number;
   /** Max pages to capture. */
   maxPages: number;
+  /** Which of the site's declared breakpoints the project keeps. Omitted means the default limit. */
+  breakpoints?: ImportBreakpointPolicy;
   /** Refine component/prop names with the LLM (requires a key). */
   aiComponents: boolean;
   /**

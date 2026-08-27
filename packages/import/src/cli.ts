@@ -3,6 +3,13 @@
 import { resolve } from "node:path";
 import { homedir } from "node:os";
 import { importSite } from "./run.ts";
+import {
+  DEFAULT_BREAKPOINT_POLICY,
+  MAX_BREAKPOINTS,
+  MAX_BREAKPOINT_WIDTH,
+  MIN_BREAKPOINT_WIDTH,
+} from "./breakpoint-plan.ts";
+import type { BreakpointPolicy, BreakpointRounding } from "./breakpoint-plan.ts";
 
 function usage(): never {
   console.log(`Usage: jx-import <url> [options]
@@ -14,6 +21,10 @@ Options:
   --depth <n>              Max crawl depth (default: 2, 0 = single page)
   --max-pages <n>          Max pages to capture (default: 25)
   --max-nodes-per-page <n> Skip styles/assets for pages above this (default: 5000)
+  --max-breakpoints <n>    Keep at most n of the site's breakpoints (default: 3, 0 = keep all)
+  --breakpoints <list>     Keep these widths instead, e.g. 640,1024,1440
+  --breakpoint-rounding <r> How a kept width matches a declared one: nearest|down|up
+                           (default: nearest)
   --no-styles              Skip CSS capture
   --no-assets              Skip asset download
   --no-crawl               Single page only (equivalent to --depth 0)
@@ -40,6 +51,8 @@ Examples:
   jx-import https://example.com --depth 1 --max-pages 10
   jx-import https://example.com --no-crawl
   jx-import https://example.com --out sites/my-clone --no-styles
+  jx-import https://example.com --breakpoints 640,1024,1440
+  jx-import https://example.com --max-breakpoints 0
   jx-import https://example.com --verify
   jx-import https://example.com --ai-components`);
   process.exit(1);
@@ -89,6 +102,47 @@ const verifyThreshold =
 const minFidelity = parseIntArg(args, "--min-fidelity", 25);
 const verifyFullPage = !args.includes("--verify-viewport-only");
 
+/**
+ * The breakpoint policy from the flags.
+ *
+ * `--breakpoints` wins over `--max-breakpoints` because it is the more specific answer: naming the
+ * widths says everything a count could have.
+ */
+function breakpointPolicy(): BreakpointPolicy {
+  const roundingIdx = args.indexOf("--breakpoint-rounding");
+  const roundingArg = roundingIdx === -1 ? "" : (args[roundingIdx + 1] ?? "");
+  const rounding: BreakpointRounding =
+    roundingArg === "down" || roundingArg === "up" ? roundingArg : "nearest";
+
+  const widthsIdx = args.indexOf("--breakpoints");
+  const widthsArg = widthsIdx === -1 ? "" : (args[widthsIdx + 1] ?? "");
+  if (widthsArg) {
+    const widths = widthsArg
+      .split(",")
+      .map((part) => Math.trunc(Number(part.trim())))
+      .filter((n) => Number.isFinite(n) && n >= MIN_BREAKPOINT_WIDTH && n <= MAX_BREAKPOINT_WIDTH);
+    if (widths.length === 0) {
+      console.error(
+        `Error: --breakpoints needs widths between ${MIN_BREAKPOINT_WIDTH} and ` +
+          `${MAX_BREAKPOINT_WIDTH}, e.g. --breakpoints 640,1024,1440`,
+      );
+      process.exit(1);
+    }
+    return { mode: "explicit", rounding, widths };
+  }
+
+  if (!args.includes("--max-breakpoints")) {
+    return DEFAULT_BREAKPOINT_POLICY;
+  }
+  const count = parseIntArg(args, "--max-breakpoints", 3);
+  // Zero is the only spelling of "keep all" a count can have, and it reads better than omitting the
+  // Flag when a script is choosing between the two.
+  return count <= 0
+    ? { mode: "all" }
+    : { count: Math.min(MAX_BREAKPOINTS, count), mode: "limit", rounding };
+}
+
+const breakpoints = breakpointPolicy();
 const maxDepth = noCrawl ? 0 : parseIntArg(args, "--depth", 2);
 const maxPages = parseIntArg(args, "--max-pages", 25);
 const maxNodesPerPage = parseIntArg(args, "--max-nodes-per-page", 5000);
@@ -131,6 +185,7 @@ async function main() {
       {
         url: url as string,
         outDir,
+        breakpoints,
         maxDepth,
         maxPages,
         maxNodesPerPage,
