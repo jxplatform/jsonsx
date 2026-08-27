@@ -131,6 +131,13 @@ JavaScript, and giving it an origin of its own keeps it away from anything the e
 browser. What it will serve is an allowlist that defaults closed, so `project.json`, a lockfile and
 every dotfile are unreachable from a page.
 
+Markdown pages preview too, and so does anything else one of your extensions can parse. The preview
+reads the `extensions` list in your `project.json` and builds the same format registry a build does,
+so `pages/index.md` renders here the way it will in production. It reads that file the same way it
+reads the rest of your tree, unsaved bytes first, so adding an extension in Studio takes effect on
+the next reload rather than after a save. A page whose format nothing installed can parse says so by
+name instead of rendering blank.
+
 It reloads the same way this server does, over the same stream, and one save is one reload however
 many things it changed. Press **Open in Browser** again and you get the same tab, moved to whatever
 page you're on now.

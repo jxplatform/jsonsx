@@ -43,6 +43,7 @@ import { serveSite, siteContext, siteHeaders } from "@jxsuite/site/serve";
 import { SERVABLE_ROOTS } from "@jxsuite/site/paths";
 import { buildSiteStyleCSS } from "@jxsuite/site/site-style";
 import type { AssetIO, SiteContext } from "@jxsuite/site/serve";
+import { readProjectConfig } from "@jxsuite/site/compose";
 import type { DocumentParser, SiteIO } from "@jxsuite/site/compose";
 import { buildProjectFormatRegistry } from "@jxsuite/compiler/format-host";
 import type { JxDocument } from "@jxsuite/schema/types";
@@ -193,7 +194,16 @@ async function treePaths(projectRoot: string, overlay: Map<string, string>): Pro
 function documentParser(projectRoot: string): DocumentParser {
   return async (path, text) => {
     try {
-      const registry = await buildProjectFormatRegistry(projectRoot);
+      /* `project.json` is the file that NAMES the extensions, so the registry is empty without it —
+         which is not "no parser for .md" but "no extensions at all", and the page reported that it
+         needed a parser this host does not run while the host was in fact running one. Read through
+         the overlay like every other read here, so adding `@jxsuite/parser` to the project renders
+         markdown without saving first. */
+      const config = await readProjectConfig({
+        paths: () => [],
+        read: (file) => readTreeFile(projectRoot, file),
+      });
+      const registry = await buildProjectFormatRegistry(projectRoot, config);
       const entry = registry.byExtension(extname(path), "parse");
       if (!entry) {
         return null;
@@ -207,22 +217,25 @@ function documentParser(projectRoot: string): DocumentParser {
   };
 }
 
+/** One file's text, overlay first — which is what makes this the canvas rather than the disk. */
+async function readTreeFile(projectRoot: string, path: string): Promise<string | null> {
+  const overlaid = overlayFor(projectRoot).files.get(path);
+  if (overlaid !== undefined) {
+    return overlaid;
+  }
+  try {
+    return await readFile(join(projectRoot, path), "utf8");
+  } catch {
+    return null;
+  }
+}
+
 /** Reading the tree, overlay first — which is what makes this the canvas rather than the disk. */
 function makeIO(projectRoot: string, paths: string[]): { io: SiteIO; assets: AssetIO } {
   const io: SiteIO = {
     parse: documentParser(projectRoot),
     paths: () => paths,
-    read: async (path) => {
-      const overlaid = overlayFor(projectRoot).files.get(path);
-      if (overlaid !== undefined) {
-        return overlaid;
-      }
-      try {
-        return await readFile(join(projectRoot, path), "utf8");
-      } catch {
-        return null;
-      }
-    },
+    read: (path) => readTreeFile(projectRoot, path),
   };
   const assets: AssetIO = {
     bytes: async (path) => {

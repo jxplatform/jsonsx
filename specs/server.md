@@ -2,7 +2,7 @@
 
 ## Development Server with Live Reload, Proxy Resolution, and Studio API
 
-**Version:** 0.2.15
+**Version:** 0.2.16
 **Status:** Implemented
 **Updated:** 2026-08-27
 **License:** MIT
@@ -180,6 +180,17 @@ overlay tied to the origin's lifetime would lose the newest edit on the one rend
 watching for. It is bounded, and eviction is REPORTED rather than silent: an overlay that quietly
 forgets a document shows the saved bytes for a file the author is actively editing with nothing
 anywhere to explain the difference.
+
+**A page is whatever format its extension parses, not only JSON.** `@jxsuite/site` composes `.json`
+itself and asks the host for anything else, which is the seam that decides whether a markdown page
+renders at all; this origin fills it with the project's own extension registry, so `pages/index.md`
+composes here exactly as it does in a build. The registry is a function of `project.json`'s
+`extensions`, so the CONFIG is what it is built from — building it from the project root alone
+yields an empty registry, and the page then reports that it needs a parser this host does not run
+while the host is in fact running one. `project.json` is read through the overlay like every other
+read, so adding an extension in Studio takes effect on the next reload rather than on the next save.
+A host without a registry — a Worker, where a format's parser is not reachable — still routes the
+page and reports it by name, which is the failure the seam exists to make legible.
 
 **Reload is the §3.1 stream, shared.** The same reading of the EventSource contract — `retry:`, the
 `id:` that arms `Last-Event-ID`, one reload on resume and none on a first connection — is defined
@@ -422,6 +433,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.2.16** (2026-08-27) — The preview origin composes non-JSON pages through the project's extension registry, built from its config.
 - **0.2.15** (2026-08-27) — The live site preview origin: an origin per project serving the working tree, with the overlay, the shared reload stream and its own resolver credential.
 - **0.2.14** (2026-08-26) — Packages family: `GET /__studio/packages/versions` reports every dependency's newest published version, behind or not, replacing the outdated-only check.
 - **0.2.13** (2026-08-26) — the import stream's done line carries the run summary, and accepts an opt-in verify pass (§4).
@@ -451,4 +463,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/server` Specification v0.2.15_
+_`@jxsuite/server` Specification v0.2.16_

@@ -16,9 +16,15 @@ import { resolve } from "node:path";
    Worker has no such thing and the composer reports the page by name instead. */
 let parseImpl: ((text: string) => unknown) | null = null;
 let registryFailure: string | null = null;
+/* What the host asked the registry to be built FROM. Recorded rather than ignored: a stub that
+   answers `.md` whatever it is handed cannot tell a host that passes the project's config from one
+   that does not, and the extension list lives in that config — see
+   `live-preview-markdown.test.ts`, which drives the real registry for the same reason. */
+const registryCalls: { config: unknown; root: string }[] = [];
 
 void mock.module("@jxsuite/compiler/format-host", () => ({
-  buildProjectFormatRegistry: () => {
+  buildProjectFormatRegistry: (root: string, config?: unknown) => {
+    registryCalls.push({ config, root });
     if (registryFailure !== null) {
       return Promise.reject(new Error(registryFailure));
     }
@@ -75,7 +81,7 @@ function write(relPath: string, content: string | object) {
 
 beforeAll(() => {
   rmSync(TMP, { force: true, recursive: true });
-  write("project.json", { name: "Gaps" });
+  write("project.json", { extensions: ["@jxsuite/parser"], name: "Gaps" });
   write("pages/index.md", "# Markdown page");
   write("public/logo.svg", "<svg/>");
 });
@@ -86,6 +92,7 @@ beforeEach(() => {
   mountResponse = null;
   mountCalls.length = 0;
   serverFunctionCalls.length = 0;
+  registryCalls.length = 0;
   clearLivePreviewOverlay(TMP);
 });
 
@@ -102,6 +109,23 @@ describe("the format parser a hosted backend does not have", () => {
     const body = await response.text();
     expect(body).toContain('id="jx-page-document"');
     expect(body).toContain("Markdown page");
+  });
+
+  /*
+   * The registry is a function of `project.json`'s `extensions`, so building it from the root alone
+   * yields an EMPTY registry — which reads as "no parser for .md" and is really "no extensions at
+   * all". That is the shape of a defect this file's own stub could not see.
+   */
+  test("the project's config is what the registry is built from, not the root alone", async () => {
+    parseImpl = (text) => ({ children: [text.replace("# ", "")], tagName: "h1" });
+    const { origin } = await startLivePreview(TMP);
+    await fetch(`${origin}/`);
+
+    expect(registryCalls.length).toBeGreaterThan(0);
+    expect(registryCalls.at(-1)).toEqual({
+      config: { extensions: ["@jxsuite/parser"], name: "Gaps" },
+      root: TMP,
+    });
   });
 
   test("with no parser for the extension, the page is named rather than left blank", async () => {
