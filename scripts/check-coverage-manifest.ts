@@ -16,15 +16,25 @@
 // Transaction. A mock cannot do those things, so the module was loaded, was
 // Executed, and was still absent from both the lcov and the coverage table.
 //
-// It is not a flake and it is not the environment: CI reproduced it 2/2, and a
-// Local replay of CI's exact 425-file order — same Bun revision, same x64
-// Linux, same 8970 tests, same flags, same `CI`/`GITHUB_ACTIONS` env — recorded
-// The file every time, 315 covered files on CI against an otherwise IDENTICAL
-// 316 here. Making the test import the module statically (the previous attempt)
-// Did not move it either. What is unusual about this one file is how few module
-// Graphs contain it: nothing in `src/` imports it, because its only production
-// Entry is a deliberate call-time `import()` in `commands/defaults.ts`, so of
-// 425 test contexts exactly two ever load it.
+// That drop has since been reduced to a rule, and the rule has nothing to do
+// With CI (jxsuite/jx#240). A source file M is omitted from BOTH the lcov and
+// The table when a test file A that fires TWO OR MORE un-awaited `import("M")`
+// Calls, from separate tests, runs BEFORE a test file B that imports M for real
+// — and B's tests still pass against the real M throughout. One fire is not
+// Enough; two is. It reproduces in five files with no jx code in them.
+//
+// It read as CI-only because the lever is `readdir` order and nothing else.
+// `bun test` 1.4.0 IGNORES the order of its file arguments and re-scans the
+// Test directory, so the "replay of CI's exact file order" that this comment
+// Used to cite as ruling order out never replayed an order at all. The same
+// Clone flips between recording and not when either file is rewritten, which is
+// Also why a static import from the test did not move it.
+//
+// The trigger is gone from this repo — `tests/commands-defaults.test.ts` doubles
+// The converter, which its two siblings already did — so nothing here should be
+// Rescued today. The adjudication stays anyway, because the next such defect
+// Will announce itself the same way: as an absence that means the opposite of
+// What it says.
 //
 // So when a file is missing, ask the smaller question that has a definite
 // Answer: re-run coverage over just the tests that name it. A file no test

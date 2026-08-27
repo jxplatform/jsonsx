@@ -5,7 +5,7 @@
  * collide, its placements satisfy the matrix, and each record's predicates and `run` do what the
  * record says. Wiring is next wave; the contract is now.
  */
-import { describe, expect, test } from "bun:test";
+import { describe, expect, mock, test } from "bun:test";
 import {
   defaultCommands,
   defaultCommandSet,
@@ -22,6 +22,33 @@ import { checkPlacements } from "../src/commands/levels";
 import { checkChromeBudget } from "../src/commands/budget";
 import { CAPABILITIES, emptyContext, makeContext } from "../src/commands/context";
 import type { CommandContext } from "../src/commands/context";
+
+/**
+ * `selection.repeat`'s converter, doubled — the one command record in this set whose `run` reaches
+ * outside this module's graph.
+ *
+ * Two reasons, and the second is not about this file at all.
+ *
+ * It makes the test below ASSERT something. `defaults.ts` fires the converter as `void
+ * import("../editor/convert-to-repeater").then(...)`, a promise nothing can await: the `await
+ * registry.run(...)` below returns while it is still in flight, so before this double existed the
+ * test ran the command and observed nothing whatever. A specifier typo would have sailed through
+ * it. The double is what makes "runs the converter" a claim with a witness.
+ *
+ * And it keeps the converter's COVERAGE. Bun 1.4.0 loses a source file's coverage record entirely
+ * when one test file fires two or more un-awaited `import()`s of it and another test file, running
+ * later, loads it for real — the later file's tests still pass against the real module, and the
+ * module is simply absent from the report (jxsuite/jx#240, reduced to a five-file standalone case
+ * and reported upstream). This file was the only one still letting those real dynamic imports fire;
+ * its siblings `context-menu.test.ts` and `settings-key-scope.test.ts` already double it. Which of
+ * the two files runs first is `readdir` order, so the same tree flips between recording and not
+ * with no change to any code — which is why it read as a CI-only defect for weeks.
+ *
+ * Removing this double is therefore not a style choice. It deletes an assertion and re-arms a
+ * coverage drop that `scripts/check-coverage-manifest.ts` then has to spend a second pass proving.
+ */
+const convertToRepeater = mock(async () => {});
+void mock.module("../src/editor/convert-to-repeater", () => ({ convertToRepeater }));
 
 /**
  * A stand-in rail, so the ⌘1–8 generator is testable without the panel registry.
@@ -224,9 +251,17 @@ describe("the records that settle an existing argument", () => {
       mac: true,
     });
     registry.registerAll(defaultCommandSet());
-    // No tab is open, so `convertToRepeater` returns on its own first guard — what is asserted is
-    // That the lazy import RESOLVES, which is the half a bare-Bun record could get wrong.
     await registry.run("selection.repeat");
+    /* `run` starts the flow and returns; the lazy import settles a turn or two later, which is the
+       whole point of the record being written that way. Turning the loop by hand rather than
+       reaching for `./harness`'s `flush`: this file is deliberately DOM-free, which is what lets
+       `check-command-levels.ts` load the command set in a bare Bun process. */
+    for (let turn = 0; turn < 2; turn += 1) {
+      await new Promise((done) => {
+        setTimeout(done, 0);
+      });
+    }
+    expect(convertToRepeater).toHaveBeenCalledTimes(1);
   });
 
   test("delete is destructive, undoable, and refuses the document root", () => {
