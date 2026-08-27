@@ -131,6 +131,12 @@ const EXTRA_EDGES: ExtraEdge[] = [
     ],
     why: "Two compiler tests build a real project that loads @jxsuite/parser (and, for feeds, @jxsuite/feed), so a change to either extension's src can break a compiler test. The sitemap one spans three packages by construction: the parser carries an entry's timestamp, the compiler lifts it onto the route, and the sitemap prints it.",
   },
+  {
+    patterns: ["packages/starters/sites/portfolio/**", "packages/starters/sites/real-estate/**"],
+    seeds: ["packages/server"],
+    evidence: ["packages/server/tests/refactor-parity.test.ts"],
+    why: "The refactor engine's read/write parity is asserted against these two committed starters rather than a hand-built fixture, deliberately: the reference shapes it was blind to are exactly the ones nobody thought to author into a fixture ($props in a markdown directive, a content entry's frontmatter, defaults.layout, a rooted URL naming a file under public/). That makes the starters' own content part of the assertion, so editing one has to re-run the engine's suite.",
+  },
 ];
 
 /**

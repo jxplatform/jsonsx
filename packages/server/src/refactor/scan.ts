@@ -22,10 +22,30 @@ export interface LoadedDoc {
 
 const isJsonPath = (p: string) => p.endsWith(".json");
 
-/** Skip vendored / build / agent directories (mirrors the component-discovery filter). */
+/**
+ * Skip vendored / build / agent directories (mirrors the component-discovery filter), and generated
+ * schema artifacts.
+ *
+ * Every committed `*.schema.json` in a project is a build output — `bun run schema:generate-all`
+ * composes the `project.schema.json` / `document.schema.json` pair into each project root — and the
+ * generators embed live `examples` blocks. `project.core.schema.json`'s `$head` example carries
+ * `/favicon.svg`, and the per-project entry schema enumerates the project's own layouts, so a sweep
+ * that reads them makes every project report its own schema as a referrer of its favicon and its
+ * base layout. Those are not references anyone authored, and nobody should be told a rename will
+ * break one.
+ *
+ * The stale-schema problem a skipped file leaves behind already has an owner: `bun run
+ * schema:verify` catches it and `schema:sync` regenerates it. A rewrite here would be a second
+ * writer on a generated file.
+ */
 export function skipScanPath(match: string): boolean {
   const f = fwd(match);
-  return match.includes("node_modules") || f.includes("dist/") || f.includes(".claude/");
+  return (
+    match.includes("node_modules") ||
+    f.includes("dist/") ||
+    f.includes(".claude/") ||
+    f.endsWith(".schema.json")
+  );
 }
 
 /** Build the recursive glob covering JSON plus every registered document/content extension. */

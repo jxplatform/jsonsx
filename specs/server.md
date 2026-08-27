@@ -2,7 +2,7 @@
 
 ## Development Server with Live Reload, Proxy Resolution, and Studio API
 
-**Version:** 0.2.18
+**Version:** 0.2.19
 **Status:** Implemented
 **Updated:** 2026-08-27
 **License:** MIT
@@ -260,6 +260,10 @@ The canonical endpoint list is the `STUDIO_ROUTES` table in `@jxsuite/protocol` 
 
 Handlers are dispatched inside the `/__studio/*` branch in this order: collab → activate → AI (`ai-api.ts`) → import-site (`import-api.ts`) → code services (`code-api.ts`) → the main studio handler (`studio-api.ts`).
 
+**Path space: server-root-relative in, project-relative out.** A client path parameter — `?path=`, `?dir=`, a `from`/`to` in a body — is resolved against the **server root**. Every path in a response is relative to the **active project root** (`activeProjectRoot ?? root`). The two roots are the same in most deployments, which is exactly why the rule has to be written down rather than inferred: where they differ, the two conventions are indistinguishable by inspection, and a parameter resolved against the wrong one names a file that does not exist. The Studio-side translator is `serverPath()` in `packages/studio/src/platforms/devserver.ts`, and it is the only one — the PAL (specs/desktop.md §3.1) is project-relative in both directions, so an adapter that also stripped a prefix off a reply would be translating twice.
+
+This binds the refactor routes in particular, because their sweep runs in the project's space while their parameters arrive in the server's: `GET /__studio/references` re-expresses its target into the project root before scanning, and `POST /__studio/file/rename` reports `from`/`to` in the project's space on both its success and its failure branch.
+
 > **Status: Implemented.** `src/studio-api.ts` and companions.
 
 ### 4.2 Security
@@ -276,6 +280,7 @@ Both server entry points share one set of primitives (`src/net-guard.ts`), appli
 - **Loopback bind** (`127.0.0.1`) by default is the primary control; a `hostname` option (`--host` on the `jx dev` CLI) can widen it for containers, which removes that control and must only be used behind trusted isolation
 - **Origin/Host gate** on every privileged surface — the RCE-capable `/__jx_resolve__` / `/__jx_server__` routes (both do dynamic `import()`), the `/_jx/` extension mounts, and the whole `/__studio/*` API: a loopback (or absent) Origin is accepted, a non-loopback Origin or Host is rejected (anti-CSRF, anti-DNS-rebinding). The browser Studio and the served site are same-origin, so they pass; an external page does not. No token is used — same-origin does not need one
 - **File containment**: every static path and every caller-supplied relative or absolute `$src` / `$base` / `$implementation` resolved before a dynamic `import()` passes a lexical `relative()` check **plus a realpath re-check** (`containedPath`), so a `../` or absolute path cannot escape and a symlink cannot point outside the tree; over-encoded paths are rejected after a single decode. A **bare-specifier** `$src` is exempt: it resolves only through Node's `node_modules` lookup (an installed package), so the class file — and the sibling `$implementation` it names, even one above the class directory — is trusted as that package's own code; the containment check still binds a project-local relative `$src`
+- **A target outside the active project is a `400`, never a zero-result `200`.** `assertAccessible` admits anything under the server root, which is wider than the sweep the refactor routes then run; a path that clears the guard but falls outside the active project has no answer, and reporting "no references" for it would be a confident lie about a question that was never asked. Containment is therefore checked twice for those routes, once per root, with distinct outcomes
 - **Two-root activation**: filesystem operations go through `assertAccessible(filePath, root, activeProjectRoot)` — the path must sit under the server root **or** the active project root Studio bound via `POST /__studio/activate`, which itself only accepts a root contained under the server root, an explicit `allowedRoots` entry, a project this server just created (below), or **a project the account already owns** — an absolute directory holding a `project.json` somewhere under the user's home directory (`isOwnedProjectDir`). That last clause is what makes an _existing_ project openable at all: projects live outside the server root as a matter of course, so `?project=/abs/path`, the Open Project picker and the recent-projects list would otherwise be able to bind nothing but a project inside the served checkout. Requiring both the `project.json` and home containment keeps a hostile page on the loopback origin from binding the server to `/etc` or to another account's files. A refused activation is an **error the client must surface**, never a silent fallback: the endpoints that take no `dir` (the git surface especially) resolve against `activeProjectRoot || root`, so a swallowed refusal would silently run against whatever tree the server is serving
 - **The import stream's terminal line reports the run, not just its location.** `POST /__studio/import-site` streams progress and ends with the new root, the project configuration, AND a summary of what the pipeline produced: the pages it emitted, the file count, the soft failures it recorded, and — when `verify` was requested — a per-page fidelity score against the original. Every field is optional, so a backend that sends none is conformant and an older client ignores them; no protocol version moves. It matters because the pipeline computed all of it and the endpoint used to discard it, leaving a caller able to say that an import had happened and nothing about what it found. `verify` is opt-in: it compiles the emitted project and drives a second browser pass, roughly doubling the run.
 
@@ -442,6 +447,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.2.19** (2026-08-27) — The Studio API's path space is written down: server-root-relative in, project-relative out; a refactor target outside the active project is a 400, not a zero-result 200.
 - **0.2.18** (2026-08-27) — The preview origin registers the project's own components without a declaration.
 - **0.2.17** (2026-08-27) — The preview origin composes non-JSON pages through the project's extension registry, built from its config.
 - **0.2.16** (2026-08-27) — The live site preview origin: an origin per project serving the working tree, with the overlay, the shared reload stream and its own resolver credential.
@@ -474,4 +480,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/server` Specification v0.2.18_
+_`@jxsuite/server` Specification v0.2.19_

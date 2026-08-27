@@ -1233,6 +1233,10 @@ async function moveFileEntry(oldPath: string, newPath: string, renderLeftPanel: 
   markLocalMutation(oldPath, newPath);
   try {
     const report = await platform.renameFile(oldPath, newPath);
+    // The refactor pass just rewrote references project-wide, and `markLocalMutation` suppresses
+    // The watcher echo that would otherwise say so — hence the explicit drop, as in `renameFile`.
+    // Without it a drag-move leaves every usage count in the session answering about the old path.
+    invalidateUsages();
 
     // Update open tabs referencing the moved path
     for (const [id] of workspace.tabs.entries()) {
@@ -1259,7 +1263,7 @@ async function moveFileEntry(oldPath: string, newPath: string, renderLeftPanel: 
 
     reloadRewrittenTabs(report, newPath);
     renderLeftPanel();
-    notify.success(`Moved to ${newPath}`);
+    notifyMoveOutcome(`Moved to ${newPath}`, report, newPath);
   } catch (error) {
     notify.error(`Could not move ${oldPath}.`, {
       detail: errorMessage(error),
@@ -1636,6 +1640,37 @@ function renameStatus(newName: string, report: RenameResult): string {
   return `Renamed to ${newName}`;
 }
 
+/**
+ * Report a move whose refactor pass could not finish, instead of reporting a plain success.
+ *
+ * The dialog above a rename states, in a modal the user has to accept, that N references "will be
+ * updated automatically. Nothing else changes." The engine keeps that promise for every document it
+ * can write — but some it cannot: a content source like a `.csv` collection has a parser and
+ * deliberately no serializer, and a document that fails to parse cannot be rewritten either. In
+ * both cases `applyRename` names the file rather than dropping it, and this is the half that makes
+ * the naming reach a person. Silence here is what turns a stated promise into a false one.
+ *
+ * A drag-move makes no promise at all — it has no dialog — which is exactly why it needs this more,
+ * not less.
+ *
+ * @param {string} headline — what happened, as the success case would have put it.
+ * @param {RenameResult} report
+ * @param {string} path — the moved file, so Problems can click through.
+ */
+function notifyMoveOutcome(headline: string, report: RenameResult, path: string): void {
+  const stuck = report.errors ?? [];
+  if (stuck.length === 0) {
+    notify.success(headline);
+    return;
+  }
+  const files = stuck.length === 1 ? "1 file" : `${stuck.length} files`;
+  notify.warn(`${headline} — references in ${files} could not be updated`, {
+    detail: stuck.map((e) => `${e.path}: ${e.error}`).join("\n"),
+    path,
+    source: "Files",
+  });
+}
+
 /** Reload any open tabs whose references the refactor rewrote (so the editor shows new paths). */
 function reloadRewrittenTabs(report: RenameResult, skipPath: string): void {
   for (const f of report.references?.files ?? []) {
@@ -1674,7 +1709,7 @@ async function renameFile(
     }
     reloadRewrittenTabs(report, newPath);
     renderLeftPanel();
-    notify.success(renameStatus(newName, report));
+    notifyMoveOutcome(renameStatus(newName, report), report, newPath);
   } catch (error) {
     notify.error(`Could not rename ${entry.name}.`, {
       detail: errorMessage(error),

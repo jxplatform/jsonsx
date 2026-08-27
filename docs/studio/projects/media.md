@@ -120,6 +120,12 @@ A count Studio could not produce is reported as **unknown**, never as zero. If t
 
 **Rename** is not a delete and doesn't read like one: its dialog states how many references will be **rewritten automatically**, because the rename repairs what the delete would break.
 
+Studio finds those references wherever they are written. An image is referenced as a site URL (`/images/hero.jpg`), and the same file might be named by a page's `src`, by a component property you filled in on the canvas, by a content entry's front matter, or by the social card in your project settings. All of them count, and all of them are rewritten when the file moves. If the file leaves `public/`, the rewritten reference follows it, and Studio picks the form the published site will actually serve.
+
+:::doc-note
+Some files can be read but not written back. A CSV collection is a data source Studio loads entries from, not a document it round-trips. A reference in one still counts toward what a delete breaks, and a rename that could not update it reports a **warning** naming the file rather than a plain success. The same applies when you drag a file to a new folder.
+:::
+
 ## What the build does to images
 
 You only ever upload one copy of an image, at full quality. When your site is built for publishing, each image is optimized automatically: the build generates multiple sizes and modern formats (WebP, AVIF) and wires them up so every visitor's browser downloads the smallest version that looks sharp on their screen. There is nothing to configure in Studio. The pipeline is described in **[Site architecture](/docs/framework/site)**.
