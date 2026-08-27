@@ -5,6 +5,7 @@ import { relative } from "node:path";
 import { rebuild } from "./build.ts";
 import { coalesceFsEvents, toFsEvent } from "./refactor/fs-events.ts";
 import { createWatchIgnore } from "./watch-policy.ts";
+import { createSseHub } from "./sse.ts";
 import { invalidateReferenceCache } from "./refactor/find-refs.ts";
 import type { BuildEntry } from "./types.ts";
 import type { FsEventPayload } from "./refactor/fs-events.ts";
@@ -51,14 +52,14 @@ function shouldIgnore(pathname: string, ignore: string[]) {
 
 export { shouldIgnore };
 
-/**
- * Reconnection time advertised on the stream, in milliseconds (HTML Standard, `retry:`).
- *
- * The default is user-agent defined and measured in seconds, which on a dev server restart is long
- * enough for a save to look like it did nothing. Both endpoints are on loopback, so a reconnect
- * costs nothing and half a second lands inside a typical restart.
+/*
+ * The stream itself lives in `sse.ts`, shared with the live preview origin's channel — the reading
+ * of the EventSource contract it encodes (`retry:`, the `id:` that arms `Last-Event-ID`, one reload
+ * on resume and none on a first connection) is specified once, in specs/server.md §3.1, and having
+ * two of it is how one of them silently stops reconnecting. Re-exported here because `RECONNECT_MS`
+ * is part of what this module's consumers already read.
  */
-export const RECONNECT_MS = 500;
+export { RECONNECT_MS } from "./sse.ts";
 
 export const SSE_SCRIPT = `\n<script>new EventSource('/__reload').onmessage=()=>location.reload()</script>`;
 
@@ -102,96 +103,7 @@ export function createWatcher(
   const reloadOnAnyChange = opts.reloadOnAnyChange ?? false;
   const { preReload } = opts;
 
-  const clients = new Set<(msg: string) => void>();
-  const encoder = new TextEncoder();
-
-  /*
-   * Monotonic reload counter, sent as the SSE `id:` of every reload frame.
-   *
-   * Its only job is to arm the browser: a stream that has never sent an `id:` makes the client omit
-   * `Last-Event-ID` on reconnect, and then the server cannot tell a first connection from a
-   * reconnection. **Nothing is buffered against it and nothing is replayed.** A reconnecting client
-   * gets exactly one reload, because the page it is holding was built before the disconnect and a
-   * full reload subsumes every event it missed — one is as correct as a hundred and finishes
-   * sooner. Do not "complete" this into a replay buffer; there is no per-event state to replay.
-   */
-  let lastEventId = 0;
-
-  function broadcast() {
-    lastEventId += 1;
-    const frame = `id: ${lastEventId}\ndata: reload\n\n`;
-    for (const send of clients) {
-      send(frame);
-    }
-  }
-
-  /**
-   * Send a _named_ SSE event. The preview iframe only listens to the default (unnamed) `onmessage`,
-   * so named events (e.g. "fs") reach the studio shell without triggering a preview reload.
-   */
-  function broadcastEvent(event: string, payload: unknown) {
-    const frame = `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`;
-    for (const send of clients) {
-      send(frame);
-    }
-  }
-
-  /**
-   * Open the live-reload stream.
-   *
-   * Two halves of the HTML Standard's EventSource contract that were missing, and are the whole of
-   * `gap:sse-reconnect`:
-   *
-   * - **`retry:`** sets the reconnection time. The default is user-agent defined and is measured in
-   *   seconds; during a dev-server restart that is long enough to watch a save do nothing. 500ms is
-   *   loopback, so the reconnect costs nothing and lands inside the restart.
-   * - **`Last-Event-ID`** is how the browser says "I was here before". It gets **one** reload and no
-   *   replay — see the note on `lastEventId`. A dev server has no event log and needs none: the
-   *   reload is idempotent and total.
-   *
-   * @param {Request} [request] - The stream request; read only for its `Last-Event-ID`
-   * @returns {Response}
-   */
-  function handleSSE(request?: Request) {
-    const resuming = (request?.headers.get("Last-Event-ID") ?? "") !== "";
-    /** @type {((msg: string) => void) | undefined} */
-    let send: ((msg: string) => void) | undefined;
-    const stream = new ReadableStream({
-      cancel() {
-        if (send) {
-          clients.delete(send);
-        }
-      },
-      start(c) {
-        send = (msg: string) => {
-          try {
-            c.enqueue(encoder.encode(msg));
-          } catch {}
-        };
-        clients.add(send);
-        // The retry interval is a stream-level field, so it is set once, before any event.
-        send(`retry: ${RECONNECT_MS}\n\n`);
-        if (resuming) {
-          lastEventId += 1;
-          send(`id: ${lastEventId}\ndata: reload\n\n`);
-        }
-        const hb = setInterval(() => {
-          try {
-            c.enqueue(encoder.encode(": heartbeat\n\n"));
-          } catch {
-            clearInterval(hb);
-          }
-        }, 15_000);
-      },
-    });
-    return new Response(stream, {
-      headers: {
-        "Cache-Control": "no-cache",
-        Connection: "keep-alive",
-        "Content-Type": "text/event-stream",
-      },
-    });
-  }
+  const { broadcast, broadcastEvent, handleSSE } = createSseHub();
 
   let timer: ReturnType<typeof setTimeout> | null = null;
   let fsTimer: ReturnType<typeof setTimeout> | null = null;
