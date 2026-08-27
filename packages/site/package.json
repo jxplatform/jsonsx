@@ -13,10 +13,14 @@
   ],
   "type": "module",
   "exports": {
+    "./compose": "./src/compose.ts",
     "./context": "./src/context.ts",
     "./head-merger": "./src/head-merger.ts",
     "./layout": "./src/layout.ts",
+    "./paths": "./src/paths.ts",
     "./routes": "./src/routes.ts",
+    "./serve": "./src/serve.ts",
+    "./shell": "./src/shell.ts",
     "./site-style": "./src/site-style.ts"
   },
   "publishConfig": {

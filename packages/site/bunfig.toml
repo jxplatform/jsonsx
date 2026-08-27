@@ -5,4 +5,4 @@ registry = "https://registry.npmjs.org"
 coverageReporter = ["text", "lcov"]
 coverageSkipTestFiles = true
 coveragePathIgnorePatterns = ["**/tests/**", "../runtime/**", "../schema/**"]
-coverageThreshold = { lines = 0.99, functions = 0.99 }
+coverageThreshold = { lines = 0.99, functions = 1.0 }
