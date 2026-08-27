@@ -828,6 +828,98 @@ describe("references", () => {
   });
 });
 
+/**
+ * The path space, when the active project is not the server root.
+ *
+ * A client path parameter is SERVER-root-relative — that is what `serverPath()` in the devserver
+ * adapter sends, and what every sibling route resolves against — while the sweep runs in the ACTIVE
+ * PROJECT's space. Resolving the parameter against the project root doubles the prefix, and a
+ * doubled prefix names a file that does not exist. `containedPath` returns a non-existent path as
+ * contained (net-guard.ts:281-284, deliberately: the caller's existence check decides), so nothing
+ * rejects it and the engine reports a confident **zero** instead of an error.
+ *
+ * This is invisible to the rest of this file: `callApi` defaults `activeProjectRoot` to null, so
+ * `scanRoot ?? root` collapses and `resolve(scanRoot, p) === resolve(root, p)`. A fourth argument
+ * merely EQUAL to `root` proves nothing either. The fixture below is the first in the suite where
+ * the two roots genuinely differ on a references query.
+ */
+describe("references — server-root-relative in, project-relative out", () => {
+  const SPACE = join(FIXTURES, "refs-space");
+  const OUTSIDE = join(FIXTURES, "refs-space-sibling");
+
+  mkdirSync(join(SPACE, "components"), { recursive: true });
+  mkdirSync(join(SPACE, "pages"), { recursive: true });
+  mkdirSync(OUTSIDE, { recursive: true });
+  writeFileSync(
+    join(SPACE, "components/card.json"),
+    JSON.stringify({ children: [], tagName: "ref-space-card" }),
+    "utf8",
+  );
+  writeFileSync(
+    join(SPACE, "pages/index.json"),
+    JSON.stringify({
+      children: [{ $ref: "../components/card.json" }, { tagName: "ref-space-card" }],
+    }),
+    "utf8",
+  );
+  writeFileSync(join(OUTSIDE, "x.json"), JSON.stringify({ children: [] }), "utf8");
+
+  /**
+   * @param {string} path — as the client sends it: relative to the SERVER root.
+   * @param {string | null} activeProjectRoot
+   */
+  async function refs(path: string, activeProjectRoot: string | null) {
+    const url = new URL(`http://localhost/__studio/references?path=${encodeURIComponent(path)}`);
+    return callApi(new Request(url, { method: "GET" }), url, FIXTURES, activeProjectRoot);
+  }
+
+  test("resolves a server-root-relative query against an activated project", async () => {
+    const res = await refs("refs-space/components/card.json", SPACE);
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    // The zero this issue is about: today the target resolves to refs-space/refs-space/... .
+    expect(data.tagName).toBe("ref-space-card");
+    expect(data.files.map((f: { path: string }) => f.path)).toEqual(["pages/index.json"]);
+    expect(data.refsTotal).toBe(2);
+  });
+
+  test("accepts the absolute form too — it is what deep links and the picker send", async () => {
+    const res = await refs(join(SPACE, "components/card.json"), SPACE);
+    const data = await res.json();
+    expect(data.tagName).toBe("ref-space-card");
+    expect(data.files.map((f: { path: string }) => f.path)).toEqual(["pages/index.json"]);
+  });
+
+  test("every path in the response is relative to the active project", async () => {
+    const res = await refs("refs-space/components/card.json", SPACE);
+    const data = await res.json();
+    expect(data.path).toBe("components/card.json");
+    for (const f of data.files as { path: string }[]) {
+      expect(f.path.startsWith("refs-space/")).toBe(false);
+      expect(f.path.startsWith("/")).toBe(false);
+    }
+  });
+
+  test("still resolves before activation, when the sweep root IS the server root", async () => {
+    // The `references` route is the only one with no `dir` parameter, so `scanRoot` comes solely
+    // from `activeProjectRoot` — and `set projectRoot` fires `activate()` fire-and-forget. A query
+    // landing in that window must not answer zero.
+    const res = await refs("refs-space/components/card.json", null);
+    const data = await res.json();
+    expect(data.tagName).toBe("ref-space-card");
+    expect(data.files.map((f: { path: string }) => f.path)).toContain(
+      "refs-space/pages/index.json",
+    );
+  });
+
+  test("a target outside the active project is a 400, never a zero-result 200", async () => {
+    // The assertion that keeps this failure mode from ever being silent again: the path is inside
+    // the SERVER root, so `assertAccessible` passes, and it is project containment that must reject.
+    const res = await refs("refs-space-sibling/x.json", SPACE);
+    expect(res.status).toBe(400);
+  });
+});
+
 // ─── files listing endpoint ─────────────────────────────────────────────────
 
 describe("files — listing", () => {
