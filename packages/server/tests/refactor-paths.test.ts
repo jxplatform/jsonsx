@@ -191,3 +191,79 @@ describe("rewriteRef", () => {
     expect(rewriteRef(classifyRef("../layouts/x.json") as never, c)).toBe("../../layouts/x.json");
   });
 });
+
+/*
+ * The lane math on its own — no filesystem, no project, no glob.
+ *
+ * A rooted reference is a SITE URL, so it is READ through every lane a dev server would try
+ * (mounts, the project root, `public/`) and the answer is RE-EMITTED through the lanes a deployed
+ * build publishes, falling back to the root lane only when no build lane can express it. Which lane
+ * matched and which lane answers are different questions; each case below fixes one pair.
+ */
+describe("rewriteRef — site URLs through the lanes", () => {
+  const mounts = [{ dir: "assets/media", urlPrefix: "/m" }];
+
+  test("a rename inside public/ re-emits at the site root, never under /public/", () => {
+    const c = ctx({ newAbs: "/p/public/images/hero-2.jpg", oldAbs: "/p/public/images/hero.jpg" });
+    expect(rewriteRef(classifyRef("/images/hero.jpg") as never, c)).toBe("/images/hero-2.jpg");
+  });
+
+  test("the query suffix survives the lane round trip", () => {
+    const c = ctx({ newAbs: "/p/public/images/hero-2.jpg", oldAbs: "/p/public/images/hero.jpg" });
+    expect(rewriteRef(classifyRef("/images/hero.jpg?v=2") as never, c)).toBe(
+      "/images/hero-2.jpg?v=2",
+    );
+  });
+
+  test("a file leaving public/ falls back to the root lane", () => {
+    // Build-broken either way; the root lane at least keeps the preview loading.
+    const c = ctx({ newAbs: "/p/images/hero.jpg", oldAbs: "/p/public/hero.jpg" });
+    expect(rewriteRef(classifyRef("/hero.jpg") as never, c)).toBe("/images/hero.jpg");
+  });
+
+  test("a file entering public/ changes lane without changing the URL", () => {
+    // Read through the root lane, re-emitted through the public lane: same URL, so no rewrite.
+    const c = ctx({ newAbs: "/p/public/images/hero.jpg", oldAbs: "/p/images/hero.jpg" });
+    expect(rewriteRef(classifyRef("/images/hero.jpg") as never, c)).toBeNull();
+  });
+
+  test("a mount is read and re-emitted through its own prefix", () => {
+    const c = ctx({ mounts, newAbs: "/p/assets/media/b.png", oldAbs: "/p/assets/media/a.png" });
+    expect(rewriteRef(classifyRef("/m/a.png") as never, c)).toBe("/m/b.png");
+  });
+
+  test("without the mount list the same URL names nothing that moved", () => {
+    // `/m/a.png` is `m/a.png` to the root lane and `public/m/a.png` to the public lane.
+    const c = ctx({ newAbs: "/p/assets/media/b.png", oldAbs: "/p/assets/media/a.png" });
+    expect(rewriteRef(classifyRef("/m/a.png") as never, c)).toBeNull();
+  });
+
+  test("a file moving from public/ into a mount re-emits at the mount prefix", () => {
+    const c = ctx({ mounts, newAbs: "/p/assets/media/a.png", oldAbs: "/p/public/a.png" });
+    expect(rewriteRef(classifyRef("/a.png") as never, c)).toBe("/m/a.png");
+  });
+
+  test("a mount overlapping public/ wins the re-emit", () => {
+    /* Read on the public lane (`/media/a.png` → `public/media/a.png`), re-emitted on the mount
+       lane, because a mount publishing the destination is the more specific answer. This pins the
+       ORDER of the authored lanes: mounts before public/, then root. */
+    const c = ctx({
+      mounts: [{ dir: "public/media", urlPrefix: "/m" }],
+      newAbs: "/p/public/media/b.png",
+      oldAbs: "/p/public/media/a.png",
+    });
+    expect(rewriteRef(classifyRef("/media/a.png") as never, c)).toBe("/m/b.png");
+  });
+
+  test("a rooted ref naming a file that did not move is null", () => {
+    const c = ctx({ mounts, newAbs: "/p/public/hero-2.jpg", oldAbs: "/p/public/hero.jpg" });
+    expect(rewriteRef(classifyRef("/other.jpg") as never, c)).toBeNull();
+    expect(rewriteRef(classifyRef("/m/other.png") as never, c)).toBeNull();
+  });
+
+  test("a rooted ref that names no project file at all is null", () => {
+    // Traversal never resolves on any lane, so there is no candidate to compare against.
+    const c = ctx({ mounts, newAbs: "/p/public/hero-2.jpg", oldAbs: "/p/public/hero.jpg" });
+    expect(rewriteRef(classifyRef("/../hero.jpg") as never, c)).toBeNull();
+  });
+});

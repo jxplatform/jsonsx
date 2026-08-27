@@ -288,7 +288,7 @@ export function rewriteRef(
 function rewriteSiteUrl(core: string, suffix: string, ctx: RemapCtx): string | null {
   const mounts = ctx.mounts ?? [];
   for (const lane of READ_LANES) {
-    const candidate = projectPathsForSiteUrl(core, mounts, [lane])[0];
+    const [candidate] = projectPathsForSiteUrl(core, mounts, [lane]);
     if (candidate === undefined) {
       continue;
     }

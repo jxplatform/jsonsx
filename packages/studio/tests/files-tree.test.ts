@@ -22,7 +22,7 @@ import { setFormats } from "../src/format/format-host";
 import { resetNotifications, toasts } from "../src/services/notify";
 import { loadUsages, peekUsages } from "../src/services/references";
 import { MARKDOWN_FORMAT, mockFormatAction, seedMarkdownFormat } from "./format-fixture";
-import type { DirEntry, RenameResult, StudioPlatform } from "../src/types";
+import type { DirEntry, ReferencesResult, RenameResult, StudioPlatform } from "../src/types";
 
 // ─── Mock the DnD adapter (registrations recorded, callbacks driveable) ───────
 
@@ -1499,8 +1499,8 @@ describe("a move reports the references it could not rewrite", () => {
     expect(reported!.message).toBe(
       "Renamed to home.json — references in 2 files could not be updated",
     );
-    // Every named file with the engine's own reason for it — the list is what makes the warning
-    // Actionable, and Problems is where the long form is read.
+    /* Every named file with the engine's own reason for it. The headline is a count; this is the
+       part an author can act on, and Problems is the surface that renders it. */
     expect(reported!.detail).toBe(
       "content/posts.csv: no serializer for .csv\npages/broken.json: Unexpected token } at 3:1",
     );
@@ -1554,9 +1554,18 @@ describe("a move reports the references it could not rewrite", () => {
     const handle = installFsPlatform(
       { "pages/index.json": "{}" },
       {
-        findReferences: async (target: { path?: string; tagName?: string }) => ({
+        findReferences: async (target: {
+          path?: string;
+          tagName?: string;
+        }): Promise<ReferencesResult> => ({
           errors: [],
-          files: [{ count: 2, path: "pages/about.json" }],
+          files: [
+            {
+              count: 2,
+              path: "pages/about.json",
+              refs: [{ count: 2, ref: "./pages/index.json", refType: "$ref" }],
+            },
+          ],
           filesReferencing: 1,
           path: target.path ?? null,
           refsTotal: 2,

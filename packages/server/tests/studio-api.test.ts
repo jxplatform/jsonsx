@@ -901,9 +901,9 @@ describe("references — server-root-relative in, project-relative out", () => {
   });
 
   test("still resolves before activation, when the sweep root IS the server root", async () => {
-    // The `references` route is the only one with no `dir` parameter, so `scanRoot` comes solely
-    // from `activeProjectRoot` — and `set projectRoot` fires `activate()` fire-and-forget. A query
-    // landing in that window must not answer zero.
+    /* The `references` route is the only one with no `dir` parameter, so `scanRoot` comes solely
+       from `activeProjectRoot`, and `set projectRoot` fires `activate()` fire-and-forget. A query
+       landing in that window must not answer zero. */
     const res = await refs("refs-space/components/card.json", null);
     const data = await res.json();
     expect(data.tagName).toBe("ref-space-card");
@@ -913,8 +913,8 @@ describe("references — server-root-relative in, project-relative out", () => {
   });
 
   test("a target outside the active project is a 400, never a zero-result 200", async () => {
-    // The assertion that keeps this failure mode from ever being silent again: the path is inside
-    // the SERVER root, so `assertAccessible` passes, and it is project containment that must reject.
+    /* The assertion that keeps this failure mode from ever being silent again: the path is inside
+       the SERVER root, so `assertAccessible` passes, and project containment is what must reject. */
     const res = await refs("refs-space-sibling/x.json", SPACE);
     expect(res.status).toBe(400);
   });
