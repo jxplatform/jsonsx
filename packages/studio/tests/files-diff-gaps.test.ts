@@ -225,6 +225,36 @@ describe("a .csv the grid editor cannot open", () => {
   });
 });
 
+/**
+ * An empty file still has to answer for itself.
+ *
+ * Returning silently was defensible while every file the tree could create was a seeded document.
+ * The format picker's `Other…` row makes an empty `main.css` or `.gitignore` an ordinary thing to
+ * create, and clicking one and having NOTHING happen — no tab, no error, no toast — reads as a
+ * broken tree rather than as a file Studio has no editor for.
+ */
+describe("an empty file", () => {
+  test("that no format claims reports the same named error a non-empty one would", async () => {
+    installFsPlatform({ "styles/main.css": "" });
+    siteState();
+
+    await openFileInTab("styles/main.css");
+
+    expect(problems.at(-1)!.detail).toContain("No format class imported");
+    expect(workspace.tabs.size).toBe(0);
+  });
+
+  test("that IS a document is nothing to report — there is simply nothing to show yet", async () => {
+    installFsPlatform({ "pages/blank.json": "" });
+    siteState();
+
+    await openFileInTab("pages/blank.json");
+
+    expect(problems).toHaveLength(0);
+    expect(workspace.tabs.size).toBe(0);
+  });
+});
+
 // ─── The tree keyboard walks the MODEL, placeholders included ─────────────────
 
 describe("the ↓ walk and the Loading… placeholder", () => {

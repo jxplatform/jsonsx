@@ -20,7 +20,8 @@ import { requireProjectState, setProjectState } from "../src/store";
 import { closeAllTabs, openTab, workspace } from "../src/workspace/workspace";
 import { initLayers } from "../src/ui/layers";
 import { setFormats } from "../src/format/format-host";
-import { resetNotifications, toasts } from "../src/services/notify";
+import { registerFileFormatCommands } from "../src/format/convert-file";
+import { problems, resetNotifications, toasts } from "../src/services/notify";
 import { loadUsages, peekUsages } from "../src/services/references";
 import { MARKDOWN_FORMAT, mockFormatAction, seedMarkdownFormat } from "./format-fixture";
 import type { DirEntry, ReferencesResult, RenameResult, StudioPlatform } from "../src/types";
@@ -602,6 +603,118 @@ describe("createNewFile (toolbar + context menu)", () => {
   });
 });
 
+/**
+ * What `New File…` becomes, per destination.
+ *
+ * The four answers are feature 3: a collection's own source root routes to the seeded New Entry
+ * flow, a subdirectory or a schema-less collection is CONSTRAINED but not rerouted, an unresolvable
+ * format is reported and left unconstrained, and everywhere else offers the full picker. Each is a
+ * different wrong answer if it fires in the wrong place, and none of them is visible in the menu —
+ * the label stays `New File…` in every case, which is asserted below.
+ */
+describe("New File asks the destination what it is", () => {
+  /** Render a tree over a project whose `content` section is `content`. */
+  async function treeFor(content: Record<string, unknown>, seed: Record<string, string> = {}) {
+    const handle = installFsPlatform(seed);
+    siteState({ projectConfig: { content, name: "Demo" } });
+    seedTreeState();
+    const state = requireProjectState();
+    for (const dir of ["posts", "posts/2026", "notes", "loose"]) {
+      state.dirs.set(dir, []);
+      state.expanded.add(dir);
+    }
+    state.dirs
+      .get(".")!
+      .push(
+        { name: "posts", path: "posts", type: "directory" },
+        { name: "notes", path: "notes", type: "directory" },
+        { name: "loose", path: "loose", type: "directory" },
+      );
+    state.dirs.get("posts")!.push({ name: "2026", path: "posts/2026", type: "directory" });
+    const tree = makeTreeCtx();
+    const out = await renderInto(renderFilesTemplate(tree.ctx), host);
+    return { ...tree, handle, out };
+  }
+
+  /** Right-click a directory and take New File…, returning what the dialog shows. */
+  async function newFileIn(out: HTMLElement, path: string) {
+    pointer(rowFor(out, path), "contextmenu");
+    await flush();
+    const menu = popoverMenuItems().map((el) => el.textContent?.trim());
+    await clickMenuItem("New File…");
+    await flush();
+    await flush();
+    const dialog = dialogWrapper();
+    return {
+      headline: dialog?.getAttribute("headline") ?? null,
+      menu,
+      message: dialog?.querySelector("p")?.textContent?.trim() ?? "",
+      rows: promptFormatOptions(),
+    };
+  }
+
+  const MARKDOWN_POSTS = {
+    posts: { format: "Markdown", schema: { properties: {} }, source: "./posts/" },
+  };
+
+  test("a collection's source root routes to the SEEDED New Entry flow", async () => {
+    const { out } = await treeFor(MARKDOWN_POSTS);
+    const shown = await newFileIn(out, "posts");
+    expect(shown.headline).toBe("New posts entry");
+    // No picker: the collection's extension is not a choice, it is the collection's.
+    expect(shown.rows).toEqual([]);
+    // …and the row that opened it is still the tree's own generic one.
+    expect(shown.menu).toContain("New File…");
+    await answerPromptDialog(null);
+  });
+
+  test("a SUBDIRECTORY is constrained, not rerouted", async () => {
+    const { out } = await treeFor(MARKDOWN_POSTS);
+    const shown = await newFileIn(out, "posts/2026");
+    // Rerouting would silently relocate the file: New Entry writes to one directory, and
+    // Co-located media lives here too (site-architecture.md §6.5).
+    expect(shown.headline).toBe("New File");
+    expect(shown.message).toContain("Creating in posts/2026/");
+    expect(shown.rows).toEqual([
+      [".md", "Markdown (.md)"],
+      ["__other__", "Other…"],
+    ]);
+    await answerPromptDialog(null);
+  });
+
+  test("a collection with NO schema is constrained, not rerouted either", async () => {
+    // There is no shape to seed and no form to draw, so the entry flow would produce an empty file
+    // And an editor with nothing in it.
+    const { out } = await treeFor({ posts: { format: "Markdown", source: "./posts/" } });
+    const shown = await newFileIn(out, "posts");
+    expect(shown.headline).toBe("New File");
+    expect(shown.rows.map(([value]) => value)).toEqual([".md", "__other__"]);
+    await answerPromptDialog(null);
+  });
+
+  test("an unresolvable format is REPORTED, and leaves the picker unconstrained", async () => {
+    // Locking to a guessed extension would be a stated lie plus an enforced refusal, which is
+    // Worse than not constraining at all.
+    const { out } = await treeFor({ notes: { format: "Toml", schema: {}, source: "./notes/" } });
+    const shown = await newFileIn(out, "notes");
+    expect(shown.headline).toBe("New File");
+    expect(shown.rows.map(([value]) => value)).toEqual([".json", ".md", "__other__"]);
+    const problem = problems.at(-1)!;
+    expect(problem.message).toContain("cannot be constrained");
+    expect(problem.detail).toContain("Toml");
+    expect(problem.path).toBe("notes");
+    await answerPromptDialog(null);
+  });
+
+  test("a directory belonging to no collection gets the full picker", async () => {
+    const { out } = await treeFor(MARKDOWN_POSTS);
+    const shown = await newFileIn(out, "loose");
+    expect(shown.headline).toBe("New File");
+    expect(shown.rows.map(([value]) => value)).toEqual([".json", ".md", "__other__"]);
+    await answerPromptDialog(null);
+  });
+});
+
 // ─── Context menu ─────────────────────────────────────────────────────────────
 
 describe("file context menu", () => {
@@ -656,6 +769,7 @@ describe("file context menu", () => {
    */
   async function renderTreeWithRegistry() {
     const handle = installFsPlatform({
+      "pages/home.json": '{"tagName":"div"}',
       "posts/first.md": "---\ntitle: First\n---\n",
       "styles/site.css": "body{}",
     });
@@ -684,6 +798,10 @@ describe("file context menu", () => {
     requireProjectState().dirs.set("styles", [
       { name: "site.css", path: "styles/site.css", type: "file" },
     ]);
+    requireProjectState().dirs.set("pages", [
+      { name: "home.json", path: "pages/home.json", type: "file" },
+    ]);
+    requireProjectState().expanded.add("pages");
     requireProjectState().expanded.add("posts");
     requireProjectState().expanded.add("styles");
 
@@ -692,6 +810,7 @@ describe("file context menu", () => {
     });
     registry.registerAll(gridCommands());
     registerContentCommands(registry);
+    registerFileFormatCommands(registry);
     setActiveRegistry(registry);
 
     const tree = makeTreeCtx();
@@ -709,6 +828,36 @@ describe("file context menu", () => {
     );
     await clickMenuItem("Edit Collection in Grid");
     expect(workspace.tabs.has("grid://collection/posts")).toBeTrue();
+  });
+
+  /**
+   * `source` and `path` are DIFFERENT facts, and the row states each only where it is true.
+   *
+   * Both name a file, so it would be easy to answer them with one key — and then "Open Entry Form"
+   * would appear on every convertible page, and "Convert Format…" on every collection entry. The
+   * two lists below are the same three rows asked two ways, and they disagree on purpose.
+   */
+  test("a convertible page offers Convert Format…; an entry and a stylesheet do not", async () => {
+    setFormats([MARKDOWN_FORMAT]);
+    const { out } = await renderTreeWithRegistry();
+
+    pointer(rowFor(out, "pages/home.json"), "contextmenu");
+    await flush();
+    const page = popoverMenuItems().map((el) => el.textContent?.trim());
+    expect(page).toContain("Convert Format…");
+    expect(page).not.toContain("Open Entry Form");
+
+    // An entry is its collection's, in either direction: converting it would drop it out of the
+    // Collection's discovery glob.
+    pointer(rowFor(out, "posts/first.md"), "contextmenu");
+    await flush();
+    const entry = popoverMenuItems().map((el) => el.textContent?.trim());
+    expect(entry).toContain("Open Entry Form");
+    expect(entry).not.toContain("Convert Format…");
+
+    pointer(rowFor(out, "styles/site.css"), "contextmenu");
+    await flush();
+    expect(popoverMenuItems().map((el) => el.textContent?.trim())).not.toContain("Convert Format…");
   });
 
   test("a content entry offers Open Entry Form; a file in no collection does not", async () => {

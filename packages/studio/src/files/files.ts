@@ -1733,10 +1733,9 @@ export async function createFileIn(request: NewFileRequest): Promise<string | nu
         return choice.because;
       }
     }
+    /* No emptiness check here: every way `fileNameFor` can answer "" is already refused above — a
+       blank field by the first rule, a display name that slugifies to nothing by the second. */
     const candidate = fileNameFor(value, picked);
-    if (!candidate) {
-      return "Enter at least one letter or number.";
-    }
     return taken.has(candidate.toLowerCase()) ? `${candidate} already exists in ${dir}/.` : "";
   };
 

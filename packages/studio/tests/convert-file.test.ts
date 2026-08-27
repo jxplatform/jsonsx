@@ -308,6 +308,37 @@ describe("the open tab", () => {
     expect(tab?.doc.content.frontmatter).toMatchObject({ title: "About" });
   });
 
+  test("a rebuilt tab whose result will not parse leaves the CONVERSION done", async () => {
+    /* The bytes on disk are the ones just written and the move has already happened, so a parse
+       failure here is a stale tab, not a failed convert. Reporting it as a failure would be a lie
+       about a file that really did convert. */
+    let parses = 0;
+    install(
+      { "pages/about.json": '{"title":"About","children":[]}' },
+      {
+        formatAction: (payload: Record<string, unknown>) => {
+          if (payload.action === "parse") {
+            parses += 1;
+            if (parses > 1) {
+              return Promise.reject(new Error("unreadable"));
+            }
+          }
+          return mockFormatAction(payload);
+        },
+      },
+    );
+    openTab({
+      document: { children: [] },
+      documentPath: "pages/about.json",
+      id: "pages/about.json",
+    });
+    const pending = convertFile("pages/about.json", ".md");
+    await answerConfirm(true);
+    expect(await pending).toBe("pages/about.md");
+    expect(state.files.has("pages/about.md")).toBe(true);
+    expect(state.files.has("pages/about.json")).toBe(false);
+  });
+
   test("a file nobody has open converts without opening one", async () => {
     const pending = convertFile("pages/about.md", ".json");
     await answerConfirm(true);
@@ -441,6 +472,28 @@ describe("what the plan reports", () => {
     const pending = convertFile("pages/about.json", ".md");
     await flush();
     expect(topDialog()?.textContent).toContain("will not read back identically");
+    await answerConfirm(false);
+    await pending;
+  });
+
+  test("a stability check that cannot be answered stays silent rather than inventing a warning", async () => {
+    // Serializing succeeds; reading the result back throws. Unanswerable is not the same as
+    // Unstable, and the schema and serialize checks already speak for what can actually fail.
+    let call = 0;
+    install(
+      { "pages/about.json": '{"title":"About","children":[]}' },
+      {
+        formatAction: (payload: Record<string, unknown>) => {
+          call += 1;
+          return payload.action === "parse" && call > 1
+            ? Promise.reject(new Error("unreadable"))
+            : mockFormatAction(payload);
+        },
+      },
+    );
+    const pending = convertFile("pages/about.json", ".md");
+    await flush();
+    expect(topDialog()?.textContent).not.toContain("will not read back identically");
     await answerConfirm(false);
     await pending;
   });

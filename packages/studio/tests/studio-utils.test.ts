@@ -337,6 +337,16 @@ describe("findContentTypeSchema", () => {
     expect(findContentTypeSchema("data/site.json", config("./data/site.json"))?.name).toBe("posts");
   });
 
+  test("an unregistered format falls back to the default content extension", () => {
+    // `collectionForFile` answers `ext: null` and names the missing class; the FORM still has to
+    // Decide whether this file is an entry, and the default content format is the only guess left.
+    const cfg = {
+      content: { posts: { format: "Nope", schema: SCHEMA, source: "./content/posts" } },
+    };
+    expect(findContentTypeSchema("content/posts/hello.json", cfg)?.name).toBe("posts");
+    expect(findContentTypeSchema("content/posts/hello.md", cfg)).toBeNull();
+  });
+
   test("no document and no content section answer nothing", () => {
     expect(findContentTypeSchema(null, config("./content/posts"))).toBeNull();
     expect(findContentTypeSchema("content/posts/a.json", {})).toBeNull();

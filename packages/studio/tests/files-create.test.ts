@@ -227,6 +227,19 @@ describe("the picker's rows", () => {
     await contentOnly;
   });
 
+  test("the prefill's own extension decides which row starts selected", async () => {
+    // A caller that already knows the shape says so with the name it suggests, and does not have to
+    // Repeat itself in `defaultExt`.
+    const pending = createFileIn({
+      dir: "pages",
+      format: { kind: "choose" },
+      suggestedName: "untitled.md",
+    });
+    await flush();
+    await answerPromptDialog("hero");
+    expect(await pending).toBe("pages/hero.md");
+  });
+
   test("a locked choice offers that format and Other…, and nothing else", async () => {
     const pending = createFileIn({
       dir: "content",

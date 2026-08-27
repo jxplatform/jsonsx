@@ -821,6 +821,18 @@ describe("creation", () => {
     expect(await seed(".md", "card.md")).toBeUndefined();
   });
 
+  test("a serializer that throws is not a reason to refuse the creation", async () => {
+    // The serializer belongs to the PROJECT. Its failure costs the tag, not the file: the format's
+    // Own template still produces something the author can finish by hand.
+    await mount();
+    setFormats([MARKDOWN_FORMAT]);
+    installMockPlatform({ formatAction: () => Promise.reject(new Error("boom")) } as never);
+    await createLibraryEntry("component");
+    const seed = (created[0] as { content: (ext: string, name: string) => Promise<unknown> })
+      .content;
+    expect(await seed(".md", "my-card.md")).toBeUndefined();
+  });
+
   test("a collection row is content/'s createEntry — the collection's extension and a SEEDED body", async () => {
     await mount();
     const path = await createLibraryEntry("collection:posts");
