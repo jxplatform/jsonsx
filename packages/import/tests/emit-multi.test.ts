@@ -79,7 +79,7 @@ describe("emitMultiPageProject", () => {
       expect(files.length).toBe(5);
 
       const project = await Bun.file(join(dir, "project.json")).json();
-      expect(project.title).toBe("Multi Page Test");
+      expect(project.name).toBe("Multi Page Test");
 
       const index = await Bun.file(join(dir, "pages", "index.json")).json();
       expect(index.textContent).toBe("Home");
@@ -164,7 +164,7 @@ describe("emitMultiPageProject", () => {
     }
   });
 
-  test("writes style tokens into project.json.$style", async () => {
+  test("writes style tokens into project.json.style", async () => {
     const dir = await mkdtemp(join(tmpdir(), "jx-import-tokens-"));
 
     try {
@@ -177,7 +177,7 @@ describe("emitMultiPageProject", () => {
       });
 
       const project = await Bun.file(join(dir, "project.json")).json();
-      expect(project.$style).toEqual({ "--brand": "#3b82f6", "--space-4": "16px" });
+      expect(project.style).toEqual({ "--brand": "#3b82f6", "--space-4": "16px" });
     } finally {
       await rm(dir, { recursive: true });
     }
@@ -230,7 +230,7 @@ describe("emitMultiPageProject", () => {
           "@font-face { src: url(https://cdn.example.com/b.woff2); }",
         ],
         fontRewriteMap: new Map([
-          ["https://cdn.example.com/a.woff2", "public/assets/fonts/a.woff2"],
+          ["https://cdn.example.com/a.woff2", "/assets/fonts/a.woff2"],
           ["https://cdn.example.com/b.woff2", "assets/fonts/b.woff2"],
         ]),
       });
