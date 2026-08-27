@@ -522,6 +522,27 @@ describe("chromium launcher RPC dispatch", () => {
     expect(handlerMocks.handleRenameFile).toHaveBeenCalledWith({ from: "a", to: "b" });
   });
 
+  /*
+   * The two synchronous entries in a map typed to promises, so the map is where they are adapted.
+   * Dispatching them through the socket is what proves the adaptation answers at all — declaring
+   * the entry is not calling it, and nothing else here ever did.
+   */
+  test("the preview overlay methods publish and retract through the socket", async () => {
+    const published = await rpc("setPreviewOverlay", {
+      contents: '{"tagName":"main"}',
+      path: "pages/index.json",
+    });
+    const retracted = await rpc("clearPreviewOverlay", { path: "pages/index.json" });
+
+    expect(published).toBeNull();
+    expect(retracted).toBeNull();
+    expect(handlerMocks.setPreviewOverlay).toHaveBeenCalledWith({
+      contents: '{"tagName":"main"}',
+      path: "pages/index.json",
+    });
+    expect(handlerMocks.clearPreviewOverlay).toHaveBeenCalledWith({ path: "pages/index.json" });
+  });
+
   test("file and project queries return handler results", async () => {
     expect(await rpc("listDirectory", { dir: "." })).toEqual([{ name: "hello.txt", type: "file" }]);
     expect(await rpc("discoverComponents", { dir: "." })).toEqual([
