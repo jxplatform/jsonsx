@@ -683,6 +683,8 @@ describe("a running import, under the chip that started it", () => {
     expect(el.querySelector(".ai-import-message")?.textContent?.trim()).toBe("Crawled 3 pages");
     expect(el.querySelectorAll(".ai-import-log-line")).toHaveLength(2);
     expect(el.querySelector("sp-progress-circle")?.hasAttribute("indeterminate")).toBe(true);
+    // A running import is open; the reader should not have to ask for the thing they are waiting on.
+    expect(el.querySelector(".ai-import-progress")?.hasAttribute("open")).toBe(true);
   });
 
   test("a phase that counts draws a determinate bar", async () => {
@@ -696,14 +698,64 @@ describe("a running import, under the chip that started it", () => {
     expect(circle.getAttribute("progress")).toBe("25");
   });
 
-  test("a settled import draws its outcome and no progress", async () => {
+  test("renders the whole retained log, not a fixed tail of it", async () => {
+    /* The log was sliced to the last six lines, so a run that reported forty steps showed six and
+       silently dropped the rest — including every warning above the cut. It is a scroller now, and
+       what it scrolls is everything the store still holds. */
+    const log = Array.from({ length: 40 }, (_, i) => ({
+      message: `step ${i}`,
+      phase: "crawl",
+    }));
+    const el = await renderInto(
+      list([importing()], { ask: { importRun: () => ({ ...RECORD, log }), pendingId: null } }),
+    );
+    expect(el.querySelectorAll(".ai-import-log-line")).toHaveLength(40);
+    expect(el.querySelector(".ai-import-count")?.textContent?.trim()).toBe("40");
+  });
+
+  test("a settled import KEEPS its log, collapsed, and says how it ended", async () => {
+    /* The record used to be fetched only while the call was pending, so a successful import
+       destroyed its own account of itself at the moment it succeeded — the same failure the
+       hand-off from the wizard to the assistant was made to fix, one layer in. */
     const el = await renderInto(
       list([importing({ success: true, summary: "Imported example.com" })], {
-        ask: { importRun: () => RECORD },
+        ask: { importRun: () => ({ ...RECORD, status: "done" as const }) },
       }),
     );
-    expect(el.querySelector(".ai-import-progress")).toBeNull();
+    const panel = el.querySelector(".ai-import-progress")!;
+    expect(panel).not.toBeNull();
+    expect(panel.hasAttribute("open")).toBe(false);
+    expect(el.querySelectorAll(".ai-import-log-line")).toHaveLength(2);
+    expect(el.querySelector(".ai-import-message")?.textContent).toContain("https://example.com/");
+    // No spinner on a run that is over.
+    expect(el.querySelector("sp-progress-circle")).toBeNull();
     expect(el.querySelector(".ai-tool-chip-outcome")?.textContent).toContain("Imported");
+  });
+
+  test("a failed run says why, where the outcome would have been", async () => {
+    const el = await renderInto(
+      list([importing({ success: false, summary: "boom" })], {
+        ask: {
+          importRun: () => ({
+            ...RECORD,
+            error: "Chrome would not launch",
+            status: "failed" as const,
+          }),
+        },
+      }),
+    );
+    expect(el.querySelector(".ai-import-message")?.textContent).toContain(
+      "Chrome would not launch",
+    );
+  });
+
+  test("a stopped run says so rather than looking like a failure", async () => {
+    const el = await renderInto(
+      list([importing({ success: false, summary: "stopped" })], {
+        ask: { importRun: () => ({ ...RECORD, status: "stopped" as const }) },
+      }),
+    );
+    expect(el.querySelector(".ai-import-message")?.textContent?.trim()).toBe("Import stopped");
   });
 
   test("a host with no run record simply draws the chip", async () => {

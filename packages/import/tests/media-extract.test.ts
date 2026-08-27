@@ -12,7 +12,8 @@ void mock.module("../src/style-capture.ts", () => ({
   },
 }));
 
-const { analyzeMediaQueries, extractMedia } = await import("../src/media-extract.ts");
+const { analyzeMediaQueries, extractMedia, skippedWidthQueries } =
+  await import("../src/media-extract.ts");
 
 function makePage(): { page: Page; viewports: { width: number; height: number }[] } {
   const viewports: { width: number; height: number }[] = [];
@@ -88,6 +89,33 @@ describe("analyzeMediaQueries", () => {
   });
 });
 
+describe("skippedWidthQueries", () => {
+  test("names the width queries the parser cannot read", () => {
+    expect(
+      skippedWidthQueries([
+        "(max-width: 640px)",
+        "(min-width: 48rem)",
+        "(min-width: 1024px) and (max-width: 1440px)",
+        "(width >= 768px)",
+      ]),
+    ).toEqual([
+      "(min-width: 48rem)",
+      "(min-width: 1024px) and (max-width: 1440px)",
+      "(width >= 768px)",
+    ]);
+  });
+
+  test("stays quiet about queries that are not about width at all", () => {
+    expect(
+      skippedWidthQueries(["(prefers-color-scheme: dark)", "(hover: hover)", "print"]),
+    ).toEqual([]);
+  });
+
+  test("deduplicates", () => {
+    expect(skippedWidthQueries(["(min-width: 48rem)", "(min-width: 48rem)"])).toHaveLength(1);
+  });
+});
+
 describe("extractMedia", () => {
   const uaDefaults = { div: { display: "block" } };
 
@@ -111,16 +139,65 @@ describe("extractMedia", () => {
     ]);
     const { page, viewports } = makePage();
 
-    const result = await extractMedia(page, base, uaDefaults, [
-      "(max-width: 768px)",
-      "(min-width: 1024px)",
-    ]);
+    const result = await extractMedia(
+      page,
+      base,
+      uaDefaults,
+      ["(max-width: 768px)", "(min-width: 1024px)"],
+      { policy: { mode: "all" } },
+    );
 
     expect(captureWidths).toEqual([768, 1024]);
     expect(result.breakpoints).toEqual({ "--768": "(max-width: 768px)" });
     expect(result.deltas["--768"]).toEqual([{ path: [0], style: { width: "400px" } }]);
     expect(result.deltas["--1024"]).toBeUndefined();
     expect(viewports).toEqual([{ width: 1440, height: 900 }]);
+  });
+
+  test("limits to three breakpoints by default, and captures only those", async () => {
+    const base: CapturedStyle[] = [
+      { path: [0], tagName: "div", styles: { width: "800px", display: "flex" } },
+    ];
+    const narrow = [{ path: [0], tagName: "div", styles: { width: "400px", display: "flex" } }];
+    capturesByWidth = new Map([
+      [520, narrow],
+      [782, narrow],
+      [1390, narrow],
+    ]);
+    const { page } = makePage();
+
+    const result = await extractMedia(page, base, uaDefaults, [
+      "(max-width: 520px)",
+      "(min-width: 600px)",
+      "(max-width: 767px)",
+      "(max-width: 781px)",
+      "(min-width: 782px)",
+      "(min-width: 960px)",
+      "(max-width: 1024px)",
+      "(min-width: 1025px)",
+      "(min-width: 1390px)",
+    ]);
+
+    // The narrowest, the middle one and the widest — and no viewport pass for the other six.
+    expect(captureWidths).toEqual([520, 782, 1390]);
+    expect(Object.keys(result.breakpoints)).toEqual(["--520", "--782", "--1390"]);
+  });
+
+  test("uses a caller-supplied plan verbatim, ignoring this page's own queries", async () => {
+    const base: CapturedStyle[] = [
+      { path: [0], tagName: "div", styles: { width: "800px", display: "flex" } },
+    ];
+    capturesByWidth = new Map([
+      [900, [{ path: [0], tagName: "div", styles: { width: "500px", display: "flex" } }]],
+    ]);
+    const { page } = makePage();
+
+    const result = await extractMedia(page, base, uaDefaults, ["(max-width: 480px)"], {
+      plan: [{ name: "--wide", query: "(min-width: 900px)", testWidth: 900 }],
+    });
+
+    expect(captureWidths).toEqual([900]);
+    expect(result.breakpoints).toEqual({ "--wide": "(min-width: 900px)" });
   });
 
   test("restores a custom original viewport width", async () => {
@@ -132,7 +209,9 @@ describe("extractMedia", () => {
     ]);
     const { page, viewports } = makePage();
 
-    const result = await extractMedia(page, base, uaDefaults, ["(max-width: 480px)"], 1280);
+    const result = await extractMedia(page, base, uaDefaults, ["(max-width: 480px)"], {
+      originalWidth: 1280,
+    });
 
     expect(result.breakpoints).toEqual({ "--480": "(max-width: 480px)" });
     expect(viewports).toEqual([{ width: 1280, height: 900 }]);

@@ -536,6 +536,40 @@ export interface ImportProgressEvent {
   total?: number;
 }
 
+/**
+ * How many of a site's declared breakpoints the imported project keeps.
+ *
+ * A real site declares as many as it has accumulated frameworks — nine is ordinary — and each one
+ * becomes a canvas size in Studio and a column in every style editor. `limit` is the default
+ * because that is the complaint it answers; `explicit` is for an author who already knows the
+ * widths their project should have. `rounding` decides which DECLARED width backs a kept one, since
+ * the styles flip where the site says they do, not where the author wishes they did.
+ */
+export type BreakpointRounding = "nearest" | "down" | "up";
+
+export interface ImportBreakpointPolicy {
+  mode: "all" | "limit" | "explicit";
+  /** `limit` only — how many to keep, evenly spaced across the declared range. */
+  count?: number;
+  /** `explicit` only — the widths the project should have, in CSS pixels. */
+  widths?: number[];
+  /** `limit` and `explicit` — how a kept width matches a declared one. */
+  rounding?: BreakpointRounding;
+}
+
+/**
+ * The line the import stream sends the moment the destination exists and holds a `project.json`.
+ *
+ * It is what makes an import watchable. The emit phase rewrites that file completely, so nothing
+ * here is a guess about the result — it says the directory is now a PROJECT, so the caller can open
+ * it and see the pages, components and assets arrive in its own file tree over the several minutes
+ * a crawl takes, rather than facing a welcome screen until the run ends.
+ */
+export interface ImportReadyEvent {
+  /** The project root, in the platform's own form. */
+  root: string;
+}
+
 /** Options for the import-site pipeline (StudioPlatform.importSite). */
 export interface ImportSiteOptions {
   /** The live site to clone; must be http(s). */
@@ -548,6 +582,8 @@ export interface ImportSiteOptions {
   depth: number;
   /** Max pages to capture. */
   maxPages: number;
+  /** Which of the site's declared breakpoints the project keeps. Omitted means the default limit. */
+  breakpoints?: ImportBreakpointPolicy;
   /** Refine component/prop names with the LLM (requires a key). */
   aiComponents: boolean;
   /**
@@ -558,8 +594,21 @@ export interface ImportSiteOptions {
    * question worth asking, and every other finding is a count of things that were skipped.
    */
   verify?: boolean;
-  /** Pixelmatch threshold 0..1 for `verify` (default 0.15). */
+  /**
+   * Pixelmatch's per-pixel COLOUR tolerance, 0..1, for `verify` (default 0.15).
+   *
+   * It decides when two pixels count as the same colour, so it moves the score and never the
+   * outcome. `verifyMinFidelity` is the bar.
+   */
   verifyThreshold?: number;
+  /**
+   * The average fidelity, 0..100, this run has to reach for `verify` to report `passed`.
+   *
+   * A finding rather than a failure on this transport: the project is written and opened either
+   * way, and the summary says the bar was missed. `jx-import` uses the same number to decide an
+   * exit code, because a script in a pipeline has no reader to tell.
+   */
+  verifyMinFidelity?: number;
   /** OpenAI-compatible credentials, from the user's AI settings. */
   apiKey?: string;
   baseUrl?: string;
@@ -569,8 +618,19 @@ export interface ImportSiteOptions {
 /** Per-page fidelity from the `verify` pass. */
 export interface ImportVerifyPage {
   route: string;
-  /** 0..1 — the share of pixels that matched the original. */
+  /** 0..100 — the percentage of pixels that matched the original. */
   fidelity: number;
+  /**
+   * Console errors and uncaught exceptions the rendered page produced.
+   *
+   * What a percentage cannot say. A page that 404s on fifteen images scores badly, and only this
+   * and `failedRequests` name the reason (issue #232).
+   */
+  consoleErrors?: number;
+  /** Requests the rendered page made that failed or answered 4xx/5xx. */
+  failedRequests?: number;
+  /** Why this page has no score at all — it could not be rendered. */
+  error?: string;
 }
 
 /**
@@ -587,7 +647,22 @@ export interface ImportSiteSummary {
   /** Soft failures the pipeline recorded: assets that would not download, pages it skipped. */
   warnings?: string[];
   /** Present only when `verify` was requested and reference screenshots were captured. */
-  verify?: { averageFidelity: number; reportDir: string; pages?: ImportVerifyPage[] };
+  verify?: {
+    averageFidelity: number;
+    reportDir: string;
+    pages?: ImportVerifyPage[];
+    /**
+     * Whether the run met its bar: the project built cleanly, every page rendered, and the average
+     * fidelity reached `minFidelity`. Over HTTP that bar is 0 by default, so `passed: false` from
+     * this backend means the project did not build or a page did not render — not that the clone
+     * merely scored low. The `jx-import` CLI sets a real floor and exits non-zero.
+     */
+    passed?: boolean;
+    /** The bar `passed` was measured against, 0..100. */
+    minFidelity?: number;
+    /** Errors the compiler reported building the emitted project. */
+    buildErrors?: string[];
+  };
 }
 
 // ─── AI proxy ────────────────────────────────────────────────────────────────

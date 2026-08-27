@@ -370,6 +370,8 @@ function openSyncedTab(
   return tab;
 }
 
+const { detachMediaPane } = await import("../src/media/media-pane");
+
 const ctx = {
   gitDiffState: null as Record<string, unknown> | null,
   openFileFromTree: mock(() => {}),
@@ -1350,6 +1352,31 @@ describe("source mode", () => {
 });
 
 // ─── Git diff mode ────────────────────────────────────────────────────────────
+
+describe("media mode", () => {
+  test("mounts the viewer, and a repaint of the same tab leaves it alone", async () => {
+    /* The viewer owns its own effect scope, so a repaint that reached the canvas pipeline would
+       tear it down and rebuild it — losing the dimensions it learned from the loaded image and the
+       reference count it had already asked for. The fast path is what stops that. */
+    const tab = openSyncedTab({ tagName: "div" }, { documentPath: "public/hero.png" });
+    tab.capabilities.modes = ["media"];
+    setMode("media");
+    renderCanvas();
+    await flush();
+
+    const viewer = stageEl().querySelector(".media-viewer");
+    expect(viewer).not.toBeNull();
+    expect(stageEl().querySelector(".media-name")?.textContent?.trim()).toBe("hero.png");
+    // No artboard: a media file is shown, not laid out.
+    expect(canvasPanels.length).toBe(0);
+
+    renderCanvas();
+    await flush();
+    expect(stageEl().querySelector(".media-viewer")).toBe(viewer!);
+
+    detachMediaPane("primary");
+  });
+});
 
 describe("git-diff mode", () => {
   test("falls back to design mode when no diff state is set", () => {

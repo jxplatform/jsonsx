@@ -30,7 +30,7 @@
  * alone), parks any rejection under the control that caused it, and re-renders. §7.1's third tier:
  * a bad value belongs at its control, not in a toast that expires.
  *
- * @docs studio/projects/pages-layouts-components
+ * @docs studio/projects/settings
  */
 
 import { html, render as litRender, nothing } from "lit-html";
@@ -140,6 +140,15 @@ type ErrorTarget = string;
  */
 const errors = new WeakMap<HTMLElement, { target: ErrorTarget; message: string }>();
 
+/**
+ * Schema errors the file already had when this section last wrote to it.
+ *
+ * Reported at section level rather than under a control, because they belong to no control — and
+ * kept per container for the same reason {@link errors} is. Populated by the first write, since
+ * validating on every render would compile a schema for a section nobody is editing.
+ */
+const inheritedErrors = new WeakMap<HTMLElement, string[]>();
+
 /** Read the current failure for a container — exported for tests and for re-render helpers. */
 export function contextsError(container: HTMLElement): { target: string; message: string } | null {
   return errors.get(container) ?? null;
@@ -171,12 +180,26 @@ export function renderContextsSection(container: HTMLElement): void {
    * shape, and the disk can refuse the write. The predecessor surfaces (`Properties › Media` and
    * the CSS-variables "Enable dark scheme") did `void updateSiteConfig(...)` and dropped the
    * rejection, so a failed write read as the field snapping back for no reason.
+   *
+   * **Only the errors THIS edit introduces block it.** The candidate is the whole `project.json`,
+   * so a violation anywhere else in the file used to refuse every context edit and park the reason
+   * under whichever control had been touched — typing `1280px` into Base width reported three
+   * unevaluated-property errors about `title`, `description` and `$style`, none of which is a
+   * width. The baseline is validated first and subtracted, the same way `services/ai-tools.ts`
+   * subtracts it before blaming the model for a document it inherited. A pre-existing problem is
+   * still worth saying, so it is reported once at section level, where a whole-file problem belongs
+   * — and it is reported rather than repaired, because `project.json` is the author's file and a
+   * settings screen that silently drops keys it did not recognise is worse than one that names
+   * them.
    */
   const persistMedia = async (next: Record<string, string>, target: ErrorTarget) => {
     const candidate = { ...config, $media: next } as unknown;
     let schemaErrors: string[] = [];
+    let inherited: string[] = [];
     try {
-      schemaErrors = await validateProjectConfig(candidate);
+      inherited = await validateProjectConfig(config);
+      const found = await validateProjectConfig(candidate);
+      schemaErrors = found.filter((error) => !inherited.includes(error));
     } catch (error) {
       /* A validator that cannot compile must not block the edit — but it must not be silent
          either, so the message rides the same inline slot the schema errors would have used. */
@@ -187,6 +210,7 @@ export function renderContextsSection(container: HTMLElement): void {
       reject(target, schemaErrors.join("; "));
       return;
     }
+    inheritedErrors.set(container, inherited);
     try {
       await updateSiteConfig({ $media: next });
       errors.delete(container);
@@ -197,6 +221,24 @@ export function renderContextsSection(container: HTMLElement): void {
       });
     }
     renderContextsSection(container);
+  };
+
+  /**
+   * What is already wrong with `project.json`, said once and not blamed on a control.
+   *
+   * It does not block anything — the edit that surfaced it went through. It is here because a file
+   * that fails its own schema will keep failing it, and until this notice existed the only place
+   * that fact appeared was as an unexplained refusal of an unrelated field.
+   */
+  const inheritedNotice = () => {
+    const inherited = inheritedErrors.get(container) ?? [];
+    return inherited.length === 0
+      ? nothing
+      : html`<p class="settings-section-notice" role="status">
+          project.json has ${inherited.length} pre-existing schema
+          ${inherited.length === 1 ? "problem" : "problems"} that this section did not cause:
+          ${inherited.join("; ")}
+        </p>`;
   };
 
   /** The error line for one control, when that is where the current failure belongs. */
@@ -370,7 +412,7 @@ export function renderContextsSection(container: HTMLElement): void {
         The conditions this project's pages are rendered under. Define them once here; choose
         between them on the pane's context control while you edit.
       </p>
-      ${errorFor("section")}
+      ${errorFor("section")} ${inheritedNotice()}
 
       <div class="settings-field">
         <label class="settings-field-label">Base width</label>

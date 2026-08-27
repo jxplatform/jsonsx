@@ -13,31 +13,19 @@ import { emitMultiPageProject } from "../src/emit.ts";
 import { downloadAssets } from "../src/asset-download.ts";
 import { rewriteAssetUrls } from "../src/asset-rewrite.ts";
 import type { DiscoveredAsset } from "../src/asset-collect.ts";
+import coreProjectFragment from "@jxsuite/schema/schemas/project.core.schema.json";
 import type { JxElement } from "@jxsuite/schema/types";
 
-/** The keys `project.schema.json` accepts at the top level of a project document. */
-const PROJECT_KEYS = new Set([
-  "$defs",
-  "$elements",
-  "$head",
-  "$media",
-  "$schema",
-  "build",
-  "copy",
-  "defaults",
-  "extensions",
-  "i18n",
-  "images",
-  "imports",
-  "manifest",
-  "name",
-  "redirects",
-  "securityTxt",
-  "serviceWorker",
-  "state",
-  "style",
-  "url",
-]);
+/**
+ * The keys a project may carry are the schema's to say, so this asks it rather than restating it.
+ *
+ * A hand-kept allowlist here would go stale in the one direction that costs something: the day the
+ * core fragment gains a key and the emitter starts writing it, a list that has not been updated
+ * fails a correct import. `tests/emit-schema.test.ts` runs the same composition end to end.
+ */
+const PROJECT_KEYS = new Set(
+  Object.keys((coreProjectFragment as { properties: Record<string, unknown> }).properties),
+);
 
 describe("an emitted project is one the compiler accepts", () => {
   test("project.json carries no key the schema rejects", async () => {

@@ -345,6 +345,22 @@ export function createProjectServer(options: CreateProjectServerOptions): Projec
           return;
         }
 
+        /*
+         * The keepalive, answered AHEAD of the session lookup.
+         *
+         * A ping's whole job is to prove the socket is alive, and that is a fact about the socket,
+         * not about which project a window is bound to. Behind the lookup it would be refused —
+         * and close the socket — in exactly the states where staying connected matters most: a
+         * window mid-re-root, or one whose session was torn down and rebuilt. The shell sends one
+         * every 30s because this server's idle timeout is 120s and a studio can be quiet for far
+         * longer than that (a site import runs for minutes over a separate HTTP stream and touches
+         * this socket not at all).
+         */
+        if (msg.method === "__ping") {
+          ws.send(JSON.stringify({ id: msg.id, result: null }));
+          return;
+        }
+
         // Re-resolve the session FRESH each message (fail-closed for Phase 7 multi-window).
         const session = resolveSession(ws.data.winId);
         if (!session) {

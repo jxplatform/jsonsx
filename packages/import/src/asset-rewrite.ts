@@ -6,6 +6,7 @@
  */
 
 import type { JxElement, JxStyle } from "@jxsuite/schema/types";
+import { SRCSET_SEPARATOR } from "./srcset.ts";
 
 /** Rewrite all asset URLs in a Jx tree in-place. Returns the count of rewrites performed. */
 export function rewriteAssetUrls(
@@ -46,13 +47,14 @@ export function rewriteAssetUrls(
     return null;
   }
 
+  /*
+   * Split by the same rule the collector downloads by (`SRCSET_SEPARATOR`). If the two disagreed,
+   * the importer would fetch one set of URLs and rewrite another — the attribute would be
+   * reassembled around fragments nothing had downloaded.
+   */
   function rewriteSrcset(srcset: string): string {
-    // A srcset entry is separated by a comma that starts a NEW URL. Splitting on every comma
-    // Shreds any URL that carries commas in its own path — Wix, Cloudinary and imgix all encode
-    // Transform parameters that way (".../fill/w_375,h_127,al_c,q_85/logo.png"), which turned one
-    // Image into a dozen unfetchable fragments.
     return srcset
-      .split(/,(?=\s*(?:https?:\/\/|data:|\/\/|\/|\.{1,2}\/|[A-Za-z0-9_-]+\.[A-Za-z]{2,5}[/?#\s]))/)
+      .split(SRCSET_SEPARATOR)
       .map((entry) => {
         const parts = entry.trim().split(/\s+/);
         const [url = ""] = parts;

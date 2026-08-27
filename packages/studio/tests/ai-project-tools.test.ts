@@ -340,7 +340,12 @@ describe("ai-project-tools — write_file", () => {
      undo to lean on. */
   test("a schema-invalid project.json is refused before anything is written", async () => {
     const onProjectConfigWritten = mock((_c: object) => {});
-    const validateProject = mock(async (_c: unknown) => ["/extensions: must be object"]);
+    // Clean before, broken after: an error the model's own write introduced.
+    const validateProject = mock(async (config: unknown) =>
+      (config as { extensions?: unknown }).extensions === "nope"
+        ? ["/extensions: must be object"]
+        : [],
+    );
     const { registry, state } = makeHarness({}, { onProjectConfigWritten, validateProject });
 
     const res = await registry.execute("write_file", {
@@ -356,6 +361,26 @@ describe("ai-project-tools — write_file", () => {
     expect(onProjectConfigWritten).not.toHaveBeenCalled();
   });
 
+  /* A project whose config was written by something else — an importer, a hand edit, an extension
+     that was later removed — must not refuse every write the model attempts. The model cannot fix
+     a violation it did not introduce and cannot reach from the edit it was asked to make, so
+     blaming it for one is a loop with no exit. Same subtraction `services/ai-tools.ts` performs on
+     a document edit. */
+  test("a violation the file already had does not refuse an unrelated write", async () => {
+    const validateProject = mock(async (_c: unknown) => [
+      "(root): must NOT have unevaluated properties (title)",
+    ]);
+    const { registry, state } = makeHarness({}, { validateProject });
+
+    const res = await registry.execute("write_file", {
+      content: JSON.stringify({ name: "Demo", url: "https://example.com" }),
+      path: "project.json",
+    });
+
+    expect(res.success).toBe(true);
+    expect(writes(state)).toHaveLength(1);
+  });
+
   test("the document validator is never used for project.json", async () => {
     const validate = mock(async (_d: unknown) => ["/tagName: must be string"]);
     const validateProject = mock(async (_c: unknown) => []);
@@ -368,7 +393,9 @@ describe("ai-project-tools — write_file", () => {
 
     expect(res.success).toBe(true);
     expect(validate).not.toHaveBeenCalled();
-    expect(validateProject).toHaveBeenCalledTimes(1);
+    // Twice: the file as it stands, then the file as this write would leave it. The first is what
+    // Gets subtracted so the model is only blamed for what it introduced.
+    expect(validateProject).toHaveBeenCalledTimes(2);
     expect(writes(state)).toHaveLength(1);
   });
 

@@ -109,6 +109,8 @@ Those two modules are bundled into your `dist/` at build time and the import map
 
 They come from `@jxsuite/compiler`'s own dependencies, not your project's, so you don't have to install anything. The runtime always matches the compiler that produced the page.
 
+Which pages get a map is decided per page, and what the build writes is read back out of the pages it just wrote: every path any emitted map names is bundled into `dist/`, and a site whose pages are all static writes no `dist/assets/` at all. That direction matters, because the alternative is a build that promises a module it never produced: a page 404ing on its runtime and rendering blank while the build reports success, which passes every structural check there is.
+
 The page also emits a `modulepreload` hint for each of them, and for each component module it loads:
 
 ```html

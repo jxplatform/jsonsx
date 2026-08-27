@@ -2,7 +2,30 @@ import { join, dirname } from "node:path";
 import { mkdir } from "node:fs/promises";
 import type { JxElement } from "@jxsuite/schema/types";
 import { componentize } from "./componentize.ts";
+import { stripClasses } from "./strip-classes.ts";
 import type { ComponentizeOptions, ComponentizeResult } from "./componentize.ts";
+
+/**
+ * The `$media` key the base width lives under — a number of CSS pixels, not a query.
+ *
+ * Studio's canvas reads it to size the default artboard (`utils/canvas-media.ts`), and an import
+ * never wrote one, so every imported project's base canvas fell back to 320px while its narrowest
+ * real breakpoint was three times that. Mirrors `settings/contexts-section.ts`'s `BASE_KEY`.
+ */
+const BASE_MEDIA_KEY = "--";
+
+/** The width a `--<width>` breakpoint key names, for sorting. Non-numeric keys sort first. */
+function mediaKeyWidth(key: string): number {
+  const width = Number(key.replace(/^--/, ""));
+  return Number.isFinite(width) ? width : -1;
+}
+
+export interface EmitResult {
+  /** Absolute paths of every file written. */
+  files: string[];
+  /** How many source-site class names were removed on the way out. */
+  classesStripped: number;
+}
 
 export interface EmitOptions {
   outDir: string;
@@ -11,6 +34,8 @@ export interface EmitOptions {
   sourceUrl: string;
   /** $media breakpoints to seed into project.json (Phase 1). */
   breakpoints?: Record<string, string>;
+  /** The capture viewport width, written as the `$media` base entry. */
+  baseWidth?: number;
   /** Phase 4: componentization options. Pass false to skip. */
   componentizeOptions?: ComponentizeOptions | false;
 }
@@ -25,6 +50,8 @@ export interface MultiEmitOptions {
   layout?: JxElement | undefined;
   /** $media breakpoints to seed into project.json. */
   breakpoints?: Record<string, string> | undefined;
+  /** The capture viewport width, written as the `$media` base entry. */
+  baseWidth?: number | undefined;
   /** Phase 4: componentization options. Pass false to skip. */
   componentizeOptions?: ComponentizeOptions | false | undefined;
   /** Pre-computed componentization result (from AI pass). Overrides componentizeOptions. */
@@ -43,14 +70,16 @@ export async function emitProject({
   document,
   sourceUrl,
   breakpoints,
+  baseWidth,
   componentizeOptions,
-}: EmitOptions): Promise<{ files: string[] }> {
+}: EmitOptions): Promise<EmitResult> {
   return emitMultiPageProject({
     outDir,
     title,
     sourceUrl,
     pages: new Map([["pages/index.json", document]]),
     breakpoints,
+    baseWidth,
     componentizeOptions,
   });
 }
@@ -61,25 +90,46 @@ export async function emitMultiPageProject({
   pages,
   layout,
   breakpoints,
+  baseWidth,
   componentizeOptions,
   precomputedComponents,
   fontFaceRules,
   fontRewriteMap,
   styleTokens,
-}: MultiEmitOptions): Promise<{ files: string[] }> {
+}: MultiEmitOptions): Promise<EmitResult> {
   await mkdir(join(outDir, "pages"), { recursive: true });
   await mkdir(join(outDir, "layouts"), { recursive: true });
   await mkdir(join(outDir, "components"), { recursive: true });
   await mkdir(join(outDir, "public"), { recursive: true });
 
+  /*
+   * Only keys the project schema declares (#228). `title` and `description` are page-level keys and
+   * `$style` is not a key at all, and all three made every imported project fail `jx validate` —
+   * and, because Studio's Contexts editor validates the WHOLE configuration before saving, made an
+   * imported project's base width uneditable, reporting `(root): must NOT have unevaluated
+   * properties` three times while naming nothing.
+   *
+   * The source URL has no schema-legal home and does not get one. `$head`'s description meta is the
+   * nearest candidate and the wrong one: it is the site's own user-facing description, and
+   * "Imported from …" is provenance, not a description of the site. The importer reports it instead.
+   */
   const projectJson: Record<string, unknown> = {
     name: title || "Imported Site",
     imports: {},
     images: { optimize: false },
   };
 
+  if (baseWidth !== undefined) {
+    projectJson.$media = { [BASE_MEDIA_KEY]: `${Math.round(baseWidth)}px` };
+  }
   if (breakpoints && Object.keys(breakpoints).length > 0) {
-    projectJson.$media = breakpoints;
+    /* Ascending, and the base first. `$media` is a map, so its order IS the order Studio's Contexts
+       list and the pane's size switcher offer these in; a crawl merged them in page-visit order,
+       which is not an order at all. */
+    const sorted = Object.entries(breakpoints).toSorted(
+      ([a], [b]) => mediaKeyWidth(a) - mediaKeyWidth(b),
+    );
+    projectJson.$media = { ...(projectJson.$media as object), ...Object.fromEntries(sorted) };
   }
 
   if (styleTokens && Object.keys(styleTokens).length > 0) {
@@ -177,6 +227,22 @@ export async function emitMultiPageProject({
   await Bun.write(projectPath, `${JSON.stringify(projectJson, null, 2)}\n`);
   files.push(projectPath);
 
+  /*
+   * Classes go here, at the last possible moment, and that placement is the whole design.
+   *
+   * `componentize` groups by structure and `ai-componentize` reads the template to choose a name —
+   * `product-card` over `component-div-0` — and the class names are the strongest signal either has.
+   * Stripping earlier would cost that; stripping later is impossible. So both passes see the source
+   * site's classes, and nothing downstream of this line does.
+   */
+  let classesStripped = 0;
+  for (const compDoc of componentFiles.values()) {
+    classesStripped += stripClasses(compDoc);
+  }
+  for (const doc of finalPages.values()) {
+    classesStripped += stripClasses(doc);
+  }
+
   // Write components
   for (const [fileName, compDoc] of componentFiles) {
     const compPath = join(outDir, "components", fileName);
@@ -219,10 +285,11 @@ export async function emitMultiPageProject({
       ...(((layoutDoc as Record<string, unknown>).$elements as JxElement[]) ?? []),
     ];
   }
+  classesStripped += stripClasses(layoutDoc);
   await Bun.write(layoutPath, `${JSON.stringify(layoutDoc, null, 2)}\n`);
   files.push(layoutPath);
 
-  return { files };
+  return { classesStripped, files };
 }
 
 function extractStateDefaults(node: JxElement | string, out: Record<string, string>) {

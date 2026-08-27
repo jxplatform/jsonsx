@@ -8,9 +8,15 @@
  *
  * Stream protocol (one JSON object per line):
  *   {"type":"progress","phase":"...","message":"...","current":n,"total":n}
+ *   {"type":"ready","root":"..."}              — the destination exists and is openable
  *   {"type":"heartbeat"}                       — keep-alives during silent phases
  *   {"type":"done","root":"...","config":{…},"result":{…}}  — terminal success
  *   {"type":"error","error":"..."}             — terminal failure
+ *
+ * `ready` arrives seconds in, before the browser launches; `done` arrives minutes later. They are
+ * two lines rather than one because they answer different questions — "where is it" and "what did it
+ * find" — and a caller that waits for the second to learn the first spends the whole crawl with
+ * nothing to show.
  *
  * LLM key flow (matches ai-api.ts): X-Api-Key / Authorization: Bearer header, falling back to the
  * OPENAI_API_KEY env var; base URL from X-Api-Base-URL / OPENAI_BASE_URL. When AI component naming
@@ -23,6 +29,8 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { problem } from "./problem.ts";
+import type { BreakpointPolicy, BreakpointRounding } from "@jxsuite/import/breakpoint-plan";
+import type { ImportBreakpointPolicy } from "@jxsuite/protocol";
 
 export interface ImportApiOptions {
   /**
@@ -46,6 +54,8 @@ interface ImportRequestBody {
   aiModel?: string;
   verify?: boolean;
   verifyThreshold?: number;
+  verifyMinFidelity?: number;
+  breakpoints?: ImportBreakpointPolicy;
 }
 
 /** Seconds between keep-alive lines while a phase is silent (browser launch is the longest gap). */
@@ -54,12 +64,58 @@ const HEARTBEAT_INTERVAL_MS = 15_000;
 const MAX_DEPTH = 5;
 const MAX_PAGES = 100;
 
-/** Pixelmatch threshold bounds for the optional verify pass. */
+/** Pixelmatch colour-tolerance bounds for the optional verify pass. */
 const MIN_THRESHOLD = 0.01;
 const MAX_THRESHOLD = 1;
 
+/**
+ * The fidelity bar's bounds, as a percentage.
+ *
+ * `0` is a legal answer and means "report only", which is what this transport did before the bar
+ * existed — so the floor here is 0 rather than the CLI's default of 25.
+ */
+const MIN_FIDELITY_FLOOR = 0;
+const MIN_FIDELITY_CEILING = 100;
+
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, Math.trunc(value)));
+}
+
+/**
+ * The breakpoint policy this request asks for, or `undefined` for "whatever the pipeline defaults
+ * to".
+ *
+ * Shape only. The bounds — how many breakpoints a project may keep, which widths are plausible —
+ * belong to `@jxsuite/import`'s planner, which clamps them and is tested doing so; restating them
+ * here would be a second set of numbers to keep in step with the first. What this does is refuse to
+ * hand the pipeline JSON it would have to interpret: a `widths` that is not an array of numbers, a
+ * `mode` that is not one of the three.
+ */
+function readBreakpointPolicy(
+  policy: ImportBreakpointPolicy | undefined,
+): BreakpointPolicy | undefined {
+  if (!policy) {
+    return undefined;
+  }
+  const rounding: BreakpointRounding =
+    policy.rounding === "down" || policy.rounding === "up" ? policy.rounding : "nearest";
+
+  if (policy.mode === "all") {
+    return { mode: "all" };
+  }
+  if (policy.mode === "explicit") {
+    const widths = (Array.isArray(policy.widths) ? policy.widths : [])
+      .map((width) => Math.trunc(Number(width)))
+      .filter((width) => Number.isFinite(width));
+    /* An override with no usable width in it is an empty override, not an instruction to keep
+       nothing. Falling through to the default beats both a 400 and an empty $media. */
+    return widths.length > 0 ? { mode: "explicit", rounding, widths } : undefined;
+  }
+  if (policy.mode === "limit") {
+    const count = Math.trunc(Number(policy.count));
+    return { count: Number.isFinite(count) && count > 0 ? count : 3, mode: "limit", rounding };
+  }
+  return undefined;
 }
 
 function getAiConfig(req: Request): { apiKey: string | null; baseUrl: string | undefined } {
@@ -114,16 +170,27 @@ async function handleImportSite(req: Request, opts: ImportApiOptions): Promise<R
    * the caller can act on: every other finding is a count of things that were skipped, and "the
    * pricing page renders at 61%" is a question worth putting to a person.
    */
-  const verify: false | { threshold: number } = body.verify
+  const verify: false | { threshold: number; minFidelity: number } = body.verify
     ? {
+        /*
+         * Two different numbers, and conflating them is what let a run scoring 8% report success.
+         * `threshold` is pixelmatch's per-pixel COLOUR tolerance and only moves the score;
+         * `minFidelity` is the bar the run's `passed` is measured against.
+         */
         threshold: Math.min(
           MAX_THRESHOLD,
           Math.max(MIN_THRESHOLD, Number(body.verifyThreshold ?? 0.15) || 0.15),
+        ),
+        minFidelity: clamp(
+          Number(body.verifyMinFidelity ?? 0) || 0,
+          MIN_FIDELITY_FLOOR,
+          MIN_FIDELITY_CEILING,
         ),
       }
     : false;
   const maxPages = clamp(body.maxPages ?? 20, 1, MAX_PAGES);
   const maxNodesPerPage = clamp(body.maxNodesPerPage ?? 5000, 100, 50_000);
+  const breakpoints = readBreakpointPolicy(body.breakpoints);
   const { apiKey, baseUrl } = getAiConfig(req);
   const toRoot = opts.toRoot ?? ((p: string) => p);
 
@@ -173,9 +240,20 @@ async function handleImportSite(req: Request, opts: ImportApiOptions): Promise<R
             ai,
             verify,
             signal: req.signal,
+            ...(breakpoints === undefined ? {} : { breakpoints }),
             ...(opts.chromePath === undefined ? {} : { chromePath: opts.chromePath }),
           },
-          (e) => writeLine({ type: "progress", ...e }),
+          (e) => {
+            /* The seed event carries the root, and it is the ONE thing a caller cannot wait for the
+               terminal line to learn: it arrives seconds in, and `done` arrives minutes later. It
+               is re-emitted as its own line rather than left inside a progress message, because a
+               root parsed out of prose is a root that breaks when the prose is reworded. */
+            if (e.phase === "seed" && e.root) {
+              writeLine({ type: "ready", root: toRoot(e.root) });
+            }
+            const { root: _root, ...progress } = e;
+            writeLine({ type: "progress", ...progress });
+          },
         );
 
         const config = JSON.parse(

@@ -163,6 +163,111 @@ describe("streaming", () => {
     expect(opts.ai).toBe(false);
   });
 
+  test("re-emits the seed as its own `ready` line, with the root in the host's own form", async () => {
+    importBehavior = (call) => {
+      const outDir = call.options.outDir as string;
+      mkdirSync(outDir, { recursive: true });
+      writeFileSync(join(outDir, "project.json"), JSON.stringify({ name: "Imported Site" }));
+      call.onProgress?.({ phase: "seed", message: `Created ${outDir}`, root: outDir });
+      call.onProgress?.({ phase: "capture", message: "Capturing page..." });
+      return Promise.resolve({ outDir, pages: [], fileCount: 3, verify: null, warnings: [] });
+    };
+    const { req, url } = makeRequest({ directory: "seeded", url: "https://x.example" });
+    const res = await handleImportApi(req, url, apiOptions);
+    const lines = await readLines(res!);
+
+    expect(lines[0]).toEqual({ type: "ready", root: `root:${resolve(ROOT, "seeded")}` });
+    // The progress line still arrives, minus the root — that fact now has a line of its own.
+    expect(lines[1]).toEqual({
+      type: "progress",
+      phase: "seed",
+      message: `Created ${resolve(ROOT, "seeded")}`,
+    });
+    // And it arrives BEFORE the terminal line, which is the entire point.
+    expect(lines.findIndex((l) => l.type === "ready")).toBeLessThan(
+      lines.findIndex((l) => l.type === "done"),
+    );
+  });
+
+  test("a seed event with no root is a progress line and nothing more", async () => {
+    importBehavior = (call) => {
+      const outDir = call.options.outDir as string;
+      mkdirSync(outDir, { recursive: true });
+      writeFileSync(join(outDir, "project.json"), JSON.stringify({ name: "Imported Site" }));
+      call.onProgress?.({ phase: "seed", message: "Created it" });
+      return Promise.resolve({ outDir, pages: [], fileCount: 1, verify: null, warnings: [] });
+    };
+    const { req, url } = makeRequest({ directory: "rootless", url: "https://x.example" });
+    const res = await handleImportApi(req, url, apiOptions);
+    const lines = await readLines(res!);
+    expect(lines.some((l) => l.type === "ready")).toBe(false);
+  });
+
+  describe("the breakpoint policy", () => {
+    async function policyFor(breakpoints: unknown): Promise<unknown> {
+      const { req, url } = makeRequest({
+        directory: `bp-${importCalls.length}`,
+        url: "https://x.example",
+        breakpoints,
+      });
+      const res = await handleImportApi(req, url, apiOptions);
+      await res?.text();
+      return importCalls.at(-1)!.options.breakpoints;
+    }
+
+    test("is omitted when the request does not ask for one, so the pipeline's default applies", async () => {
+      const { req, url } = makeRequest({ directory: "bp-none", url: "https://x.example" });
+      const res = await handleImportApi(req, url, apiOptions);
+      await res?.text();
+      expect(importCalls.at(-1)!.options.breakpoints).toBeUndefined();
+    });
+
+    test("passes an explicit width list through, trimmed to whole numbers", async () => {
+      expect(await policyFor({ mode: "explicit", widths: [640, "1024", 1440.7] })).toEqual({
+        mode: "explicit",
+        rounding: "nearest",
+        widths: [640, 1024, 1440],
+      });
+    });
+
+    test("keeps the rounding when it names one, and defaults it when it does not", async () => {
+      expect(await policyFor({ mode: "limit", count: 4, rounding: "down" })).toEqual({
+        count: 4,
+        mode: "limit",
+        rounding: "down",
+      });
+      expect(await policyFor({ mode: "limit", count: 4, rounding: "sideways" })).toEqual({
+        count: 4,
+        mode: "limit",
+        rounding: "nearest",
+      });
+      expect(await policyFor({ mode: "limit", count: 4, rounding: "up" })).toEqual({
+        count: 4,
+        mode: "limit",
+        rounding: "up",
+      });
+    });
+
+    test("passes `all` through", async () => {
+      expect(await policyFor({ mode: "all" })).toEqual({ mode: "all" });
+    });
+
+    test("an explicit override with nothing usable in it falls back to the default", async () => {
+      expect(await policyFor({ mode: "explicit", widths: [] })).toBeUndefined();
+      expect(await policyFor({ mode: "explicit", widths: "640,1024" })).toBeUndefined();
+      expect(await policyFor({ mode: "explicit" })).toBeUndefined();
+    });
+
+    test("a nonsense count still limits, and a nonsense mode is no policy at all", async () => {
+      expect(await policyFor({ mode: "limit", count: "many" })).toEqual({
+        count: 3,
+        mode: "limit",
+        rounding: "nearest",
+      });
+      expect(await policyFor({ mode: "sideways" })).toBeUndefined();
+    });
+  });
+
   test("clamps depth and maxPages to sane bounds", async () => {
     const { req, url } = makeRequest({
       directory: "clamped",
@@ -349,7 +454,7 @@ describe("the verify pass and the run summary", () => {
       verifyThreshold: 0.3,
     });
     await readLines((await handleImportApi(req, url, apiOptions))!);
-    expect(importCalls[0]!.options.verify).toEqual({ threshold: 0.3 });
+    expect(importCalls[0]!.options.verify).toEqual({ minFidelity: 0, threshold: 0.3 });
 
     for (const [sent, expected] of [
       [5, 1],
@@ -365,8 +470,44 @@ describe("the verify pass and the run summary", () => {
         ...(sent === undefined ? {} : { verifyThreshold: sent }),
       });
       await readLines((await handleImportApi(next.req, next.url, apiOptions))!);
-      expect(importCalls[0]!.options.verify).toEqual({ threshold: expected });
+      expect(importCalls[0]!.options.verify).toEqual({ minFidelity: 0, threshold: expected });
     }
+  });
+
+  /*
+   * The bar, which is a different number from the colour tolerance beside it (jxsuite/jx issue
+   * 232). It defaults to 0 here rather than to the CLI's 25: over this transport a missed bar is a
+   * finding the assistant reports, and a caller that never asked for one gets the score reported
+   * exactly as it always was.
+   */
+  test("the fidelity minimum is forwarded, clamped, and defaults to report-only", async () => {
+    for (const [sent, expected] of [
+      [60, 60],
+      [400, 100],
+      [-5, 0],
+      ["nonsense", 0],
+      [undefined, 0],
+    ] as const) {
+      importCalls = [];
+      const next = makeRequest({
+        directory: "site",
+        url: "https://x.example",
+        verify: true,
+        ...(sent === undefined ? {} : { verifyMinFidelity: sent }),
+      });
+      await readLines((await handleImportApi(next.req, next.url, apiOptions))!);
+      expect(importCalls[0]!.options.verify).toMatchObject({ minFidelity: expected });
+    }
+  });
+
+  test("a fidelity minimum without verify asks for no verification at all", async () => {
+    const { req, url } = makeRequest({
+      directory: "site",
+      url: "https://x.example",
+      verifyMinFidelity: 90,
+    });
+    await readLines((await handleImportApi(req, url, apiOptions))!);
+    expect(importCalls[0]!.options.verify).toBe(false);
   });
 
   test("the done line carries what the run found", async () => {

@@ -14,6 +14,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `ai.md`
 
+- **0.1.10-draft** (2026-08-26) — import_site adopts the project when it exists, not when the run ends; the run's log outlives it (§3.5).
 - **0.1.9-draft** (2026-08-26) — ask_user suspends a turn on the author (§3.4); import_site bootstraps a project from a live site (§3.5).
 - **0.1.8-draft** (2026-08-23) — 2.1 Managed providers: a platform may broker credentials, Studio offers that path before the key form, and the models endpoint is specified as a capability probe that must answer 200 for every credential state — with cf_not_connected, cf_reconnect_required and cf_upstream_error distinguished.
 - **0.1.7-draft** (2026-08-20) — The Anthropic client yields an error event with code NOT_IMPLEMENTED; it does not throw (§2).
@@ -38,6 +39,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `compiler.md`
 
+- **0.4.1-draft** (2026-08-27) — §12: the client-runtime asset set is derived from the emitted HTML, so every import map a build ships names files it wrote.
 - **0.4.0-draft** (2026-08-26) — Browser bundles are minified (§12); component CSS is inlined rather than linked (§8.2); image sizes derives from the container and variants stop at the configured ceiling (§7.2, §7.2.1).
 - **0.3.3-draft** (2026-08-26) — §8: the boolean-attribute rule is shared with the runtime rather than restated, and covers the enumerated family.
 - **0.3.2-draft** (2026-08-26) — Static output omits a false boolean attribute and emits a true one bare.
@@ -77,6 +79,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `desktop.md`
 
+- **0.4.4-draft** (2026-08-26) — the Import tab chooses how many breakpoints the project keeps, and what an import emits is normative (§4.5).
 - **0.4.3-draft** (2026-08-26) — Typechecking resolves the ElectroBun SDK from the pinned vendor/electrobun submodule; .hutch/devkit stays the build sysroot.
 - **0.4.2-draft** (2026-08-26) — Packages capability row: the registry seam is `packageVersions?` (each dependency's own latest), not `outdatedPackages?`.
 - **0.4.1-draft** (2026-08-26) — the Import source hands its brief to the assistant, which runs the import; the git-init obligation moves to whatever creates the project (§4.5).
@@ -232,6 +235,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `server.md`
 
+- **0.2.15** (2026-08-26) — the import stream names its destination on a ready line, before the crawl finishes (§4.2).
 - **0.2.14** (2026-08-26) — Packages family: `GET /__studio/packages/versions` reports every dependency's newest published version, behind or not, replacing the outdated-only check.
 - **0.2.13** (2026-08-26) — the import stream's done line carries the run summary, and accepts an opt-in verify pass (§4).
 - **0.2.12** (2026-08-25) — §3: the static-file order now matches a build — public/ precedes the project root, which survives as a compatibility lane that warns.
@@ -260,6 +264,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `site-architecture.md`
 
+- **0.6.1-draft** (2026-08-27) — media files open in a viewer, which is the reader the usage query was missing (§9.4).
 - **0.6.0-draft** (2026-08-26) — §12.4: component CSS inlined and modulepreload hints emitted; §14.3: name the hosts that read _headers, and warn when one will not.
 - **0.5.18-draft** (2026-08-26) — Standards evidence follows head-merger to @jxsuite/schema.
 - **0.5.17-draft** (2026-08-25) — §9.3: an editor whose host does not serve the site URL space MUST resolve references to the project files they name; §9.4: a parent-realm preview resolves in the same space, and an authored reference is not a file path.
@@ -450,6 +455,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `studio.md`
 
+- **0.9.51-draft** (2026-08-27) — a media file opens in a Media mode that shows it and says what uses it (§4.2, §9.3, §13.4); a long run's log is a feed that outlives the run (§6).
 - **0.9.50-draft** (2026-08-26) — the gear's project rows disable rather than hide, and the menu is bottom-anchored to its trigger's region.
 - **0.9.49-draft** (2026-08-26) — the rail foot is a Settings menu over both settings families; styles.open names the Project Styles editor.
 - **0.9.48-draft** (2026-08-26) — buildSite may serve a live rendering of the working tree rather than build output; SiteBuildResult.mode says which.

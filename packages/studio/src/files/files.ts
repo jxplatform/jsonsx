@@ -59,6 +59,7 @@ import {
   workspace,
 } from "../workspace/workspace";
 import { openCsvGridTab, openPagesGrid } from "../grid/grid-open";
+import { isViewableMedia, openMediaTab } from "../media/media-open";
 import { collectionDirs } from "../grid/sources/content-source";
 import { activeRegistry } from "../commands/active-registry";
 import { collectionOfPath } from "../content/entry-model";
@@ -1771,6 +1772,29 @@ export async function openFileInTab(path: string, opts: OpenFileOpts = {}) {
       }
       return;
     }
+  }
+
+  /*
+   * Media opens in the viewer, and the branch has to be HERE.
+   *
+   * Everything below reads the file as text: a PNG went through `platform.readFile`, matched no
+   * format class and no `.json`, and threw — so clicking an image in the tree produced "No format
+   * class imported for … — add one to project.json imports", which is not advice about a PNG. The
+   * Library's tiles and the file context menu's Open route through this same function, so they were
+   * all the same dead end, and `workspace/session.ts` restores tabs by calling it again — which is
+   * why a branch anywhere else would send a restored media tab straight back down the error path.
+   */
+  if (isViewableMedia(path)) {
+    openMediaTab(path);
+    if (follows) {
+      requireProjectState().selectedPath = path;
+    }
+    trackRecentFile({
+      name: path.split("/").pop() || path,
+      path,
+      root: requireProjectState().projectRoot,
+    });
+    return;
   }
 
   // CSV files open in the grid editor (source mode remains as the raw-text alternate).

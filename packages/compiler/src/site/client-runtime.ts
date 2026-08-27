@@ -161,6 +161,52 @@ export async function writeClientRuntime(
   return { errors, written };
 }
 
+/**
+ * The asset paths an import map's `imports` object asks THIS build to write.
+ *
+ * Two kinds of entry are named by a map and produced by nobody: a prefix key's value is the
+ * DIRECTORY its subpaths are served from — `/assets/lit-html/` — rather than a file, and a CDN
+ * fallback belongs to a third party. What is left is the exact set `writeClientRuntime` matches
+ * against, so the promise the HTML makes and the bundles the build writes are read off one rule.
+ */
+export function importMapAssets(imports: Record<string, string>): string[] {
+  return Object.entries(imports)
+    .filter(([specifier, url]) => !isPrefixSpecifier(specifier) && url.startsWith("/"))
+    .map(([, url]) => url);
+}
+
+/**
+ * The same set, read back out of a finished page.
+ *
+ * A page reaches an import map by more than one route: `injectComponentScripts` adds one, and the
+ * page-template tiers in `compile-static`/`compile-client`/`compile-element` emit their own. Only
+ * the first of those was recording what it named, so a project with interactivity but no components
+ * shipped a map pointing at `/assets/vue-reactivity.js` while the set that gates bundling stayed
+ * empty — nothing was written, the page 404'd on both modules and rendered blank, and the build
+ * reported success (issue #227). Scanning the emitted HTML is what makes the two agree no matter
+ * which path produced the map.
+ */
+export function importMapAssetsInHtml(html: string): string[] {
+  const found: string[] = [];
+  for (const match of html.matchAll(/<script type="importmap">([\s\S]*?)<\/script>/g)) {
+    let imports: unknown;
+    try {
+      ({ imports } = JSON.parse(match[1] as string) as { imports?: unknown });
+    } catch {
+      // A map the build did not write and cannot parse names nothing this build must produce.
+      continue;
+    }
+    if (typeof imports !== "object" || imports === null) {
+      continue;
+    }
+    const entries = Object.entries(imports as Record<string, unknown>).filter(
+      (entry): entry is [string, string] => typeof entry[1] === "string",
+    );
+    found.push(...importMapAssets(Object.fromEntries(entries)));
+  }
+  return found;
+}
+
 /** Render the `<script type="importmap">` block for a resolved runtime. */
 export function renderImportMap(imports: Record<string, string>): string {
   const entries = Object.entries(imports)

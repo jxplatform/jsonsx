@@ -3,6 +3,13 @@
 import { resolve } from "node:path";
 import { homedir } from "node:os";
 import { importSite } from "./run.ts";
+import {
+  DEFAULT_BREAKPOINT_POLICY,
+  MAX_BREAKPOINTS,
+  MAX_BREAKPOINT_WIDTH,
+  MIN_BREAKPOINT_WIDTH,
+} from "./breakpoint-plan.ts";
+import type { BreakpointPolicy, BreakpointRounding } from "./breakpoint-plan.ts";
 
 function usage(): never {
   console.log(`Usage: jx-import <url> [options]
@@ -14,6 +21,10 @@ Options:
   --depth <n>              Max crawl depth (default: 2, 0 = single page)
   --max-pages <n>          Max pages to capture (default: 25)
   --max-nodes-per-page <n> Skip styles/assets for pages above this (default: 5000)
+  --max-breakpoints <n>    Keep at most n of the site's breakpoints (default: 3, 0 = keep all)
+  --breakpoints <list>     Keep these widths instead, e.g. 640,1024,1440
+  --breakpoint-rounding <r> How a kept width matches a declared one: nearest|down|up
+                           (default: nearest)
   --no-styles              Skip CSS capture
   --no-assets              Skip asset download
   --no-crawl               Single page only (equivalent to --depth 0)
@@ -25,7 +36,10 @@ Options:
   --ai-components          Use LLM to refine component names and props (Phase 4 AI pass)
   --ai-model <model>       Model for AI componentization (default: gpt-4o-mini)
   --verify                 After import, build and screenshot-diff vs original (Phase 5)
-  --verify-threshold <n>   Pixel diff threshold 0..1 (default: 0.15)
+  --min-fidelity <n>       Fail (exit 1) below this average fidelity 0..100 (default: 25)
+  --verify-threshold <n>   Per-pixel colour tolerance 0..1 for the diff (default: 0.15).
+                           Moves the score; it is NOT the pass bar — --min-fidelity is.
+  --verify-viewport-only   Diff only the first viewport instead of the whole page
 
 Environment:
   OPENAI_API_KEY           Required for --ai-components
@@ -37,6 +51,8 @@ Examples:
   jx-import https://example.com --depth 1 --max-pages 10
   jx-import https://example.com --no-crawl
   jx-import https://example.com --out sites/my-clone --no-styles
+  jx-import https://example.com --breakpoints 640,1024,1440
+  jx-import https://example.com --max-breakpoints 0
   jx-import https://example.com --verify
   jx-import https://example.com --ai-components`);
   process.exit(1);
@@ -73,7 +89,60 @@ const verifyThreshold =
   verifyThresholdIdx !== -1 && args[verifyThresholdIdx + 1]
     ? Number(args[verifyThresholdIdx + 1]) || 0.15
     : 0.15;
+/*
+ * The floor below which the output is not a clone of anything.
+ *
+ * It is deliberately low rather than a quality bar: a real import of a complicated site lands well
+ * under 100 for reasons nobody can fix from here (a rotating hero, a font that renders a hair
+ * differently), and failing those would train people to pass `--min-fidelity 0` and stop looking.
+ * Under a quarter of pixels matching is a different question — that is the 8%-fidelity Wix clone
+ * that printed `Done!` and exited 0, which is worse than a failure because the only way to see it
+ * is to open the result (issue #232).
+ */
+const minFidelity = parseIntArg(args, "--min-fidelity", 25);
+const verifyFullPage = !args.includes("--verify-viewport-only");
 
+/**
+ * The breakpoint policy from the flags.
+ *
+ * `--breakpoints` wins over `--max-breakpoints` because it is the more specific answer: naming the
+ * widths says everything a count could have.
+ */
+function breakpointPolicy(): BreakpointPolicy {
+  const roundingIdx = args.indexOf("--breakpoint-rounding");
+  const roundingArg = roundingIdx === -1 ? "" : (args[roundingIdx + 1] ?? "");
+  const rounding: BreakpointRounding =
+    roundingArg === "down" || roundingArg === "up" ? roundingArg : "nearest";
+
+  const widthsIdx = args.indexOf("--breakpoints");
+  const widthsArg = widthsIdx === -1 ? "" : (args[widthsIdx + 1] ?? "");
+  if (widthsArg) {
+    const widths = widthsArg
+      .split(",")
+      .map((part) => Math.trunc(Number(part.trim())))
+      .filter((n) => Number.isFinite(n) && n >= MIN_BREAKPOINT_WIDTH && n <= MAX_BREAKPOINT_WIDTH);
+    if (widths.length === 0) {
+      console.error(
+        `Error: --breakpoints needs widths between ${MIN_BREAKPOINT_WIDTH} and ` +
+          `${MAX_BREAKPOINT_WIDTH}, e.g. --breakpoints 640,1024,1440`,
+      );
+      process.exit(1);
+    }
+    return { mode: "explicit", rounding, widths };
+  }
+
+  if (!args.includes("--max-breakpoints")) {
+    return DEFAULT_BREAKPOINT_POLICY;
+  }
+  const count = parseIntArg(args, "--max-breakpoints", 3);
+  // Zero is the only spelling of "keep all" a count can have, and it reads better than omitting the
+  // Flag when a script is choosing between the two.
+  return count <= 0
+    ? { mode: "all" }
+    : { count: Math.min(MAX_BREAKPOINTS, count), mode: "limit", rounding };
+}
+
+const breakpoints = breakpointPolicy();
 const maxDepth = noCrawl ? 0 : parseIntArg(args, "--depth", 2);
 const maxPages = parseIntArg(args, "--max-pages", 25);
 const maxNodesPerPage = parseIntArg(args, "--max-nodes-per-page", 5000);
@@ -116,6 +185,7 @@ async function main() {
       {
         url: url as string,
         outDir,
+        breakpoints,
         maxDepth,
         maxPages,
         maxNodesPerPage,
@@ -125,7 +195,9 @@ async function main() {
         respectRobots: !args.includes("--no-robots"),
         componentize: noComponents ? false : { minInstances, minDepth },
         ai,
-        verify: doVerify ? { threshold: verifyThreshold } : false,
+        verify: doVerify
+          ? { threshold: verifyThreshold, minFidelity, fullPage: verifyFullPage }
+          : false,
       },
       (e) => console.log(`  ${e.message}`),
     );
@@ -136,7 +208,39 @@ async function main() {
     }
     if (result.verify) {
       console.log(`  Average fidelity: ${result.verify.averageFidelity}%`);
+      for (const page of result.verify.pages) {
+        const misses = [
+          page.failedRequests > 0 ? `${page.failedRequests} failed request(s)` : "",
+          page.consoleErrors > 0 ? `${page.consoleErrors} console error(s)` : "",
+        ].filter(Boolean);
+        if (misses.length > 0) {
+          console.log(`    ${page.route}: ${misses.join(", ")}`);
+        }
+      }
       console.log(`  Report: ${result.verify.reportDir}/report.json`);
+    }
+
+    /*
+     * A verify that cannot fail is a report, not a gate. An import nobody opens and looks at is
+     * exactly the case the exit code exists for, so a build error or a fidelity under the floor
+     * ends the run non-zero and says which one it was.
+     */
+    if (result.verify && !result.verify.passed) {
+      for (const error of result.verify.buildErrors) {
+        console.error(`Build error: ${error}`);
+      }
+      console.error(
+        `\nVerification FAILED — the project is at ${outDir}, but it does not match the original.`,
+      );
+      if (result.verify.buildErrors.length === 0) {
+        console.error(
+          `  Average fidelity ${result.verify.averageFidelity}% is below the ` +
+            `${result.verify.minFidelity}% minimum. Pass --min-fidelity to change it.`,
+        );
+      }
+      console.error(`  Report: ${result.verify.reportDir}/report.json`);
+      process.exitCode = 1;
+      return;
     }
 
     console.log(`\nDone! Open in Studio:`);

@@ -2,9 +2,9 @@
 
 ## File-Based Routing, Content Collections, Layouts, and Static Site Generation
 
-**Version:** 0.6.0-draft
+**Version:** 0.6.1-draft
 **Status:** Partial
-**Updated:** 2026-08-26
+**Updated:** 2026-08-27
 **License:** MIT
 
 ---
@@ -1456,13 +1456,16 @@ Shipped:
   decoded it — so a caption never costs a second download
 - **Delete** — the confirmation states the reference count, computed on the authored ref, and says
   **unknown** rather than zero when a lane cannot be counted (`files/file-ops.ts`)
-
-Still planned:
-
-- **Usage tracking as a SURFACE.** The query ships (`files/media-usage.ts`) and is correct; what is
-  missing is a reader other than the delete confirmation. No column, panel or field answers "which
-  pages use this image?" until you try to remove it — so the answer arrives at the one moment the
-  author has already decided.
+- **Viewing** — clicking a media file in the Files tree or the Library opens it in a tab of its own
+  (`studio.md` §4.2's Media mode). It shows the asset at full size — an image, a video or audio with
+  controls, a font as a specimen, a PDF embedded — with its kind and dimensions, the site URL a
+  document would reference it by, and the list of documents that do. Before it, opening a media file
+  was not merely unsupported: it produced an error telling the author to add a format class to
+  `project.json`, which is not advice about a PNG.
+- **Usage tracking as a surface** — the Media view is that reader. The query already shipped and was
+  already correct; what was missing was anywhere to see it outside the delete confirmation, so the
+  answer to "which pages use this image?" arrived at the one moment the author had already decided.
+  A failed count still reads **unknown**, never zero.
 
 ---
 
@@ -2670,6 +2673,7 @@ This spec builds on existing Jx primitives wherever possible:
 
 ## Changelog
 
+- **0.6.1-draft** (2026-08-27) — media files open in a viewer, which is the reader the usage query was missing (§9.4).
 - **0.6.0-draft** (2026-08-26) — §12.4: component CSS inlined and modulepreload hints emitted; §14.3: name the hosts that read _headers, and warn when one will not.
 - **0.5.18-draft** (2026-08-26) — Standards evidence follows head-merger to @jxsuite/schema.
 - **0.5.17-draft** (2026-08-25) — §9.3: an editor whose host does not serve the site URL space MUST resolve references to the project files they name; §9.4: a parent-realm preview resolves in the same space, and an authored reference is not a file path.

@@ -20,6 +20,7 @@ import type { ToolRegistry, ToolResult } from "@jxsuite/ai/tools";
 import type { JxMutableNode, ProjectConfig } from "@jxsuite/schema/types";
 import { getPlatform } from "../platform";
 import { workspace } from "../workspace/workspace";
+import { projectState } from "../store";
 import type { Tab } from "../tabs/tab";
 import { adoptCreatedProject } from "./project-adoption";
 import { translateValidationError } from "./ai-tools";
@@ -355,8 +356,16 @@ export function registerProjectTools(
           /* The per-project entry document closes the composition over every enabled extension
              (extensions.md §5.2), so this is what catches a typo'd section key or a misshapen
              extension section. Without it the model shipped config its own tool call called clean
-             and Monaco flagged the moment a human opened the file. */
-          const configErrors = await validateProject(parsedConfig);
+             and Monaco flagged the moment a human opened the file.
+
+             Errors the file ALREADY had are subtracted, the same way `services/ai-tools.ts`
+             subtracts them from a document edit: a project whose config was written by something
+             else — an importer, a hand edit, an extension that was removed — would otherwise refuse
+             every write the model attempted, blaming it for a violation it did not introduce and
+             cannot reach from the edit it was asked to make. */
+          const before = new Set(await validateProject(projectState?.projectConfig ?? {}));
+          const found = await validateProject(parsedConfig);
+          const configErrors = found.filter((error) => !before.has(error));
           if (configErrors.length > 0) {
             const formatted = configErrors
               .map((e) => `- ${translateValidationError(e)}`)
