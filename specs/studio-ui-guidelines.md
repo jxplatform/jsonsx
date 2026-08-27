@@ -1,8 +1,8 @@
 # Jx Studio UI/UX Interface Guidelines
 
-**Version:** 0.3.15
+**Version:** 0.3.16
 **Status:** Implemented
-**Updated:** 2026-08-26
+**Updated:** 2026-08-27
 **Applies to:** `packages/studio/`
 
 ---
@@ -578,14 +578,34 @@ sandboxed contexts. The `no-alert` lint rule (oxlint `restriction` category, ena
 
 - `value` pre-fills the field; `select` controls what is highlighted on focus — `"all"`, `"stem"`
   (everything before the last dot, so renaming a file keeps its extension), or `"none"`.
-- `validate(value)` returns `""` for valid input, or a message. A non-empty message renders as
-  `sp-help-text[slot="negative-help-text"]`, marks the field `invalid`, and blocks confirmation
+- `validate(value, chosen)` returns `""` for valid input, or a message. A non-empty message renders
+  as `sp-help-text[slot="negative-help-text"]`, marks the field `invalid`, and blocks confirmation
   without closing the dialog. The default rejects blank input.
-- `message` renders explanatory copy above the field; `placeholder`, `confirmLabel`, and
-  `cancelLabel` follow the usual Spectrum semantics.
+- `message` renders explanatory copy above the field; `placeholder` (a string, or a function read on
+  every render), `confirmLabel`, and `cancelLabel` follow the usual Spectrum semantics.
 - Confirming resolves the **trimmed** value; cancel, close, and dismissal all resolve `null`.
 - <kbd>Enter</kbd> in the field confirms. The field takes focus on open, once — re-renders triggered
   by validation must not steal the caret back.
+- `choice` adds a picker ABOVE the field whose selection the dialog **owns** — its value reaches
+  `validate` as the second argument, and picking a row re-runs it. Owning it is the point: `check`
+  and the in-place re-render are private to the helper, so a caller-built control could change the
+  selection but could never make the field's refusal catch up with it. The New File format picker is
+  exactly that case — switching from Markdown to JSON changes whether the typed name is already
+  taken, with no keystroke to notice.
+  - `options` is a **function**, read on every render. A snapshot taken when the options object was
+    built freezes a list the project may still be loading.
+  - A pick always re-renders, unlike a keystroke, which re-renders only when the error string
+    changed: a pick can alter the placeholder, the selected row and the composed value with the
+    error text unchanged.
+  - A pick REFRESHES an error already on screen and never mints the first one. A dialog that opens
+    on a valid prefill must not paint a complaint under a field nobody has touched; the confirm
+    still refuses, because it validates unconditionally.
+  - The `sp-textfield` stays in ONE template position in every mode. A conditional branch builds a
+    new element, re-fires the field ref, hits the focus latch and strands the caret mid-name.
+  - The picker carries no focusing ref, and <kbd>Enter</kbd> stays bound to the field: `sp-picker`
+    does not stop Enter propagating, so a wrapper-level handler would confirm the dialog out from
+    under an open menu. It does stop <kbd>Escape</kbd>, so an Escape closing the menu does not reach
+    the dialog.
 
 Dialog attributes are kebab-case on `sp-dialog-wrapper` (`confirm-label`, `cancel-label`,
 `secondary-label`). The camelCase property names are not observed attributes; using them silently
@@ -1130,6 +1150,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.3.16** (2026-08-27) — showPromptDialog carries an optional choice control beside its field.
 - **0.3.15** (2026-08-26) — §8.4 becomes Menus: menu-button triggers, submenus and the APG deviation; §12.1 gains the settings/menu placement.
 - **0.3.14** (2026-08-22) — Template conventions (9.4) and the gate behind them; render orchestration described as it is; custom components corrected to the two that exist.
 - **0.3.13** (2026-08-21) — Chrome ships two themes; a theme in CHROME_THEMES must have its Spectrum colour fragment registered, and the semantic token table documents the dark fallbacks with the light ramp resolved from the brand fragment.
