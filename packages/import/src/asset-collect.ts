@@ -72,8 +72,14 @@ export async function collectAssets(page: Page): Promise<AssetCollectionResult> 
     }
 
     function parseSrcset(srcset: string): string[] {
+      // A srcset entry is separated by a comma that starts a NEW URL. Splitting on every comma
+      // Shreds any URL that carries commas in its own path — Wix, Cloudinary and imgix all encode
+      // Transform parameters that way (".../fill/w_375,h_127,al_c,q_85/logo.png"), which turned one
+      // Image into a dozen unfetchable fragments.
       return srcset
-        .split(",")
+        .split(
+          /,(?=\s*(?:https?:\/\/|data:|\/\/|\/|\.{1,2}\/|[A-Za-z0-9_-]+\.[A-Za-z]{2,5}[/?#\s]))/,
+        )
         .map((entry) => entry.trim().split(/\s+/)[0] ?? "")
         .filter(Boolean);
     }

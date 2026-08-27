@@ -11,7 +11,9 @@ import { tmpdir } from "node:os";
 import { existsSync } from "node:fs";
 import { emitMultiPageProject } from "../src/emit.ts";
 import { downloadAssets } from "../src/asset-download.ts";
+import { rewriteAssetUrls } from "../src/asset-rewrite.ts";
 import type { DiscoveredAsset } from "../src/asset-collect.ts";
+import type { JxElement } from "@jxsuite/schema/types";
 
 /** The keys `project.schema.json` accepts at the top level of a project document. */
 const PROJECT_KEYS = new Set([
@@ -154,5 +156,52 @@ describe("a downloaded font is the one the page asks for", () => {
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
+  });
+});
+describe("srcset survives a URL that carries its own commas", () => {
+  test("a transform-CDN url is one entry, not one per parameter", () => {
+    // Wix, Cloudinary and imgix all encode transform parameters as commas INSIDE the path.
+    // Splitting on every comma turned one image into a dozen unfetchable fragments, and a failed
+    // Download leaves the origin's URL in the page — so the clone hotlinked the site it cloned.
+    const wide = "https://cdn.example.com/media/x.png/v1/fill/w_750,h_254,al_c,q_85/logo.png";
+    const narrow = "https://cdn.example.com/media/x.png/v1/fill/w_375,h_127,al_c,q_85/logo.png";
+    const tree: JxElement = {
+      tagName: "div",
+      children: [{ tagName: "img", attributes: { srcset: `${narrow} 1x, ${wide} 2x` } }],
+    };
+    const map = new Map([
+      [narrow, "/assets/images/logo.png"],
+      [wide, "/assets/images/logo-1.png"],
+    ]);
+
+    const count = rewriteAssetUrls(tree, map);
+
+    expect(count).toBe(2);
+    expect((tree.children as JxElement[])[0]!.attributes!.srcset).toBe(
+      "/assets/images/logo.png 1x, /assets/images/logo-1.png 2x",
+    );
+  });
+
+  test("an ordinary srcset still splits on every entry", () => {
+    const tree: JxElement = {
+      tagName: "div",
+      children: [
+        {
+          tagName: "img",
+          attributes: { srcset: "https://example.com/s.jpg 320w, https://example.com/l.jpg 1024w" },
+        },
+      ],
+    };
+    const map = new Map([
+      ["https://example.com/s.jpg", "/assets/images/s.jpg"],
+      ["https://example.com/l.jpg", "/assets/images/l.jpg"],
+    ]);
+
+    const count = rewriteAssetUrls(tree, map);
+
+    expect(count).toBe(2);
+    expect((tree.children as JxElement[])[0]!.attributes!.srcset).toBe(
+      "/assets/images/s.jpg 320w, /assets/images/l.jpg 1024w",
+    );
   });
 });
