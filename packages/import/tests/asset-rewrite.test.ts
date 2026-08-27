@@ -13,14 +13,12 @@ describe("rewriteAssetUrls", () => {
         },
       ],
     };
-    const map = new Map([["https://example.com/hero.jpg", "public/assets/images/hero.jpg"]]);
+    const map = new Map([["https://example.com/hero.jpg", "/assets/images/hero.jpg"]]);
 
     const count = rewriteAssetUrls(tree, map);
 
     expect(count).toBe(1);
-    expect((tree.children as JxElement[])[0]!.attributes!.src).toBe(
-      "public/assets/images/hero.jpg",
-    );
+    expect((tree.children as JxElement[])[0]!.attributes!.src).toBe("/assets/images/hero.jpg");
   });
 
   test("rewrites srcset attribute", () => {
@@ -36,15 +34,61 @@ describe("rewriteAssetUrls", () => {
       ],
     };
     const map = new Map([
-      ["https://example.com/small.jpg", "public/assets/images/small.jpg"],
-      ["https://example.com/large.jpg", "public/assets/images/large.jpg"],
+      ["https://example.com/small.jpg", "/assets/images/small.jpg"],
+      ["https://example.com/large.jpg", "/assets/images/large.jpg"],
     ]);
 
     const count = rewriteAssetUrls(tree, map);
 
     expect(count).toBe(2);
     expect((tree.children as JxElement[])[0]!.attributes!.srcset).toBe(
-      "public/assets/images/small.jpg 320w, public/assets/images/large.jpg 1024w",
+      "/assets/images/small.jpg 320w, /assets/images/large.jpg 1024w",
+    );
+  });
+
+  /*
+   * Issue #231: the attribute is reassembled from the same split that decides what gets
+   * downloaded, and `.split(",")` shredded any URL carrying commas in its own path. Wix,
+   * Cloudinary and imgix all encode image transforms that way.
+   */
+  test("rewrites a transform-CDN srcset without shredding its URLs", () => {
+    const wide =
+      "https://static.wixstatic.com/media/X~mv2.png/v1/fill/w_750,h_254,al_c,q_85/logo.png";
+    const narrow =
+      "https://static.wixstatic.com/media/X~mv2.png/v1/fill/w_375,h_127,al_c,q_85/logo.png";
+    const tree: JxElement = {
+      tagName: "img",
+      attributes: { srcset: `${narrow} 1x, ${wide} 2x` },
+    };
+    const map = new Map([
+      [narrow, "/assets/images/logo.png"],
+      [wide, "/assets/images/logo-1.png"],
+    ]);
+
+    const count = rewriteAssetUrls(tree, map);
+
+    expect(count).toBe(2);
+    expect(tree.attributes!.srcset).toBe(
+      "/assets/images/logo.png 1x, /assets/images/logo-1.png 2x",
+    );
+  });
+
+  // A URL that was never downloaded stays exactly as it was — which is what leaves an origin URL
+  // In the page, and why a failed download is worth a warning rather than silence.
+  test("leaves an un-downloaded srcset entry untouched", () => {
+    const tree: JxElement = {
+      tagName: "img",
+      attributes: { srcset: "https://origin.example/a.png 1x, https://origin.example/b.png 2x" },
+    };
+
+    const count = rewriteAssetUrls(
+      tree,
+      new Map([["https://origin.example/a.png", "/assets/images/a.png"]]),
+    );
+
+    expect(count).toBe(1);
+    expect(tree.attributes!.srcset).toBe(
+      "/assets/images/a.png 1x, https://origin.example/b.png 2x",
     );
   });
 
@@ -55,12 +99,12 @@ describe("rewriteAssetUrls", () => {
         backgroundImage: 'url("https://example.com/bg.png")',
       },
     };
-    const map = new Map([["https://example.com/bg.png", "public/assets/images/bg.png"]]);
+    const map = new Map([["https://example.com/bg.png", "/assets/images/bg.png"]]);
 
     const count = rewriteAssetUrls(tree, map);
 
     expect(count).toBe(1);
-    expect(tree.style!.backgroundImage).toBe('url("public/assets/images/bg.png")');
+    expect(tree.style!.backgroundImage).toBe('url("/assets/images/bg.png")');
   });
 
   test("rewrites URLs in $media nested style objects", () => {
@@ -74,16 +118,16 @@ describe("rewriteAssetUrls", () => {
       },
     };
     const map = new Map([
-      ["https://example.com/bg-desktop.png", "public/assets/images/bg-desktop.png"],
-      ["https://example.com/bg-mobile.png", "public/assets/images/bg-mobile.png"],
+      ["https://example.com/bg-desktop.png", "/assets/images/bg-desktop.png"],
+      ["https://example.com/bg-mobile.png", "/assets/images/bg-mobile.png"],
     ]);
 
     const count = rewriteAssetUrls(tree, map);
 
     expect(count).toBe(2);
-    expect(tree.style!.backgroundImage).toBe('url("public/assets/images/bg-desktop.png")');
+    expect(tree.style!.backgroundImage).toBe('url("/assets/images/bg-desktop.png")');
     expect((tree.style!["@--768"] as JxStyle).backgroundImage).toBe(
-      'url("public/assets/images/bg-mobile.png")',
+      'url("/assets/images/bg-mobile.png")',
     );
   });
 
@@ -92,7 +136,7 @@ describe("rewriteAssetUrls", () => {
       tagName: "a",
       attributes: { href: "https://example.com/page" },
     };
-    const map = new Map([["https://example.com/page", "public/assets/other/page"]]);
+    const map = new Map([["https://example.com/page", "/assets/other/page"]]);
 
     const count = rewriteAssetUrls(tree, map);
 
@@ -105,12 +149,12 @@ describe("rewriteAssetUrls", () => {
       tagName: "video",
       attributes: { poster: "https://example.com/thumb.jpg" },
     };
-    const map = new Map([["https://example.com/thumb.jpg", "public/assets/images/thumb.jpg"]]);
+    const map = new Map([["https://example.com/thumb.jpg", "/assets/images/thumb.jpg"]]);
 
     const count = rewriteAssetUrls(tree, map);
 
     expect(count).toBe(1);
-    expect(tree.attributes!.poster).toBe("public/assets/images/thumb.jpg");
+    expect(tree.attributes!.poster).toBe("/assets/images/thumb.jpg");
   });
 
   test("skips URLs not in the rewrite map", () => {
@@ -146,7 +190,7 @@ describe("rewriteAssetUrls", () => {
         },
       ],
     };
-    const map = new Map([["https://example.com/deep.jpg", "public/assets/images/deep.jpg"]]);
+    const map = new Map([["https://example.com/deep.jpg", "/assets/images/deep.jpg"]]);
 
     const count = rewriteAssetUrls(tree, map);
 
@@ -178,22 +222,18 @@ describe("rewriteAssetUrls", () => {
       ],
     };
     const map = new Map([
-      ["https://tailwindcss.com/_next/static/media/hero.jpg", "public/assets/images/hero.jpg"],
-      ["https://tailwindcss.com/images/logo.svg", "public/assets/images/logo.svg"],
-      ["https://tailwindcss.com/_next/static/media/bg.png", "public/assets/images/bg.png"],
+      ["https://tailwindcss.com/_next/static/media/hero.jpg", "/assets/images/hero.jpg"],
+      ["https://tailwindcss.com/images/logo.svg", "/assets/images/logo.svg"],
+      ["https://tailwindcss.com/_next/static/media/bg.png", "/assets/images/bg.png"],
     ]);
 
     const count = rewriteAssetUrls(tree, map, "https://tailwindcss.com/");
 
     expect(count).toBe(3);
-    expect((tree.children as JxElement[])[0]!.attributes!.src).toBe(
-      "public/assets/images/hero.jpg",
-    );
-    expect((tree.children as JxElement[])[1]!.attributes!.src).toBe(
-      "public/assets/images/logo.svg",
-    );
+    expect((tree.children as JxElement[])[0]!.attributes!.src).toBe("/assets/images/hero.jpg");
+    expect((tree.children as JxElement[])[1]!.attributes!.src).toBe("/assets/images/logo.svg");
     expect((tree.children as JxElement[])[2]!.style!.backgroundImage).toBe(
-      'url("public/assets/images/bg.png")',
+      'url("/assets/images/bg.png")',
     );
   });
 
@@ -202,12 +242,12 @@ describe("rewriteAssetUrls", () => {
       tagName: "img",
       attributes: { src: "//cdn.example.com/image.jpg" },
     };
-    const map = new Map([["https://cdn.example.com/image.jpg", "public/assets/images/image.jpg"]]);
+    const map = new Map([["https://cdn.example.com/image.jpg", "/assets/images/image.jpg"]]);
 
     const count = rewriteAssetUrls(tree, map, "https://example.com/");
 
     expect(count).toBe(1);
-    expect(tree.attributes!.src).toBe("public/assets/images/image.jpg");
+    expect(tree.attributes!.src).toBe("/assets/images/image.jpg");
   });
 
   test("still matches absolute URLs without sourceUrl", () => {
@@ -215,7 +255,7 @@ describe("rewriteAssetUrls", () => {
       tagName: "img",
       attributes: { src: "https://example.com/hero.jpg" },
     };
-    const map = new Map([["https://example.com/hero.jpg", "public/assets/images/hero.jpg"]]);
+    const map = new Map([["https://example.com/hero.jpg", "/assets/images/hero.jpg"]]);
 
     const count = rewriteAssetUrls(tree, map);
 
@@ -227,12 +267,12 @@ describe("rewriteAssetUrls", () => {
       tagName: "img",
       attributes: { src: "https://example.com/x" },
     };
-    const map = new Map([["https://example.com/x/", "public/assets/images/x"]]);
+    const map = new Map([["https://example.com/x/", "/assets/images/x"]]);
 
     const count = rewriteAssetUrls(tree, map);
 
     expect(count).toBe(1);
-    expect(tree.attributes!.src).toBe("public/assets/images/x");
+    expect(tree.attributes!.src).toBe("/assets/images/x");
   });
 
   test("leaves relative URLs whose resolution misses the map", () => {
@@ -240,7 +280,7 @@ describe("rewriteAssetUrls", () => {
       tagName: "img",
       attributes: { src: "/missing.jpg" },
     };
-    const map = new Map([["https://example.com/hero.jpg", "public/assets/images/hero.jpg"]]);
+    const map = new Map([["https://example.com/hero.jpg", "/assets/images/hero.jpg"]]);
 
     const count = rewriteAssetUrls(tree, map, "https://example.com/");
 
@@ -253,7 +293,7 @@ describe("rewriteAssetUrls", () => {
       tagName: "img",
       attributes: { src: "/x.jpg" },
     };
-    const map = new Map([["https://example.com/hero.jpg", "public/assets/images/hero.jpg"]]);
+    const map = new Map([["https://example.com/hero.jpg", "/assets/images/hero.jpg"]]);
 
     const count = rewriteAssetUrls(tree, map, "::::not-a-base");
 
@@ -266,7 +306,7 @@ describe("rewriteAssetUrls", () => {
       tagName: "div",
       style: { backgroundImage: 'url("https://unknown.example/bg.png")' },
     };
-    const map = new Map([["https://example.com/hero.jpg", "public/assets/images/hero.jpg"]]);
+    const map = new Map([["https://example.com/hero.jpg", "/assets/images/hero.jpg"]]);
 
     const count = rewriteAssetUrls(tree, map);
 
@@ -279,12 +319,12 @@ describe("rewriteAssetUrls", () => {
       tagName: "link",
       attributes: { href: "https://example.com/favicon.ico", rel: "icon" },
     };
-    const map = new Map([["https://example.com/favicon.ico", "public/assets/icons/favicon.ico"]]);
+    const map = new Map([["https://example.com/favicon.ico", "/assets/icons/favicon.ico"]]);
 
     const count = rewriteAssetUrls(tree, map);
 
     expect(count).toBe(1);
-    expect(tree.attributes!.href).toBe("public/assets/icons/favicon.ico");
+    expect(tree.attributes!.href).toBe("/assets/icons/favicon.ico");
   });
 
   test("rewrites multiple assets in one pass", () => {
@@ -306,9 +346,9 @@ describe("rewriteAssetUrls", () => {
       ],
     };
     const map = new Map([
-      ["https://example.com/a.jpg", "public/assets/images/a.jpg"],
-      ["https://example.com/b.png", "public/assets/images/b.png"],
-      ["https://example.com/c.webp", "public/assets/images/c.webp"],
+      ["https://example.com/a.jpg", "/assets/images/a.jpg"],
+      ["https://example.com/b.png", "/assets/images/b.png"],
+      ["https://example.com/c.webp", "/assets/images/c.webp"],
     ]);
 
     const count = rewriteAssetUrls(tree, map);

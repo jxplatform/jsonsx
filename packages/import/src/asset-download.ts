@@ -3,6 +3,10 @@
  *
  * Skips tracking/analytics domains. Dedupes by URL. Preserves file extensions. Organizes into
  * subdirectories by type: images/, fonts/, icons/.
+ *
+ * Where the bytes are WRITTEN and where they are SERVED are two different paths, and the rewrite
+ * map holds the second. `public/` is the compiler's static root: its contents land at `dist/<path>`
+ * with the segment stripped. See `downloadAssets` for what emitting the on-disk path instead cost.
  */
 
 import { join, extname } from "node:path";
@@ -11,8 +15,8 @@ import type { DiscoveredAsset } from "./asset-collect.ts";
 
 export interface DownloadResult {
   /**
-   * Maps original absolute URL → relative path from project root (e.g.
-   * "public/assets/images/hero.jpg").
+   * Maps original absolute URL → the site-absolute path the BUILT site serves the asset from (e.g.
+   * "/assets/images/hero.jpg"), which is what a reference in a page or component has to name.
    */
   rewriteMap: Map<string, string>;
   /** URLs that failed to download. */
@@ -172,7 +176,16 @@ export async function downloadAssets(
     usedNames.set(nameKey, count + 1);
 
     const destPath = join(assetsDir, subdir, filename);
-    const relativePath = `public/assets/${subdir}/${filename}`;
+    /*
+     * The site-absolute path the built asset is served from — NOT `destPath` made relative.
+     *
+     * `public/` is the compiler's static ROOT, so its contents land at `dist/<path>` and the
+     * segment must not survive into a reference; and the leading slash must be there, or a
+     * reference emitted inside a component resolves against `/components/` and one on a nested
+     * route against that route. Emitting `public/assets/…` broke every image on every imported
+     * page at once — 15 dead references on one home page, fidelity 29.3% (issue #229).
+     */
+    const servedPath = `/assets/${subdir}/${filename}`;
 
     try {
       const headers: Record<string, string> = {
@@ -191,7 +204,7 @@ export async function downloadAssets(
       const buffer = await response.arrayBuffer();
       totalBytes += buffer.byteLength;
       await Bun.write(destPath, buffer);
-      rewriteMap.set(url, relativePath);
+      rewriteMap.set(url, servedPath);
     } catch {
       failed.push(url);
     }

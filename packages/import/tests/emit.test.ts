@@ -26,9 +26,13 @@ describe("emitProject", () => {
 
       expect(files.length).toBeGreaterThanOrEqual(2);
 
+      /*
+       * Only keys the project schema declares. `title` and `description` used to be written here
+       * and are page-level keys, so `jx validate` rejected every imported project (issue #228).
+       */
       const project = await Bun.file(join(dir, "project.json")).json();
-      expect(project.title).toBe("Test Site");
-      expect(project.description).toContain("example.com");
+      expect(project.name).toBe("Test Site");
+      expect(Object.keys(project)).toEqual(["name", "imports", "images"]);
 
       const page = await Bun.file(join(dir, "pages", "index.json")).json();
       expect(page.tagName).toBe("div");

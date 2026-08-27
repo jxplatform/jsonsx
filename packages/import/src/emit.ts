@@ -18,6 +18,12 @@ export interface EmitOptions {
 export interface MultiEmitOptions {
   outDir: string;
   title: string;
+  /**
+   * The page this project was cloned from. Kept as provenance for callers to report — it is NOT
+   * written into `project.json`: the schema has no key for it, and `url` means the canonical base
+   * of THIS site, so seeding it with the origin would have the clone's sitemap and canonicals claim
+   * the URLs of the site it cloned.
+   */
   sourceUrl: string;
   /** Map of route path (e.g. "pages/index.json") → Jx document. */
   pages: Map<string, JxElement>;
@@ -31,9 +37,9 @@ export interface MultiEmitOptions {
   precomputedComponents?: ComponentizeResult | undefined;
   /** Font-face CSS rule texts to emit as public/assets/fonts.css (R2). */
   fontFaceRules?: string[] | undefined;
-  /** URL rewrite map for fonts — maps original font URLs to local paths. */
+  /** Maps a font's original URL to the site-absolute path the built site serves it from. */
   fontRewriteMap?: Map<string, string> | undefined;
-  /** CSS custom property tokens to hoist into project.json.$style (R5). */
+  /** CSS custom property tokens to hoist into project.json's `style` (R5). */
   styleTokens?: Record<string, string> | undefined;
 }
 
@@ -58,7 +64,6 @@ export async function emitProject({
 export async function emitMultiPageProject({
   outDir,
   title,
-  sourceUrl,
   pages,
   layout,
   breakpoints,
@@ -73,10 +78,18 @@ export async function emitMultiPageProject({
   await mkdir(join(outDir, "components"), { recursive: true });
   await mkdir(join(outDir, "public"), { recursive: true });
 
+  /*
+   * Only keys the project schema declares. `title` and `description` are page-level keys and
+   * `$style` is not a key at all — the three of them made `jx validate` reject EVERY imported
+   * project (issue #228). `$style` was the expensive one: the compiler reads `projectStyle` from
+   * `style`, so every design token the importer worked to extract landed in a key nothing reads,
+   * no `:root` block was emitted, and each `var(--x)` in the imported CSS resolved to nothing.
+   *
+   * There is no schema-legal home for the source URL, so provenance is reported by the importer
+   * rather than written into a key the validator would then reject in its turn.
+   */
   const projectJson: Record<string, unknown> = {
     name: title || "Imported Site",
-    title: title || "Imported Site",
-    description: `Imported from ${sourceUrl}`,
     imports: {},
     images: { optimize: false },
   };
@@ -86,7 +99,7 @@ export async function emitMultiPageProject({
   }
 
   if (styleTokens && Object.keys(styleTokens).length > 0) {
-    projectJson.$style = styleTokens;
+    projectJson.style = styleTokens;
   }
 
   const files: string[] = [];
@@ -123,13 +136,7 @@ export async function emitMultiPageProject({
   if (fontFaceRules && fontFaceRules.length > 0) {
     let fontCss = fontFaceRules.join("\n\n");
     if (fontRewriteMap) {
-      for (const [originalUrl, localPath] of fontRewriteMap) {
-        // Rewrite absolute URLs in font-face rules to relative local paths
-        const relativePath = localPath.startsWith("public/")
-          ? localPath.slice("public/".length)
-          : localPath;
-        fontCss = fontCss.replaceAll(originalUrl, `/${relativePath}`);
-      }
+      fontCss = rewriteFontUrls(fontCss, fontRewriteMap);
     }
     const fontsDir = join(outDir, "public", "assets");
     await mkdir(fontsDir, { recursive: true });
@@ -197,6 +204,55 @@ export async function emitMultiPageProject({
   files.push(layoutPath);
 
   return { files };
+}
+
+/**
+ * Point every `url()` in the collected `@font-face` rules at the font that was downloaded for it.
+ *
+ * The map is keyed by the ABSOLUTE URL the downloader resolved, but a `@font-face` rule carries the
+ * form its author wrote — root-relative in practice, sometimes protocol-relative. Matching only the
+ * absolute form meant nothing ever matched: 113 fonts downloaded, `fonts.css` still pointing at the
+ * origin, the page silently falling back to system fonts (issue #230).
+ *
+ * Matching every form has a trap in it, and it must be ONE pass. Replacing form by form re-scans
+ * text the loop already rewrote, so a bare pathname (`/a.woff2`) matches inside the local path it
+ * just produced and `/assets/fonts/a.woff2` becomes `/assets/fonts/assets/fonts/a.woff2`. Hence a
+ * single alternation, longest form first so a pathname cannot pre-empt the absolute URL containing
+ * it, and a replacer that looks each match up rather than rewriting the result.
+ */
+function rewriteFontUrls(css: string, fontRewriteMap: Map<string, string>): string {
+  const byForm = new Map<string, string>();
+  for (const [originalUrl, localPath] of fontRewriteMap) {
+    /*
+     * `downloadAssets` emits served paths already; the `public/` branch keeps a hand-built map, or
+     * one from an older importer, working.
+     */
+    const local = localPath.startsWith("public/") ? localPath.slice("public/".length) : localPath;
+    const href = local.startsWith("/") ? local : `/${local}`;
+    const forms = new Set([originalUrl]);
+    try {
+      const u = new URL(originalUrl);
+      forms.add(`//${u.host}${u.pathname}${u.search}`);
+      forms.add(`${u.pathname}${u.search}`);
+    } catch {
+      // Already a relative reference — the literal form is all there is.
+    }
+    for (const form of forms) {
+      if (form) {
+        byForm.set(form, href);
+      }
+    }
+  }
+
+  const forms = [...byForm.keys()].toSorted((a, b) => b.length - a.length);
+  if (forms.length === 0) {
+    return css;
+  }
+  const pattern = new RegExp(
+    forms.map((f) => f.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)).join("|"),
+    "g",
+  );
+  return css.replaceAll(pattern, (match) => byForm.get(match) ?? match);
 }
 
 function extractStateDefaults(node: JxElement | string, out: Record<string, string>) {

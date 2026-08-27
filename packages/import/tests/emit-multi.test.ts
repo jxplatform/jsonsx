@@ -6,6 +6,20 @@ import { existsSync } from "node:fs";
 import type { JxElement } from "@jxsuite/schema/types";
 import type { ComponentizeResult } from "../src/componentize.ts";
 import { emitMultiPageProject } from "../src/emit.ts";
+import projectCoreSchema from "@jxsuite/schema/schemas/project.core.schema.json" with { type: "json" };
+
+/**
+ * The keys `project.json` may carry, read from the schema rather than restated here.
+ *
+ * The per-project entry schema composes this core with extension-contributed fields and closes the
+ * object with `unevaluatedProperties: false`, so a key absent from the composition is a validation
+ * error — which is how `title`, `description` and `$style` made every imported project INVALID
+ * (issue #228). Checking against the core is the conservative half of that: anything it allows, the
+ * composition allows.
+ */
+const PROJECT_KEYS = new Set(
+  Object.keys((projectCoreSchema as { properties: Record<string, unknown> }).properties),
+);
 
 function makePrecomputed(): ComponentizeResult {
   const template: JxElement = {
@@ -79,7 +93,7 @@ describe("emitMultiPageProject", () => {
       expect(files.length).toBe(5);
 
       const project = await Bun.file(join(dir, "project.json")).json();
-      expect(project.title).toBe("Multi Page Test");
+      expect(project.name).toBe("Multi Page Test");
 
       const index = await Bun.file(join(dir, "pages", "index.json")).json();
       expect(index.textContent).toBe("Home");
@@ -164,7 +178,12 @@ describe("emitMultiPageProject", () => {
     }
   });
 
-  test("writes style tokens into project.json.$style", async () => {
+  /*
+   * `style`, not `$style`. The compiler reads `projectStyle` from `style`, so under the old key no
+   * `:root` block was emitted and every `var(--x)` in the imported CSS resolved to nothing — the
+   * tokens the importer works to extract silently did nothing at all (issue #228).
+   */
+  test("writes style tokens into project.json.style", async () => {
     const dir = await mkdtemp(join(tmpdir(), "jx-import-tokens-"));
 
     try {
@@ -177,7 +196,8 @@ describe("emitMultiPageProject", () => {
       });
 
       const project = await Bun.file(join(dir, "project.json")).json();
-      expect(project.$style).toEqual({ "--brand": "#3b82f6", "--space-4": "16px" });
+      expect(project.style).toEqual({ "--brand": "#3b82f6", "--space-4": "16px" });
+      expect(project.$style).toBeUndefined();
     } finally {
       await rm(dir, { recursive: true });
     }
@@ -239,6 +259,142 @@ describe("emitMultiPageProject", () => {
       expect(css).toContain("url(/assets/fonts/a.woff2)");
       expect(css).toContain("url(/assets/fonts/b.woff2)");
       expect(css).not.toContain("cdn.example.com");
+    } finally {
+      await rm(dir, { recursive: true });
+    }
+  });
+
+  /*
+   * Issue #230: the map is keyed by the ABSOLUTE URL the downloader resolved, but a `@font-face`
+   * rule carries the form its author wrote — root-relative in practice, sometimes
+   * protocol-relative. Matching only the absolute form meant nothing ever matched: 113 fonts
+   * downloaded, `fonts.css` still pointing at the origin, and the page silently falling back to
+   * system fonts, which on a brand-heavy site is most of what makes it look like a different site.
+   */
+  test("rewrites the author's own URL form, not just the resolved one", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "jx-import-fontforms-"));
+
+    try {
+      await emitMultiPageProject({
+        outDir: dir,
+        title: "Font Form Test",
+        sourceUrl: "https://site.example",
+        pages: new Map([["pages/index.json", { tagName: "div" as const }]]),
+        fontFaceRules: [
+          '@font-face { font-family: "R"; src: url("/wp-content/themes/x/lustria.woff2"); }',
+          '@font-face { font-family: "P"; src: url("//site.example/fonts/proto.woff"); }',
+          '@font-face { font-family: "A"; src: url("https://site.example/fonts/abs.ttf"); }',
+        ],
+        fontRewriteMap: new Map([
+          ["https://site.example/wp-content/themes/x/lustria.woff2", "/assets/fonts/lustria.woff2"],
+          ["https://site.example/fonts/proto.woff", "/assets/fonts/proto.woff"],
+          ["https://site.example/fonts/abs.ttf", "/assets/fonts/abs.ttf"],
+        ]),
+      });
+
+      const css = await Bun.file(join(dir, "public", "assets", "fonts.css")).text();
+      expect(css).toContain('url("/assets/fonts/lustria.woff2")');
+      expect(css).toContain('url("/assets/fonts/proto.woff")');
+      expect(css).toContain('url("/assets/fonts/abs.ttf")');
+      expect(css).not.toContain("wp-content");
+      expect(css).not.toContain("site.example");
+    } finally {
+      await rm(dir, { recursive: true });
+    }
+  });
+
+  /*
+   * The trap in matching every form: replacing form by form re-scans text the loop already
+   * rewrote, so the bare pathname `/a.woff2` matches inside `/assets/fonts/a.woff2` and produces
+   * `/assets/fonts/assets/fonts/a.woff2`. One pass, longest form first, is what avoids it.
+   */
+  test("does not rewrite a path it has already rewritten", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "jx-import-fontidem-"));
+
+    try {
+      await emitMultiPageProject({
+        outDir: dir,
+        title: "Font Idempotence Test",
+        sourceUrl: "https://site.example",
+        pages: new Map([["pages/index.json", { tagName: "div" as const }]]),
+        fontFaceRules: ['@font-face { src: url("/a.woff2"); }'],
+        fontRewriteMap: new Map([["https://site.example/a.woff2", "/assets/fonts/a.woff2"]]),
+      });
+
+      const css = await Bun.file(join(dir, "public", "assets", "fonts.css")).text();
+      expect(css).toContain('url("/assets/fonts/a.woff2")');
+      expect(css).not.toContain("/assets/fonts/assets/");
+    } finally {
+      await rm(dir, { recursive: true });
+    }
+  });
+
+  // A URL that carries a query — the cache-buster a theme appends — is one form, not two.
+  test("keeps a query string with the path form", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "jx-import-fontquery-"));
+
+    try {
+      await emitMultiPageProject({
+        outDir: dir,
+        title: "Font Query Test",
+        sourceUrl: "https://site.example",
+        pages: new Map([["pages/index.json", { tagName: "div" as const }]]),
+        fontFaceRules: ['@font-face { src: url("/fonts/b.woff2?v=4.7.0"); }'],
+        fontRewriteMap: new Map([
+          ["https://site.example/fonts/b.woff2?v=4.7.0", "/assets/fonts/b.woff2"],
+        ]),
+      });
+
+      const css = await Bun.file(join(dir, "public", "assets", "fonts.css")).text();
+      expect(css).toContain('url("/assets/fonts/b.woff2")');
+      expect(css).not.toContain("v=4.7.0");
+    } finally {
+      await rm(dir, { recursive: true });
+    }
+  });
+
+  test("leaves a rule alone when no font was downloaded for it", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "jx-import-fontnone-"));
+
+    try {
+      await emitMultiPageProject({
+        outDir: dir,
+        title: "Font Miss Test",
+        sourceUrl: "https://site.example",
+        pages: new Map([["pages/index.json", { tagName: "div" as const }]]),
+        fontFaceRules: ['@font-face { src: url("/fonts/missing.woff2"); }'],
+        fontRewriteMap: new Map(),
+      });
+
+      const css = await Bun.file(join(dir, "public", "assets", "fonts.css")).text();
+      expect(css).toContain('url("/fonts/missing.woff2")');
+    } finally {
+      await rm(dir, { recursive: true });
+    }
+  });
+
+  test("emits only keys the project schema declares", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "jx-import-keys-"));
+
+    try {
+      // Everything the writer can put in one project at once, so no branch escapes the check.
+      await emitMultiPageProject({
+        outDir: dir,
+        title: "Key Test",
+        sourceUrl: "https://site.example",
+        pages: new Map([["pages/index.json", { tagName: "div" as const }]]),
+        breakpoints: { "@md": "(min-width: 768px)" },
+        styleTokens: { "--brand": "#3b82f6" },
+        fontFaceRules: ['@font-face { src: url("/a.woff2"); }'],
+      });
+
+      const project = await Bun.file(join(dir, "project.json")).json();
+      const emitted = Object.keys(project);
+
+      expect(emitted).toContain("style");
+      expect(emitted).toContain("$media");
+      expect(emitted).toContain("$head");
+      expect(emitted.filter((key) => !PROJECT_KEYS.has(key))).toEqual([]);
     } finally {
       await rm(dir, { recursive: true });
     }
