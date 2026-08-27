@@ -107,3 +107,52 @@ describe("an asset reference names the path the built site serves", () => {
     }
   });
 });
+describe("a downloaded font is the one the page asks for", () => {
+  test("a root-relative @font-face url is rewritten, not just the absolute form", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "jx-import-fontform-"));
+    try {
+      await emitMultiPageProject({
+        outDir: dir,
+        title: "Font Form Test",
+        sourceUrl: "https://example.com",
+        pages: new Map([["pages/index.json", { tagName: "div" as const }]]),
+        // The form a stylesheet AUTHOR writes. The rewrite map is keyed by the absolute URL the
+        // Downloader resolved, so matching on that alone rewrote nothing and every downloaded font
+        // Stayed unreferenced.
+        fontFaceRules: ['@font-face { src: url("/fonts/lato.woff2"); }'],
+        fontRewriteMap: new Map([
+          ["https://example.com/fonts/lato.woff2", "/assets/fonts/lato.woff2"],
+        ]),
+      });
+
+      const css = await Bun.file(join(dir, "public", "assets", "fonts.css")).text();
+
+      expect(css).toContain('url("/assets/fonts/lato.woff2")');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("rewriting is a single pass, so a local path is never rewritten again", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "jx-import-fontonce-"));
+    try {
+      await emitMultiPageProject({
+        outDir: dir,
+        title: "Font Once Test",
+        sourceUrl: "https://example.com",
+        pages: new Map([["pages/index.json", { tagName: "div" as const }]]),
+        fontFaceRules: ['@font-face { src: url("https://cdn.example.com/a.woff2"); }'],
+        fontRewriteMap: new Map([["https://cdn.example.com/a.woff2", "/assets/fonts/a.woff2"]]),
+      });
+
+      const css = await Bun.file(join(dir, "public", "assets", "fonts.css")).text();
+
+      // Replacing form by form re-scans text already rewritten: the pathname "/a.woff2" then
+      // Matches inside the "/assets/fonts/a.woff2" this loop just produced.
+      expect(css).toContain('url("/assets/fonts/a.woff2")');
+      expect(css).not.toContain("/assets/fonts/assets/");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});

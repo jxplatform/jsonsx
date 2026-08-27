@@ -230,7 +230,7 @@ describe("emitMultiPageProject", () => {
           "@font-face { src: url(https://cdn.example.com/b.woff2); }",
         ],
         fontRewriteMap: new Map([
-          ["https://cdn.example.com/a.woff2", "public/assets/fonts/a.woff2"],
+          ["https://cdn.example.com/a.woff2", "/assets/fonts/a.woff2"],
           ["https://cdn.example.com/b.woff2", "assets/fonts/b.woff2"],
         ]),
       });

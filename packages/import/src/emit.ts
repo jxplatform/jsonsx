@@ -120,12 +120,41 @@ export async function emitMultiPageProject({
   if (fontFaceRules && fontFaceRules.length > 0) {
     let fontCss = fontFaceRules.join("\n\n");
     if (fontRewriteMap) {
+      // A @font-face rule carries the url() form its AUTHOR wrote — usually root-relative
+      // ("/wp-content/.../lato.woff2"), sometimes protocol-relative. The rewrite map is keyed by the
+      // Absolute URL the downloader resolved, so matching on that alone rewrote nothing: every
+      // Downloaded font stayed unreferenced and the page fell back to system fonts.
+      //
+      // Replaced in ONE pass, longest form first. Replacing form by form re-scans text this loop
+      // Already rewrote, and a bare pathname ("/a.woff2") then matches inside the local path it
+      // Just produced ("/assets/fonts/a.woff2" to "/assets/fonts/assets/fonts/a.woff2").
+      const byForm = new Map<string, string>();
       for (const [originalUrl, localPath] of fontRewriteMap) {
-        // Rewrite absolute URLs in font-face rules to relative local paths
-        const relativePath = localPath.startsWith("public/")
+        const local = localPath.startsWith("public/")
           ? localPath.slice("public/".length)
           : localPath;
-        fontCss = fontCss.replaceAll(originalUrl, `/${relativePath}`);
+        const href = local.startsWith("/") ? local : `/${local}`;
+        const forms = new Set([originalUrl]);
+        try {
+          const u = new URL(originalUrl);
+          forms.add(`//${u.host}${u.pathname}${u.search}`);
+          forms.add(`${u.pathname}${u.search}`);
+        } catch {
+          // Already a relative reference — the literal form is all there is.
+        }
+        for (const form of forms) {
+          if (form) {
+            byForm.set(form, href);
+          }
+        }
+      }
+      const forms = [...byForm.keys()].toSorted((a, b) => b.length - a.length);
+      if (forms.length > 0) {
+        const pattern = new RegExp(
+          forms.map((f) => f.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)).join("|"),
+          "g",
+        );
+        fontCss = fontCss.replaceAll(pattern, (m) => byForm.get(m) ?? m);
       }
     }
     const fontsDir = join(outDir, "public", "assets");
