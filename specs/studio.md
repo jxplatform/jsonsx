@@ -2,7 +2,7 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.9.52-draft
+**Version:** 0.10.0-draft
 **Status:** Partial
 **Updated:** 2026-08-27
 **License:** MIT
@@ -1034,7 +1034,15 @@ than on one.
 
 ### 8.1 Format-Class Dispatch
 
-The studio holds no format knowledge: `.json` is native, and every other extension dispatches through the project's **format registry** (see `specs/extensions.md`), built from the project-level `imports` map and fetched via the PAL (`listFormats`). Opening a format file invokes the class's `parse` capability; saving invokes `serialize` (`formatAction` → `POST /__studio/format` on the dev server, RPC on desktop). The format's `$studio` block drives the control surface:
+The studio holds no format knowledge: `.json` is native, and every other extension dispatches through the project's **format registry** (see `specs/extensions.md`), built from the project-level `imports` map and fetched via the PAL (`listFormats`). Opening a format file invokes the class's `parse` capability; saving invokes `serialize` (`formatAction` → `POST /__studio/format` on the dev server, RPC on desktop).
+
+The registry answers three more questions, all derived from the same declarations and none of them a
+list this app maintains: which formats a new file may be created as (§9.1.1), which pairs a document
+may be converted between (§8.4), and which extensions the rename refactor can write back. `.json` is
+the endpoint every one of them shares, because a registry never claims it. A format extension that
+declares `parse` and `serialize` therefore reaches all three with no edit to the studio.
+
+The format's `$studio` block drives the control surface:
 
 - `modes` — which editor modes the tab offers
 - `documentMode` — content vs component classification (e.g. promote to component when frontmatter `tagName` matches `.+-.+`)
@@ -1218,6 +1226,64 @@ the tick standing.
 
 The studio loads any registered format file (e.g. `.md` with the `Markdown` class imported), converts it to Jx for visual editing via the class's `parse` capability, and saves back through its `serialize` capability. Projects without format imports handle only `.json`.
 
+### 8.4 Converting a Document Between Formats
+
+> **Status: Implemented.** A page drafted as JSON that wants to be prose, or a markdown page that
+> needs `state`, was a manual re-type. The registry already knows how to read one and write the
+> other; a conversion is that pair, applied to a file.
+
+**Which pairs are offered is DERIVED**, from five conditions that must all hold:
+
+1. The file sits under `pages/` or `components/`. Both are conventions the build hard-codes rather
+   than reads, so a convert may lean on them — and the alternative is offering a conversion for
+   `package.json`, `tsconfig.json` and every `nav.json` that no format and no schema claims.
+2. The source reads as a Jx document: `.json`, or an extension whose `parse`-capable format declares
+   `page` or `component` in `documentKinds`. Membership of those kinds already ENTAILS that `parse`
+   returns a document — the compiler builds its page and component globs from
+   `documentExtensions("page"|"component")` and casts every `parse` result — so no new declaration
+   is needed, and a `content`-only format (whose `parse` may return entries rather than a document)
+   is excluded by the same test.
+3. The target writes one: `.json`, or a `serialize`-capable format declaring `page` or `component`.
+4. The target format differs from the source's, compared by format rather than by extension.
+5. Neither the file nor its directory belongs to a content collection, and the file is not a layout.
+
+**A layout is JSON, and that clause is hand-written.** Both readers of a layout parse it as JSON and
+neither dispatches through the registry, and there is no `"layout"` document kind for a format to
+declare — so unlike every other clause here, this one cannot be derived and says so where it is
+written.
+
+**A collection's files refuse in BOTH directions.** Converting an entry drops it out of its
+collection's discovery glob; converting a file that merely sits beside the entries INTO the
+collection's format enlists it as an entry nobody seeded. Source and target share a directory, so one
+rule covers both sides.
+
+**The conversion is in place.** `about.md` becomes `about.json`; the original is gone and the rename
+refactor rewrites every reference that pointed at it. Being a rename is what makes it safe — the
+backend's refactor pass is reachable no other way, and writing a new file beside the old one would
+leave every reference dangling.
+
+**The converted bytes are written to the OLD path, and the rename follows.** The refactor pass runs
+after the move and re-reads every document in the project, the moved one included. The other order
+hands it markdown at a `.json` path: it throws, silently skips the component tag pass, and leaves the
+moved file's own references unrewritten. If the rename then fails, the original text is restored, so
+a failed conversion cannot leave target-format bytes at the source extension.
+
+**Refusals fire before anything moves**, each carrying the path: a pair no rule allows, a destination
+that already exists (checked fail-CLOSED, because the parent provably exists and `rename(2)` replaces
+without a word), a file open with unsaved changes, a serializer that throws, and a result the
+document schema rejects.
+
+**Consequences are stated before the button** (§9.1.1): the reference count in the CONVERT wording —
+those references are repaired, but the rename's closing "nothing else changes" would be false about
+the file itself — plus the count of referrers in a format the refactor cannot write back, a stability
+verdict when the result does not read back identically, and the move sentence. The schema check is
+three-state: valid, invalid, or **could not be checked**, which is never reported as valid.
+
+**An open tab is rebuilt, not reloaded.** A reload sets the document and never the source format, so
+the tab would keep the old format's modes and the next save would write the wrong format. It is
+re-keyed to the new path and reopened under it, which disposes the stale tab while keeping its pane
+slot.
+
 ---
 
 ## 9. File Management
@@ -1237,14 +1303,74 @@ The studio tracks:
 Every name the user supplies is collected through the Spectrum dialogs in §8.7 of
 studio-ui-guidelines.md — no native browser prompts:
 
-| Action                                                        | Dialog                                                                                               |
-| ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| Files panel **New File** (toolbar and directory context menu) | New File — pre-filled `untitled.json`, extension preserved on retype, scoped to the target directory |
-| Files / Browse **Rename**                                     | Rename — pre-filled with the current name                                                            |
-| Browse **New ›** _entity_                                     | New _Type_ — pre-filled `untitled`, slugified into the type's directory                              |
-| Files / Browse **Delete**                                     | Confirmation dialog                                                                                  |
+| Action                                                        | Dialog                                                                                                                          |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Files panel **New File** (toolbar and directory context menu) | New File — a name field pre-filled `untitled`, plus a **Format** picker that owns the extension; scoped to the target directory |
+| Files / Browse **Rename**                                     | Rename — pre-filled with the current name                                                                                       |
+| Files **Convert Format…**                                     | Convert Format — the target, and the consequences, before the button                                                            |
+| Browse **New ›** _entity_                                     | New _Type_ — pre-filled `untitled`, slugified into the type's directory                                                         |
+| Files / Browse **Delete**                                     | Confirmation dialog                                                                                                             |
 
 Blank input is rejected in place: the dialog stays open with negative help text rather than closing.
+
+##### The extension is chosen, not typed
+
+> **Status: Implemented.** The project already declares which formats it understands. A creation
+> dialog that asks the author to type `.md` from memory is asking them to know something the app
+> knows, and to be punished for a typo with a file no format claims.
+
+The picker's rows are DERIVED: `.json` first, because it is the one native shape no registry ever
+claims, then every extension for which some registered class declares **both `parse` and
+`serialize`**. Both halves are load-bearing — without `parse` the file cannot be opened after it is
+created, and without `serialize` its first save falls through to the default content format and
+writes another format's bytes into it. The lookup is per `(extension, capability)` rather than per
+class, because a split claim across two classes is legal (§8.1).
+
+Three naming modes follow from what the caller already knows, and they are not interchangeable:
+
+- **A picker mode** asks for a NAME and appends the picked extension **verbatim** — never slugified.
+  `pages/[slug].json` is a route eight starters ship, and a slugifier lowercases and strips the
+  brackets, so slugifying here would make a dynamic route uncreatable and say nothing about it.
+- **A fixed extension** (a content collection's) asks for a DISPLAY NAME and slugifies it.
+- **No picker at all** takes the whole file name verbatim — what a caller that already knows the
+  name wants.
+
+The last picker row is **Other…**, which returns the field to a whole file name. It is not a
+courtesy: New File is the only generic creation affordance in the app and both backends create
+intermediate directories on write, so without it `styles/main.css`, `public/robots.txt` and a
+`credits.txt` beside a collection's images all become uncreatable, and the picker would have taken
+away more than it gave.
+
+A name is refused in the field when it is blank, when it collides (compared case-insensitively,
+because the filesystem often is), when it escapes the destination, and when its typed extension
+CONTRADICTS the pick — naming both sides. A name whose extension matches the pick is composed once
+rather than doubled; a name ending in an extension no format claims is a stem with a dot in it.
+
+##### Creating inside a content collection
+
+> **Status: Implemented.** A collection already fixes its entries' format. Offering a free choice
+> there produces a file matched by no format and therefore an entry of the collection it was created
+> in only by accident.
+
+The destination decides, and there are four answers:
+
+| Destination                                                         | New File does                                                                                                     |
+| ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| A collection's **source root** that declares a `schema`             | The full **New Entry** flow — the collection's extension, a body seeded from its schema, opened in the entry form |
+| A **subdirectory** of a source root, or a root with **no `schema`** | The picker, **locked** to the collection's extension, plus Other…                                                 |
+| A collection whose declared `format` is not registered              | The full picker, plus a Problem naming the format class that is missing                                           |
+| Anywhere else                                                       | The full picker                                                                                                   |
+
+A subdirectory is **constrained but not rerouted**. Entry discovery is recursive, so a document there
+really is an entry — but co-located media lives there too (site-architecture.md §6.5) and the New
+Entry flow writes to one directory, so rerouting would silently relocate the file. A schema-less
+collection is constrained for the same reason in reverse: there is no shape to seed and no form to
+draw. Under a lock, **Other…** still refuses a name whose extension is a document extension other
+than the collection's, so the escape hatch cannot smuggle a `post.json` into a Markdown collection
+while leaving `credits.txt` creatable.
+
+The menu label does not change for a collection folder. The tree's own verbs are what the TREE does;
+the dialog names the destination.
 
 #### Consequences, stated before the action
 
@@ -2700,6 +2826,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.10.0-draft** (2026-08-27) — New File chooses a format rather than an extension (Other... preserves arbitrary names); a document converts between formats in place; creating in a collection source routes to New Entry.
 - **0.9.52-draft** (2026-08-27) — Open in Browser previews the working tree through the runtime; Build Site keeps the compiler under its own verb.
 - **0.9.51-draft** (2026-08-27) — a media file opens in a Media mode that shows it and says what uses it (§4.2, §9.3, §13.4); a long run's log is a feed that outlives the run (§6).
 - **0.9.50-draft** (2026-08-26) — the gear's project rows disable rather than hide, and the menu is bottom-anchored to its trigger's region.
@@ -2807,4 +2934,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/studio` Specification v0.9.52-draft_
+_`@jxsuite/studio` Specification v0.10.0-draft_

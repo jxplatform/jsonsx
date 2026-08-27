@@ -56,12 +56,13 @@ The same answer is reachable by name: **Find Usages** in the command palette, or
 The count separates **pages** from **other files** on purpose. A component used only inside another component has not been placed on your site yet; a component used on seven pages is load-bearing.
 :::
 
-### Before you delete or rename
+### Before you delete, rename or convert
 
-Every delete and rename confirmation carries that same count, so you can see what an action breaks before you take it, not after.
+Every delete, rename and convert confirmation carries that same count, so you can see what an action breaks before you take it, not after.
 
 - **Deleting** a file tells you how many references stop resolving, and that the files holding them stay exactly where they are. Only the references break.
 - **Renaming** a file tells you how many references will be **updated automatically**. Studio rewrites every one of them across the project, and for a component it renames the element tag to match the new filename too.
+- **[Converting](/docs/studio/interface#converting-a-file-to-another-format)** a file to another format tells you the same, in its own words: those references are repaired, but the file itself is not the file it was, so the rename's "nothing else changes" would be untrue. It adds a count of references sitting in a format Studio cannot write back, which are the ones left pointing at the old name.
 
 If Studio cannot count (a backend without project search), the confirmation says so rather than showing a zero. "We could not check" and "nothing uses this" are never displayed as the same thing.
 

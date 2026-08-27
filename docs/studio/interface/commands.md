@@ -23,6 +23,7 @@ Everything Studio can do is a command, and every command is reachable by name: p
 
 | Command            | Id                       | Shortcut | Level       | Requires                                                          |
 | ------------------ | ------------------------ | -------- | ----------- | ----------------------------------------------------------------- |
+| Convert Format…    | `file.convertFormat`     | —        | project     | an open project                                                   |
 | Create Translation | `i18n.createTranslation` | —        | document    | a document open in a project that declares more than one language |
 | Go to File…        | `palette.openFiles`      | `⌘P`     | application | —                                                                 |
 | New Entry          | `content.newEntry`       | —        | project     | a project with a directory-backed content collection              |

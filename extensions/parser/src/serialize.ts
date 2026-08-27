@@ -4,7 +4,8 @@
  * The single Jx → markdown serializer, replacing the studio's md-convert and the
  * compiler's compile-markdown. Two modes over a shared tag map:
  *
- * - `roundtrip` (default) — lossless: YAML frontmatter from non-children doc keys,
+ * - `roundtrip` (default) — lossless for everything it can express (a `tagName` chosen at render
+ *   time cannot be, and throws): YAML frontmatter from non-children doc keys,
  *   non-markdown elements emitted as remark directives with collapsed dot-path
  *   attributes. Inverse of `transpileJxMarkdown()`.
  * - `export` — lossy: strips all Jx decoration, unwraps wrapper tags, inlines custom
@@ -191,7 +192,7 @@ function codeLang(codeChild: JxElement | undefined): string | null {
 // ─── Options ────────────────────────────────────────────────────────────────
 
 export interface SerializeOptions {
-  /** `roundtrip` (lossless, default) or `export` (lossy clean markdown). */
+  /** `roundtrip` (default; lossless where expressible) or `export` (lossy clean markdown). */
   mode?: "roundtrip" | "export";
   /** Export mode: component definitions for inlining custom elements. */
   componentDefs?: Map<string, JxElement>;

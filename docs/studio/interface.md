@@ -3,6 +3,8 @@ title: "The workspace"
 description: "Every region of the Jx Studio window: the Command Bar, the Navigator, the pane grid, the jump bar, the Inspector, the Bottom dock, and the status bar."
 spec:
   - studio.md#3.1
+  - studio.md#8.4
+  - studio.md#9.1.1
   - studio.md#9.1.4
   - studio.md#16
   - studio.md#18
@@ -13,6 +15,10 @@ code:
   - packages/studio/src/panels/left-panel.ts
   - packages/studio/src/files/files.ts
   - packages/studio/src/files/gitignore.ts
+  - packages/studio/src/format/format-host.ts
+  - packages/studio/src/format/format-choices.ts
+  - packages/studio/src/format/convert-file.ts
+  - packages/studio/src/content/collection-match.ts
   - packages/studio/src/panels/right-panel.ts
   - packages/studio/src/panels/jump-bar.ts
   - packages/studio/src/panels/bottom-dock.ts
@@ -61,7 +67,7 @@ The vertical strip on the far left. Every button carries a **text label under it
 
 **Project**
 
-- **Files** (:kbd[⌘1]): the project file tree. Open, rename and organize the files in your project folder. **New File…** (from the panel's toolbar, or from a folder's right-click menu) opens the [creation dialog](#creating-a-file) with `untitled.json` pre-filled and only the name part selected, so typing replaces the name and keeps the extension. Studio picks the starting content from the extension you give it. The tree leaves out whatever your project ignores; see [Files the tree hides](#files-the-tree-hides). Drag files in from your desktop and they upload into whichever folder you drop them on; see [Media](/docs/studio/projects/media). On a [multilingual project](/docs/studio/interface/languages), a file under a language's directory carries that language's name beside it: _français_, not _French_.
+- **Files** (:kbd[⌘1]): the project file tree. Open, rename, convert and organize the files in your project folder. **New File…** (from the panel's toolbar, or from a folder's right-click menu) opens the [creation dialog](#creating-a-file), which asks for a name and offers a **Format** picker beside it. Studio picks the starting content from the format you choose. The tree leaves out whatever your project ignores; see [Files the tree hides](#files-the-tree-hides). Drag files in from your desktop and they upload into whichever folder you drop them on; see [Media](/docs/studio/projects/media). On a [multilingual project](/docs/studio/interface/languages), a file under a language's directory carries that language's name beside it: _français_, not _French_.
 - **Source Control** (:kbd[⌘3]): the built-in git client. A badge counts changed files. See [Publish](/docs/studio/publish).
 
 **Document**
@@ -95,9 +101,34 @@ There is one creation flow, and every surface that makes a file uses it: **New F
 
 - **It says where the file is going**, above the field: `Creating in content/blog/`, or _Creating in the project root_. The destination is part of the gesture you made, never guessed from a filter or a fallback.
 - **A name that folder already has is refused at the field.** The dialog stays open and tells you `about.md already exists in content/blog/.`, so nothing is overwritten and there is nothing to undo. A blank name, or one with no letters or digits left in it, is refused the same way.
-- **What it asks for depends on whether the extension is already settled.** The Files tree and the Library's **New** ask for a **file name** and take it as typed, so the extension is yours to choose. `untitled.json` and `untitled` are the respective prefills, with only the name part selected. **New Entry** for a content collection asks for a **display name** instead, because that collection already fixes the extension: `My First Post` becomes `my-first-post.md`.
+- **You choose the format; you don't type the extension.** The **Format** picker lists `JSON` and every format your project's extensions provide (`Markdown`, if you have the [content extension](/docs/extending/extensions/formats) installed), and the file gets that extension. The name is taken exactly as you type it, so `[slug]` stays `[slug]`.
+
+Switching the picker re-checks the name against the folder, so a name that is free as a `.json` and taken as a `.md` tells you the moment you switch, rather than after you press **Create**.
+
+### Creating something that isn't a document
+
+The last row of the picker is **Other…**, and it hands the field back to you whole: type `styles/main.css`, `public/robots.txt` or `.gitignore` and that is exactly what you get. Folders in the path are created for you, so **Other…** is also how you make a new folder from the tree.
+
+### Creating inside a content collection
+
+A [content type](/docs/studio/projects/content-types) already fixes the format of its entries, so the dialog does not ask twice:
+
+- In the collection's **own folder**, **New File…** _is_ **New Entry**: the extension is the collection's, the fields are seeded from its schema, and the file opens in the entry form.
+- In a **subfolder** of it, the picker is locked to the collection's format, because a document there is still one of its entries. **Other…** stays available for the images and notes you keep beside them. What **Other…** will not accept there is a document of a _different_ format, which would be discovered as an entry the collection cannot read.
 
 The new file is written with the starting content its type calls for: a content entry is seeded from its content type's fields, so it is valid the moment it exists. Creating from the Library or from a collection opens the new file for you as well.
+
+## Converting a file to another format
+
+Right-click a page or component in the Files tree and choose **Convert Format…** to move it between formats: a Markdown page to JSON, or back. The file keeps its name and takes the new extension, and every `$ref` in your project that pointed at it is rewritten to match. The tab you had open follows.
+
+Studio offers the action only where it means something. Files outside `pages/` and `components/` are not offered it, nor are layouts (which are always JSON), nor anything inside a content collection: converting an entry would quietly remove it from its collection, and converting a file that merely sits beside the entries would quietly add it.
+
+Before the button, the dialog tells you what is about to happen: how many references will be rewritten, whether any of them are in a file Studio cannot write back, whether the result reads back identically, and that the original is not kept. If the file is open with unsaved changes, the conversion is refused until you save or discard them.
+
+:::doc-note
+There is no undo for a conversion. The file has moved and its references have moved with it. That is why the count is on screen before you confirm, rather than in a toast afterwards.
+:::
 
 :::doc-note
 If the write itself fails, the reason arrives as a **Problem** in the [Bottom dock](#bottom-dock) carrying the path. A toast would scroll away, and the thing you have to do next is about that path.

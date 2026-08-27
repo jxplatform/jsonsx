@@ -62,13 +62,18 @@ Click any item to open it in a tab. Right-click for **Open**, **Rename…**, **D
 
 A media tile opens in the **[Media viewer](/docs/studio/projects/media#open-a-media-file)**: the picture at full size, with its dimensions, the reference a document writes for it, and the pages that use it.
 
-Rename and delete go through the same confirmations as the Files panel, and they carry the same counts: a rename tells you how many references Studio will rewrite for you, and a delete tells you how many stop resolving. See **[Before you delete or rename](/docs/studio/projects/pages-layouts-components#before-you-delete-or-rename)**.
+Rename and delete go through the same confirmations as the Files panel, and they carry the same counts: a rename tells you how many references Studio will rewrite for you, and a delete tells you how many stop resolving. See **[Before you delete, rename or convert](/docs/studio/projects/pages-layouts-components#before-you-delete-rename-or-convert)**.
 
 ## Create something
 
 **New** creates a Page, a Layout or a Component, and lists one row per content type your project defines. Each row names the folder the file lands in.
 
-Studio asks for a file name, tells you which folder it is creating in, and refuses a name that folder already holds. Include the extension you want (`about.md`, `hero.json`): it decides what kind of file Studio writes and how the file opens. The new file opens in a tab straight away.
+Studio asks for a name, tells you which folder it is creating in, and refuses a name that folder already holds. The new file opens in a tab straight away.
+
+What it asks about the format depends on what the kind allows:
+
+- **Page** offers a **Format** picker, because a page really can be a `.md` as easily as a `.json`. Pick one and the extension follows.
+- **Layout** and **Component** are always `.json`. A layout is read as JSON by the build with no format dispatch at all, and a component needs a `tagName` a blank markdown file does not carry, so the choice would only ever produce a file nothing loads.
 
 :::doc-tip
 A content entry has a better route than a blank file: **New Entry** names the file with its collection's own extension and seeds every field from the collection's schema, so the entry is valid the moment it exists and opens in the entry form. See **[Content types](/docs/studio/projects/content-types)**.

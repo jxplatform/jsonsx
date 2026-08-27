@@ -38,6 +38,8 @@ Ordering is load-bearing: the privileged endpoints must be claimed before the st
 
 Format and extension behavior is served from a per-project **extension registry**, built by scanning the project's dependencies and cached against `project.json`'s mtime. Edit the manifest and the next request rebuilds the registry. The `formats`, `format`, and `project-schemas` routes all answer from it.
 
+A host embedding `handleStudioApi` directly passes `onFileMoved` alongside `allowedRoots` and `onProjectCreated`. `createDevServer` wires it to the collaboration registry, and a host running its own collab layer must do the same: a live room is keyed by path, so a rename moves the file out from under it and the room's shutdown flush would write its pre-rename content back, recreating the file the rename deleted. It is called with the OLD absolute path, and it is the same hook the file watcher already uses.
+
 ## The resolve proxies
 
 `resolve.ts` implements the two endpoints the runtime uses to run server-side code during development. `handleResolve` takes a `$prototype`/`$src` entry, imports the module server-side (`.js` directly; `.class.json` via its `$implementation`, or a class constructed from the schema), instantiates it with the config, and returns the resolved value. `handleServerFunction` imports a module and invokes a named export with an arguments object. Both do dynamic `import()` of project code. They are remote-code-execution surfaces by design, which is why the security model below exists.
