@@ -2,7 +2,7 @@
 
 ## Development Server with Live Reload, Proxy Resolution, and Studio API
 
-**Version:** 0.2.19
+**Version:** 0.2.20
 **Status:** Implemented
 **Updated:** 2026-08-27
 **License:** MIT
@@ -247,7 +247,7 @@ The canonical endpoint list is the `STUDIO_ROUTES` table in `@jxsuite/protocol` 
 
 - **Site preview and build** — `POST /__studio/preview` renders the working tree at a route on the live origin (§3.4) and reports whether a client already holding this project's preview took it; `POST|DELETE /__studio/preview/overlay` publishes and retracts one document's unsaved bytes; `POST /__studio/build` runs the compiler and names where the output is browsable
 - **Session / project** — activate, project metadata/probing, site enumeration, project creation, directory location (placing a `showDirectoryPicker()` handle on disk by the id it wrote into a hidden `.jx-loc-id`, so the New Project **Location** field gets a real folder chooser in the browser — specs/desktop.md §8.2.1), starters, AI-guided site import (NDJSON progress stream, whose terminal line carries what the run found)
-- **Filesystem** — directory listing and project-wide search on one route (`files?dir=` / `files?glob=`), file CRUD, upload, rename (with refactor report), locate
+- **Filesystem** — directory listing and project-wide search on one route (`files?dir=` / `files?glob=`), file CRUD, upload, rename (with refactor report), locate. Both listing shapes answer in **stable path order**: `readdir` and glob scans report in filesystem order, which varies with a directory's write history, and Studio's collection grid inserts rows in listing order, so an unsorted listing reaches the user as a table that reshuffles itself between opens. Codepoint order, not locale collation, so two implementations agree.
 - **Realtime co-editing** — `GET /__studio/collab`: a WebSocket upgrade speaking the `@jxsuite/collab` wire envelope (one socket per project, documents multiplexed by path); a plain GET answers the capability probe. Implemented in `src/collab.ts`: rooms seed from the file on disk, persistence is explicit (flush on save, plus graceful shutdown), and genuinely external file changes bump the doc epoch and reset subscribers.
 - **Documents / components / formats** — component discovery, CEM extraction, the project's format/extension registry, generated project schemas, format parse/serialize dispatch, plugin schemas, code services (§5)
 - **Packages** — dependency list/add/remove/install, an install-staleness check, the newest published version of
@@ -447,6 +447,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.2.20** (2026-08-27) — Directory listing and project-wide search answer in stable path order, in both implementations.
 - **0.2.19** (2026-08-27) — The Studio API's path space is written down: server-root-relative in, project-relative out; a refactor target outside the active project is a 400, not a zero-result 200.
 - **0.2.18** (2026-08-27) — The preview origin registers the project's own components without a declaration.
 - **0.2.17** (2026-08-27) — The preview origin composes non-JSON pages through the project's extension registry, built from its config.
@@ -480,4 +481,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/server` Specification v0.2.19_
+_`@jxsuite/server` Specification v0.2.20_
