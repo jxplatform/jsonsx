@@ -98,6 +98,9 @@ const mockHandleServerFunction = mock(
 void mock.module("@jxsuite/server/resolve", () => ({
   handleResolve: mockHandleResolve,
   handleServerFunction: mockHandleServerFunction,
+  // The refactor engine reads the project's asset mounts to resolve rooted refs through the mount
+  // Lane; a whole-module mock has to keep the export alive or its importers fail to link.
+  projectAssetMounts: mock(() => Promise.resolve([])),
 }));
 
 const {
