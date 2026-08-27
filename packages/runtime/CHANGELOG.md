@@ -1,5 +1,36 @@
 # Changelog
 
+## [3.0.0](https://github.com/jxsuite/jx/compare/runtime-v2.1.0...runtime-v3.0.0) (2026-08-27)
+
+
+### ⚠ BREAKING CHANGES
+
+* **schema,site:** `@jxsuite/schema` no longer exports `./routes`, `./layout`, `./context` or `./head-merger`. Import them from `@jxsuite/site`; the modules and their behaviour are unchanged.
+
+### Features
+
+* Open in Browser previews the working tree through the runtime ([b02e0e5](https://github.com/jxsuite/jx/commit/b02e0e543016879c963810f770b568995023e6ed))
+* **server:** the working tree, browsable at real routes, on its own origin ([eaaafe3](https://github.com/jxsuite/jx/commit/eaaafe319b12a251b7da1e6b2375a1aa0d56bea2))
+* **site,compiler:** the docs sidebar folds into accordions that open to the current page ([a9cc338](https://github.com/jxsuite/jx/commit/a9cc338c2e43dc075b1c83279ca4073f2ccd246f))
+
+
+### Bug Fixes
+
+* **runtime,compiler:** one boolean-attribute rule, and it knows the two families ([c9de06b](https://github.com/jxsuite/jx/commit/c9de06b0743592f126bc086b8e16abc4fb14e039))
+* **runtime,compiler:** one boolean-attribute rule, and it knows the two families ([3738342](https://github.com/jxsuite/jx/commit/373834245b52aded356d6cb2c4ddebdf47e05073))
+
+
+### Code Refactoring
+
+* **schema,site:** site composition gets its own package ([f9d270d](https://github.com/jxsuite/jx/commit/f9d270daf261eef9ac9566192787b7a4bba25135))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/schema bumped to 2.0.0
+
 ## [2.1.0](https://github.com/jxsuite/jx/compare/runtime-v2.0.5...runtime-v2.1.0) (2026-08-26)
 
 

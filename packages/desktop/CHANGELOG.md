@@ -1,5 +1,53 @@
 # Changelog
 
+## [5.0.0](https://github.com/jxsuite/jx/compare/desktop-v4.0.0...desktop-v5.0.0) (2026-08-27)
+
+
+### ⚠ BREAKING CHANGES
+
+* **schema,site:** `@jxsuite/schema` no longer exports `./routes`, `./layout`, `./context` or `./head-merger`. Import them from `@jxsuite/site`; the modules and their behaviour are unchanged.
+
+### Features
+
+* **desktop:** both launchers can preview the working tree live ([5a7b816](https://github.com/jxsuite/jx/commit/5a7b8161252770d2f694bdd8c94e144c91f692cf))
+* **import:** the site-import workflow, end to end ([eab1109](https://github.com/jxsuite/jx/commit/eab1109e0fc21a5f311d2f1c8f90626c1d51c55d))
+* Open in Browser previews the working tree through the runtime ([b02e0e5](https://github.com/jxsuite/jx/commit/b02e0e543016879c963810f770b568995023e6ed))
+* **studio:** watch an import in the project, in a feed that outlives the run ([509a1fd](https://github.com/jxsuite/jx/commit/509a1fdb313b26971bfffbd97a600f67999509e7))
+
+
+### Bug Fixes
+
+* **desktop,import:** the two gates the live preview left red, and the coverage it owed ([72657b7](https://github.com/jxsuite/jx/commit/72657b7c636d63aecb831378e5f16e134b062adb))
+* **screenshots:** stop the screenshot lane churning, and fix the three defects underneath it ([1eb0e45](https://github.com/jxsuite/jx/commit/1eb0e45c0a3a1ca14859f0cf0dc322a4619eff51))
+* **server,desktop:** answer a directory listing in stable path order ([8e7f314](https://github.com/jxsuite/jx/commit/8e7f3147bc9c4f91093066a5568459dfe0dcb4a7))
+* **server,studio:** findReferences answers about every reference, and the rename keeps its promise ([84e558f](https://github.com/jxsuite/jx/commit/84e558f67abe9524e2895f0e9045fb6ad14a0981))
+* **server:** resolve rooted refs through every lane, and index refs by shape ([29d3271](https://github.com/jxsuite/jx/commit/29d32716fb3c35e2e37235d4091739d950c2693a)), closes [#239](https://github.com/jxsuite/jx/issues/239)
+* **studio:** the Packages table shows each dependency's own npm latest ([a90e170](https://github.com/jxsuite/jx/commit/a90e170392398c93926d94e092d7ec9ebe9b83e6))
+* **studio:** the Packages table shows each dependency's own npm latest ([b019a26](https://github.com/jxsuite/jx/commit/b019a26848d06a92c9136f27a27edb2bea6e10dd))
+* **studio:** the Packages table shows each dependency's own npm latest ([4fa433f](https://github.com/jxsuite/jx/commit/4fa433fba641973f2bfbeed99e16c4de96482b4a))
+
+
+### Code Refactoring
+
+* **schema,site:** site composition gets its own package ([f9d270d](https://github.com/jxsuite/jx/commit/f9d270daf261eef9ac9566192787b7a4bba25135))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/compiler bumped to 3.0.0
+    * @jxsuite/create bumped to 1.3.8
+    * @jxsuite/parser bumped to 1.6.0
+    * @jxsuite/protocol bumped to 2.1.0
+    * @jxsuite/schema bumped to 2.0.0
+    * @jxsuite/server bumped to 4.0.0
+    * @jxsuite/starters bumped to 1.6.5
+    * @jxsuite/studio bumped to 4.0.0
+  * devDependencies
+    * @jxsuite/connector bumped to 0.5.6
+    * @jxsuite/server bumped to 4.0.0
+
 ## [4.0.0](https://github.com/jxsuite/jx/compare/desktop-v3.0.1...desktop-v4.0.0) (2026-08-26)
 
 

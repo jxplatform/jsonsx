@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.8.4](https://github.com/jxsuite/jx/compare/collab-v0.8.3...collab-v0.8.4) (2026-08-27)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/schema bumped to 2.0.0
+
 ## [0.8.3](https://github.com/jxsuite/jx/compare/collab-v0.8.2...collab-v0.8.3) (2026-08-26)
 
 

@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.6.0](https://github.com/jxsuite/jx/compare/parser-v1.5.6...parser-v1.6.0) (2026-08-27)
+
+
+### Features
+
+* **studio:** choose a format on New File, convert between formats, and inherit a collection's ([1c1061b](https://github.com/jxsuite/jx/commit/1c1061b95a66cc5e73aaf73d3605c0e7a285e086))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/markup bumped to 0.4.8
+    * @jxsuite/schema bumped to 2.0.0
+  * devDependencies
+    * @jxsuite/runtime bumped to 3.0.0
+
 ## [1.5.6](https://github.com/jxsuite/jx/compare/parser-v1.5.5...parser-v1.5.6) (2026-08-26)
 
 

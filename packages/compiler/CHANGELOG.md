@@ -1,5 +1,51 @@
 # Changelog
 
+## [3.0.0](https://github.com/jxsuite/jx/compare/compiler-v2.0.8...compiler-v3.0.0) (2026-08-27)
+
+
+### ⚠ BREAKING CHANGES
+
+* **schema,site:** `@jxsuite/schema` no longer exports `./routes`, `./layout`, `./context` or `./head-merger`. Import them from `@jxsuite/site`; the modules and their behaviour are unchanged.
+
+### Features
+
+* **import:** the site-import workflow, end to end ([eab1109](https://github.com/jxsuite/jx/commit/eab1109e0fc21a5f311d2f1c8f90626c1d51c55d))
+* Open in Browser previews the working tree through the runtime ([b02e0e5](https://github.com/jxsuite/jx/commit/b02e0e543016879c963810f770b568995023e6ed))
+* **site,compiler:** the docs sidebar folds into accordions that open to the current page ([f817617](https://github.com/jxsuite/jx/commit/f817617991847d1dafeb9f1c98e8384ea749fdc5))
+* **site,compiler:** the docs sidebar folds into accordions that open to the current page ([a9cc338](https://github.com/jxsuite/jx/commit/a9cc338c2e43dc075b1c83279ca4073f2ccd246f))
+* **site,compiler:** the docs sidebar folds into accordions that open to the current page ([a127fa3](https://github.com/jxsuite/jx/commit/a127fa3ce2fd0e29ae4536e7890ebae7f2facfea))
+
+
+### Bug Fixes
+
+* **compiler:** write the runtime bundles every emitted import map names ([994b3da](https://github.com/jxsuite/jx/commit/994b3daa5a64fb8a227131e635f0abed3193d47b)), closes [#227](https://github.com/jxsuite/jx/issues/227)
+* **runtime,compiler:** one boolean-attribute rule, and it knows the two families ([c9de06b](https://github.com/jxsuite/jx/commit/c9de06b0743592f126bc086b8e16abc4fb14e039))
+* **runtime,compiler:** one boolean-attribute rule, and it knows the two families ([3738342](https://github.com/jxsuite/jx/commit/373834245b52aded356d6cb2c4ddebdf47e05073))
+
+
+### Performance Improvements
+
+* **compiler:** minify bundles, inline component CSS, preload the runtime ([f19136e](https://github.com/jxsuite/jx/commit/f19136e35efb629c397923eccf959559af4d28b6))
+* **compiler:** minify bundles, inline component CSS, preload the runtime ([f1a1537](https://github.com/jxsuite/jx/commit/f1a1537b1b7966892fa14cda9d1e3cfcb956cad4))
+
+
+### Code Refactoring
+
+* **schema,site:** site composition gets its own package ([f9d270d](https://github.com/jxsuite/jx/commit/f9d270daf261eef9ac9566192787b7a4bba25135))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/create bumped to 1.3.8
+    * @jxsuite/runtime bumped to 3.0.0
+    * @jxsuite/schema bumped to 2.0.0
+    * @jxsuite/site bumped to 1.0.0
+  * devDependencies
+    * @jxsuite/connector bumped to 0.5.6
+    * @jxsuite/parser bumped to 1.6.0
+
 ## [2.0.8](https://github.com/jxsuite/jx/compare/compiler-v2.0.7...compiler-v2.0.8) (2026-08-26)
 
 

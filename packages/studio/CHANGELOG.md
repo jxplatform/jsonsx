@@ -1,5 +1,78 @@
 # Changelog
 
+## [4.0.0](https://github.com/jxsuite/jx/compare/studio-v3.0.0...studio-v4.0.0) (2026-08-27)
+
+
+### ⚠ BREAKING CHANGES
+
+* **schema,site:** `@jxsuite/schema` no longer exports `./routes`, `./layout`, `./context` or `./head-merger`. Import them from `@jxsuite/site`; the modules and their behaviour are unchanged.
+
+### Features
+
+* **desktop:** both launchers can preview the working tree live ([5a7b816](https://github.com/jxsuite/jx/commit/5a7b8161252770d2f694bdd8c94e144c91f692cf))
+* **import:** make jx-import --verify able to fail ([71382d5](https://github.com/jxsuite/jx/commit/71382d54e604aad01beba52d08ec99d826b13bee)), closes [#232](https://github.com/jxsuite/jx/issues/232)
+* **import:** the site-import workflow, end to end ([eab1109](https://github.com/jxsuite/jx/commit/eab1109e0fc21a5f311d2f1c8f90626c1d51c55d))
+* Open in Browser previews the working tree through the runtime ([b02e0e5](https://github.com/jxsuite/jx/commit/b02e0e543016879c963810f770b568995023e6ed))
+* **server,studio:** the import stream says what the run found, and can check its own fidelity ([2e4c0e3](https://github.com/jxsuite/jx/commit/2e4c0e3dd1b63aead94bb70379c7ad8738420fd8))
+* **studio,ai:** the assistant can stop and ask, and the turn waits for the answer ([3e75af4](https://github.com/jxsuite/jx/commit/3e75af4b847f508ce5b6560e9ec07cffe6fd55ee))
+* **studio:** a backend may satisfy Open in Browser by rendering, not only by building ([47ce1e6](https://github.com/jxsuite/jx/commit/47ce1e61715857aebce741fe85410a41828bb50c))
+* **studio:** a prompt dialog can own a choice beside its field ([560070d](https://github.com/jxsuite/jx/commit/560070d3262c6e43262014cb75f30865fe437656))
+* **studio:** choose a format on New File, convert between formats, and inherit a collection's ([1c1061b](https://github.com/jxsuite/jx/commit/1c1061b95a66cc5e73aaf73d3605c0e7a285e086))
+* **studio:** convert a document between formats, in place ([44cae58](https://github.com/jxsuite/jx/commit/44cae582317252027a19ed19c53eb3c2bd99818c))
+* **studio:** New File chooses a format, and a collection folder fixes it ([8f975fc](https://github.com/jxsuite/jx/commit/8f975fc5507bc8e6979c8128662ae7ea12854cfc))
+* **studio:** Open in Browser previews the canvas, and Build Site keeps the compiler ([9c45d21](https://github.com/jxsuite/jx/commit/9c45d219f2c55740ded4299fc4a75c3852878787))
+* **studio:** set the import's fidelity minimum in the New Project dialog ([d338bdb](https://github.com/jxsuite/jx/commit/d338bdbc616f80426058a7c0eeeb49af7919dd69))
+* **studio:** the Files tree hides what .gitignore masks ([2e0c5d5](https://github.com/jxsuite/jx/commit/2e0c5d5c05f95706130c7653459b014b2a63d33b))
+* **studio:** the Files tree hides what .gitignore masks ([8e8bab0](https://github.com/jxsuite/jx/commit/8e8bab0e854c4bf093b4a91347ffde430f8d8ed0))
+* **studio:** the Import source chooses its own model, and states what to do with the site ([07020a9](https://github.com/jxsuite/jx/commit/07020a9e6435e799e31818a56430273278271e26))
+* **studio:** the rail foot is a Settings menu over both settings families ([2145422](https://github.com/jxsuite/jx/commit/2145422ff2d9143e298e953c9a9966157434eeb7))
+* **studio:** the rail foot is a Settings menu over both settings families ([a6f6ec7](https://github.com/jxsuite/jx/commit/a6f6ec74c8dfb4bdd4d1a1d537993021176652dc))
+* **studio:** the site import is an agent turn — model, brief, live status, and a pause to ask ([775abee](https://github.com/jxsuite/jx/commit/775abeeb20a4f1a727072ea60191c32bea5d0d9f))
+* **studio:** the site import runs in the assistant, where it can be watched and questioned ([957dc51](https://github.com/jxsuite/jx/commit/957dc51048ae855ba489d16156739d099990a060))
+* **studio:** watch an import in the project, in a feed that outlives the run ([509a1fd](https://github.com/jxsuite/jx/commit/509a1fdb313b26971bfffbd97a600f67999509e7))
+
+
+### Bug Fixes
+
+* **desktop,import:** the two gates the live preview left red, and the coverage it owed ([72657b7](https://github.com/jxsuite/jx/commit/72657b7c636d63aecb831378e5f16e134b062adb))
+* **docs,studio:** satisfy the prose gate and the type-aware lint ([bf699c0](https://github.com/jxsuite/jx/commit/bf699c060a5cee6502380208d2b2b1b191609590))
+* **screenshots:** stop the screenshot lane churning, and fix the three defects underneath it ([1eb0e45](https://github.com/jxsuite/jx/commit/1eb0e45c0a3a1ca14859f0cf0dc322a4619eff51))
+* **server,studio:** findReferences answers about every reference, and the rename keeps its promise ([84e558f](https://github.com/jxsuite/jx/commit/84e558f67abe9524e2895f0e9045fb6ad14a0981))
+* **studio:** a nested style path that empties takes its emptied parents with it ([f2ab188](https://github.com/jxsuite/jx/commit/f2ab188b01ae4779dc7552f483d2989ab1f6ab73))
+* **studio:** close the settings-submenu rule, which swallowed 22 rules after it ([20be69b](https://github.com/jxsuite/jx/commit/20be69baf0471b82ca65360539babe21dce3a008))
+* **studio:** double the lazy converter, so the test asserts and the coverage record survives ([dac2c03](https://github.com/jxsuite/jx/commit/dac2c03219cdfaf53ce1c56832f2b357c369e468))
+* **studio:** double the lazy converter, so the test asserts and the record survives ([068144c](https://github.com/jxsuite/jx/commit/068144cedc2219ddca43718b770e63de75946d37))
+* **studio:** re-read the format registry after installing a project's dependencies ([6fae5e0](https://github.com/jxsuite/jx/commit/6fae5e041cf7f4b200e82aa8e9521dbae9797111))
+* **studio:** report the references a move could not rewrite ([e7b069b](https://github.com/jxsuite/jx/commit/e7b069bd3700c48609a3d476782b59492d6f0289)), closes [#239](https://github.com/jxsuite/jx/issues/239)
+* **studio:** stop stripping the project root off a reply that is already in it ([de84180](https://github.com/jxsuite/jx/commit/de84180d9225029e18dcebe25a352f550e309f79)), closes [#239](https://github.com/jxsuite/jx/issues/239)
+* **studio:** the agent's create path initialises a repository, and a stopped tool cannot poison history ([2f365ff](https://github.com/jxsuite/jx/commit/2f365ffd2fbfa386f4b9137a251057e19b679d28))
+* **studio:** the empty-text placeholder disappears when you type into the block ([6b0bb6f](https://github.com/jxsuite/jx/commit/6b0bb6f8754508f5a9f9a7d505703f4ea570091d))
+* **studio:** the empty-text placeholder disappears when you type into the block ([3a54739](https://github.com/jxsuite/jx/commit/3a5473996354158d0fe590c1b6cc5d5cdf9c8a06))
+* **studio:** the Packages table shows each dependency's own npm latest ([a90e170](https://github.com/jxsuite/jx/commit/a90e170392398c93926d94e092d7ec9ebe9b83e6))
+* **studio:** the Packages table shows each dependency's own npm latest ([b019a26](https://github.com/jxsuite/jx/commit/b019a26848d06a92c9136f27a27edb2bea6e10dd))
+* **studio:** the Packages table shows each dependency's own npm latest ([4fa433f](https://github.com/jxsuite/jx/commit/4fa433fba641973f2bfbeed99e16c4de96482b4a))
+* **studio:** wait for the grid's range outline, not just its range model ([7a0247f](https://github.com/jxsuite/jx/commit/7a0247ff921fd3318a0ee61bb76961f92f577367))
+
+
+### Code Refactoring
+
+* **schema,site:** site composition gets its own package ([f9d270d](https://github.com/jxsuite/jx/commit/f9d270daf261eef9ac9566192787b7a4bba25135))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/ai bumped to 0.36.5
+    * @jxsuite/collab bumped to 0.8.4
+    * @jxsuite/create bumped to 1.3.8
+    * @jxsuite/formulas bumped to 0.0.15
+    * @jxsuite/markup bumped to 0.4.8
+    * @jxsuite/protocol bumped to 2.1.0
+    * @jxsuite/runtime bumped to 3.0.0
+    * @jxsuite/schema bumped to 2.0.0
+    * @jxsuite/site bumped to 1.0.0
+
 ## [3.0.0](https://github.com/jxsuite/jx/compare/studio-v2.4.3...studio-v3.0.0) (2026-08-26)
 
 

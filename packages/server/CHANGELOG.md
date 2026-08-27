@@ -1,5 +1,65 @@
 # Changelog
 
+## [4.0.0](https://github.com/jxsuite/jx/compare/server-v3.0.0...server-v4.0.0) (2026-08-27)
+
+
+### ⚠ BREAKING CHANGES
+
+* **schema,site:** `@jxsuite/schema` no longer exports `./routes`, `./layout`, `./context` or `./head-merger`. Import them from `@jxsuite/site`; the modules and their behaviour are unchanged.
+
+### Features
+
+* **import:** limit the breakpoints an import keeps, and strip the classes it cannot use ([9ac5b60](https://github.com/jxsuite/jx/commit/9ac5b600a0b6834bb031daa64e1283ab51346cff))
+* **import:** the site-import workflow, end to end ([eab1109](https://github.com/jxsuite/jx/commit/eab1109e0fc21a5f311d2f1c8f90626c1d51c55d))
+* Open in Browser previews the working tree through the runtime ([b02e0e5](https://github.com/jxsuite/jx/commit/b02e0e543016879c963810f770b568995023e6ed))
+* **server,studio:** the import stream says what the run found, and can check its own fidelity ([2e4c0e3](https://github.com/jxsuite/jx/commit/2e4c0e3dd1b63aead94bb70379c7ad8738420fd8))
+* **server:** the working tree, browsable at real routes, on its own origin ([eaaafe3](https://github.com/jxsuite/jx/commit/eaaafe319b12a251b7da1e6b2375a1aa0d56bea2))
+* **studio:** choose a format on New File, convert between formats, and inherit a collection's ([1c1061b](https://github.com/jxsuite/jx/commit/1c1061b95a66cc5e73aaf73d3605c0e7a285e086))
+* **studio:** Open in Browser previews the canvas, and Build Site keeps the compiler ([9c45d21](https://github.com/jxsuite/jx/commit/9c45d219f2c55740ded4299fc4a75c3852878787))
+* **studio:** set the import's fidelity minimum in the New Project dialog ([d338bdb](https://github.com/jxsuite/jx/commit/d338bdbc616f80426058a7c0eeeb49af7919dd69))
+* **studio:** the site import is an agent turn — model, brief, live status, and a pause to ask ([775abee](https://github.com/jxsuite/jx/commit/775abeeb20a4f1a727072ea60191c32bea5d0d9f))
+* **studio:** watch an import in the project, in a feed that outlives the run ([509a1fd](https://github.com/jxsuite/jx/commit/509a1fdb313b26971bfffbd97a600f67999509e7))
+
+
+### Bug Fixes
+
+* **desktop,import:** the two gates the live preview left red, and the coverage it owed ([72657b7](https://github.com/jxsuite/jx/commit/72657b7c636d63aecb831378e5f16e134b062adb))
+* **screenshots:** stop the screenshot lane churning, and fix the three defects underneath it ([1eb0e45](https://github.com/jxsuite/jx/commit/1eb0e45c0a3a1ca14859f0cf0dc322a4619eff51))
+* **server,desktop:** answer a directory listing in stable path order ([8e7f314](https://github.com/jxsuite/jx/commit/8e7f3147bc9c4f91093066a5568459dfe0dcb4a7))
+* **server,studio:** findReferences answers about every reference, and the rename keeps its promise ([84e558f](https://github.com/jxsuite/jx/commit/84e558f67abe9524e2895f0e9045fb6ad14a0981))
+* **server:** a rename drops the co-editing room keyed to the old path ([e1e6f25](https://github.com/jxsuite/jx/commit/e1e6f25fdd31345cad69d83bef3a0454ae7dad8b))
+* **server:** resolve rooted refs through every lane, and index refs by shape ([29d3271](https://github.com/jxsuite/jx/commit/29d32716fb3c35e2e37235d4091739d950c2693a)), closes [#239](https://github.com/jxsuite/jx/issues/239)
+* **server:** resolve the references target against the server root, like its sibling ([bf86279](https://github.com/jxsuite/jx/commit/bf8627973f8e3298430ef37a4924932895f0e76b)), closes [#239](https://github.com/jxsuite/jx/issues/239)
+* **server:** the preview origin builds its format registry from the project's config ([91c9ec6](https://github.com/jxsuite/jx/commit/91c9ec6ec316df22fd37bedecb37f83c3ea74d47))
+* **studio:** stop stripping the project root off a reply that is already in it ([de84180](https://github.com/jxsuite/jx/commit/de84180d9225029e18dcebe25a352f550e309f79)), closes [#239](https://github.com/jxsuite/jx/issues/239)
+* **studio:** the Packages table shows each dependency's own npm latest ([a90e170](https://github.com/jxsuite/jx/commit/a90e170392398c93926d94e092d7ec9ebe9b83e6))
+* **studio:** the Packages table shows each dependency's own npm latest ([b019a26](https://github.com/jxsuite/jx/commit/b019a26848d06a92c9136f27a27edb2bea6e10dd))
+* **studio:** the Packages table shows each dependency's own npm latest ([4fa433f](https://github.com/jxsuite/jx/commit/4fa433fba641973f2bfbeed99e16c4de96482b4a))
+
+
+### Code Refactoring
+
+* **schema,site:** site composition gets its own package ([f9d270d](https://github.com/jxsuite/jx/commit/f9d270daf261eef9ac9566192787b7a4bba25135))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/collab bumped to 0.8.4
+    * @jxsuite/compiler bumped to 3.0.0
+    * @jxsuite/create bumped to 1.3.8
+    * @jxsuite/import bumped to 0.40.0
+    * @jxsuite/protocol bumped to 2.1.0
+    * @jxsuite/runtime bumped to 3.0.0
+    * @jxsuite/schema bumped to 2.0.0
+    * @jxsuite/site bumped to 1.0.0
+    * @jxsuite/starters bumped to 1.6.5
+  * devDependencies
+    * @jxsuite/auth bumped to 0.5.6
+    * @jxsuite/connector bumped to 0.5.6
+    * @jxsuite/parser bumped to 1.6.0
+
 ## [3.0.0](https://github.com/jxsuite/jx/compare/server-v2.2.7...server-v3.0.0) (2026-08-26)
 
 
