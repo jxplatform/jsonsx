@@ -85,7 +85,42 @@ describe("verify - serveDirectory", () => {
     try {
       const res = await fetch(`${baseUrl}/app.js`);
       expect(res.status).toBe(200);
-      expect(res.headers.get("Content-Type")).toContain("application/javascript");
+      expect(res.headers.get("Content-Type")).toContain("text/javascript");
+    } finally {
+      void server.stop();
+    }
+  });
+
+  /*
+   * Issue #232: the map was `.html`, `.css`, `.js` and nothing else, so every image and font went
+   * out as `application/octet-stream`. A browser will not render an `<img>` served as a binary
+   * blob or use a font handed to it as one, which cost the clone fidelity points that had nothing
+   * to do with the import.
+   */
+  it.each([
+    ["logo.svg", "image/svg+xml"],
+    ["hero.png", "image/png"],
+    ["photo.webp", "image/webp"],
+    ["inter.woff2", "font/woff2"],
+    ["data.json", "application/json"],
+  ])("serves %s as %s", async (name, expected) => {
+    writeFileSync(join(tmpDir, name as string), "x");
+    const { server, baseUrl } = serveDirectory(tmpDir);
+    try {
+      const res = await fetch(`${baseUrl}/${name}`);
+      expect(res.status).toBe(200);
+      expect(res.headers.get("Content-Type")).toContain(expected as string);
+    } finally {
+      void server.stop();
+    }
+  });
+
+  it("still falls back to octet-stream for a type it does not know", async () => {
+    writeFileSync(join(tmpDir, "archive.bin"), "x");
+    const { server, baseUrl } = serveDirectory(tmpDir);
+    try {
+      const res = await fetch(`${baseUrl}/archive.bin`);
+      expect(res.headers.get("Content-Type")).toContain("application/octet-stream");
     } finally {
       void server.stop();
     }
@@ -131,5 +166,8 @@ describe("verify - verifyProject (build-failure path)", () => {
     expect(result.pages.length).toBe(1);
     expect(result.pages[0]!.error).toBeTruthy();
     expect(result.pages[0]!.error).toMatch(/build|not found|missing/i);
+    // A build that threw is a failure the caller can act on, not a 0% score to shrug at.
+    expect(result.passed).toBe(false);
+    expect(result.buildErrors).toHaveLength(1);
   });
 });

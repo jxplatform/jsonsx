@@ -24,6 +24,14 @@ export interface CrawlOptions {
   noScroll?: boolean;
   /** Capture a reference screenshot of each page before closing (for --verify). */
   captureScreenshots?: boolean;
+  /**
+   * Capture the whole scrollable page rather than the viewport (default true).
+   *
+   * It has to agree with what `verifyProject` screenshots on the other side. A viewport reference
+   * diffed against a full-page render is compared by padding the shorter image, so the two would
+   * disagree over everything below the fold before a single style was compared.
+   */
+  fullPageScreenshots?: boolean;
   onProgress?: (msg: string) => void;
   /** Abort the crawl between pages; the loop throws before capturing the next page. */
   signal?: AbortSignal;
@@ -178,6 +186,7 @@ export async function crawlSite(options: CrawlOptions): Promise<CrawlResult> {
     skipStyles,
     skipAssets,
     respectRobots,
+    fullPageScreenshots = true,
     onProgress = console.log,
   } = options;
 
@@ -243,7 +252,9 @@ export async function crawlSite(options: CrawlOptions): Promise<CrawlResult> {
       skippedByNodeCap.push(entry.url);
       let screenshot: Buffer | undefined;
       if (options.captureScreenshots) {
-        screenshot = Buffer.from(await capture.page.screenshot({ type: "png" }));
+        screenshot = Buffer.from(
+          await capture.page.screenshot({ fullPage: fullPageScreenshots, type: "png" }),
+        );
       }
       await capture.page.close();
 
@@ -347,7 +358,9 @@ export async function crawlSite(options: CrawlOptions): Promise<CrawlResult> {
 
     let screenshot: Buffer | undefined;
     if (options.captureScreenshots) {
-      screenshot = Buffer.from(await capture.page.screenshot({ type: "png" }));
+      screenshot = Buffer.from(
+        await capture.page.screenshot({ fullPage: fullPageScreenshots, type: "png" }),
+      );
     }
     await capture.page.close();
 

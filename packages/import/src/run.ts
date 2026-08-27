@@ -46,8 +46,14 @@ export interface ImportSiteOptions {
   componentize?: false | { minInstances?: number; minDepth?: number };
   /** LLM refinement of component/prop names; false/undefined to skip. */
   ai?: false | { apiKey: string; baseUrl?: string | undefined; model?: string | undefined };
-  /** Build + screenshot-diff the emitted project against the original; false to skip. */
-  verify?: false | { threshold?: number };
+  /**
+   * Build + screenshot-diff the emitted project against the original; false to skip.
+   *
+   * `threshold` is pixelmatch's per-pixel COLOUR tolerance, not a bar; `minFidelity` is the bar,
+   * and the run reports `passed` against it. `fullPage` compares the whole scrollable page (default
+   * true) rather than the first viewport.
+   */
+  verify?: false | { threshold?: number; minFidelity?: number; fullPage?: boolean | undefined };
   /** Explicit browser binary (wins over CHROME_PATH and PATH discovery). */
   chromePath?: string;
   /** Aborts between phases (and between crawled pages). */
@@ -82,13 +88,32 @@ export interface ImportSiteResult {
     averageFidelity: number;
     reportDir: string;
     /**
+     * Whether the run met its bar — it built cleanly, every page rendered, and the average reached
+     * `minFidelity`. Nothing about verify could fail before this existed: a clone scoring 8%
+     * finished exactly like one scoring 95% (issue #232).
+     */
+    passed: boolean;
+    /** The bar `passed` was measured against. */
+    minFidelity: number;
+    /** Errors the compiler reported building the project — recorded, and now also enforced. */
+    buildErrors: string[];
+    /**
      * Per page, because the average cannot name one.
      *
      * "Average fidelity 84%" is a fact nobody can act on; "the pricing page renders at 61%" is a
      * decision — retry it, patch it by hand, or accept it. The verifier computed both and only the
      * average was reported, so the actionable half was thrown away one level below the caller.
+     *
+     * The counts alongside it are what a percentage cannot say: a page that 404s on fifteen images
+     * scores badly, and only `failedRequests` says why.
      */
-    pages: { route: string; fidelity: number; error?: string }[];
+    pages: {
+      route: string;
+      fidelity: number;
+      consoleErrors: number;
+      failedRequests: number;
+      error?: string;
+    }[];
   } | null;
   warnings: string[];
 }
@@ -190,6 +215,8 @@ export async function importSite(
     progress(phase, `⚠ ${message}`);
   };
   const verifyThreshold = verify === false ? 0.15 : (verify.threshold ?? 0.15);
+  const verifyMinFidelity = verify === false ? 0 : (verify.minFidelity ?? 0);
+  const verifyFullPage = verify === false ? true : (verify.fullPage ?? true);
 
   try {
     if (maxDepth === 0) {
@@ -349,7 +376,12 @@ export async function importSite(
     if (verify !== false) {
       progress("verify", "Capturing reference screenshot...");
       const { captureReferenceScreenshot } = await import("./verify.ts");
-      referenceScreenshot = await captureReferenceScreenshot(capture.page);
+      referenceScreenshot = await captureReferenceScreenshot(
+        capture.page,
+        undefined,
+        undefined,
+        verifyFullPage,
+      );
     }
 
     await capture.page.close();
@@ -414,6 +446,8 @@ export async function importSite(
       respectRobots,
       noScroll: !scroll,
       captureScreenshots: verify !== false,
+      // The reference and the render must be framed the same way, or the diff pads one of them.
+      fullPageScreenshots: verifyFullPage,
       onProgress: (msg) => progress("crawl", msg.trim()),
       ...(signal === undefined ? {} : { signal }),
     });
@@ -523,21 +557,51 @@ export async function importSite(
       projectDir: outDir,
       pages: verifyPages,
       threshold: verifyThreshold,
+      minFidelity: verifyMinFidelity,
+      fullPage: verifyFullPage,
       onProgress: (msg) => progress("verify", msg),
       ...(browser === undefined ? {} : { browser }),
     });
+    /*
+     * Build errors were logged inside the verifier and dropped there. They are warnings on the
+     * import as a whole: a project that did not compile is not a clone of anything, however the
+     * pixels happen to score.
+     */
+    for (const error of verifyResult.buildErrors) {
+      warn("verify", `Build error: ${error}`);
+    }
     for (const page of verifyResult.pages) {
       const status = page.error ? `ERROR: ${page.error}` : `${page.fidelity}% fidelity`;
-      progress("verify", `${page.route} — ${status}`);
+      const misses =
+        page.failedRequests.length > 0 ? `, ${page.failedRequests.length} failed request(s)` : "";
+      progress("verify", `${page.route} — ${status}${misses}`);
     }
     progress("verify", `Average fidelity: ${verifyResult.averageFidelity}%`);
+    if (!verifyResult.passed) {
+      warn(
+        "verify",
+        `Verification failed: average fidelity ${verifyResult.averageFidelity}% ` +
+          `(minimum ${verifyMinFidelity}%). See ${verifyResult.reportDir}/report.json`,
+      );
+    }
     return {
       averageFidelity: verifyResult.averageFidelity,
       reportDir: verifyResult.reportDir,
+      passed: verifyResult.passed,
+      minFidelity: verifyMinFidelity,
+      buildErrors: verifyResult.buildErrors,
       pages: verifyResult.pages.map((page) => {
-        const entry: { route: string; fidelity: number; error?: string } = {
+        const entry: {
+          route: string;
+          fidelity: number;
+          consoleErrors: number;
+          failedRequests: number;
+          error?: string;
+        } = {
           route: page.route,
           fidelity: page.fidelity,
+          consoleErrors: page.consoleErrors.length,
+          failedRequests: page.failedRequests.length,
         };
         if (page.error !== undefined) {
           entry.error = page.error;

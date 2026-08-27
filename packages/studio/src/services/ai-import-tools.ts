@@ -124,6 +124,24 @@ function describeRun(id: string, root: string, summary?: ImportSiteSummary): str
     lines.push(
       `Fidelity against the original averaged ${summary.verify.averageFidelity}%${detail}`,
     );
+    /*
+     * The score says a page looks wrong; this says why. A page that 404s on fifteen asset
+     * references scores badly for one fixable reason, and reading a percentage on its own sends
+     * the reader looking for the wrong thing entirely (jxsuite/jx issue 232).
+     */
+    const missing = (summary.verify.pages ?? []).reduce(
+      (sum, page) => sum + (page.failedRequests ?? 0),
+      0,
+    );
+    if (missing > 0) {
+      lines.push(
+        `${missing} request${missing === 1 ? "" : "s"} failed or 404'd in the rendered pages — ` +
+          "check the emitted asset paths before treating a low score as a layout problem.",
+      );
+    }
+    for (const error of summary.verify.buildErrors ?? []) {
+      lines.push(`The emitted project did not build cleanly: ${error}`);
+    }
   }
 
   if (warnings.length > 0) {
