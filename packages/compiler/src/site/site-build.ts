@@ -100,7 +100,8 @@ import {
 } from "./i18n.ts";
 import type { LocaleAlternate, PageLocaleContext } from "./i18n.ts";
 import {
-  isPrefixSpecifier,
+  importMapAssets,
+  importMapAssetsInHtml,
   renderImportMap,
   resolveClientRuntime,
   writeClientRuntime,
@@ -209,6 +210,11 @@ export async function buildSite(
    */
   const clientRuntime = resolveClientRuntime();
   const runtimeImports = clientRuntime.imports;
+  /*
+   * What step 6d bundles, scanned back out of each finished page rather than recorded wherever a
+   * map is emitted. Several places emit one and only `injectComponentScripts` was recording, so a
+   * page whose interactivity came from anything else shipped a map naming files no build wrote.
+   */
   const runtimeAssetsUsed = new Set<string>();
   /*
    * Scanned from every finished page, so the hashes name the exact bytes shipped rather than what
@@ -688,8 +694,16 @@ export async function buildSite(
           staticTags,
           result.files.map((f: { content: string }) => f.content).join("\n"),
           runtimeImports,
-          runtimeAssetsUsed,
         );
+      }
+
+      /*
+       * Whatever import map this page ended up with, step 6d owes it the files it names. Read from
+       * the finished HTML so the answer does not depend on which of the emission paths produced
+       * the map — the one that reported and the one that shipped were different sets (issue #227).
+       */
+      for (const assetPath of importMapAssetsInHtml(result.html)) {
+        runtimeAssetsUsed.add(assetPath);
       }
 
       // Mounted assets this page actually references — scanned from the finished HTML so a
@@ -2108,7 +2122,6 @@ function expandComponents(
  * @param {Set<string>} [staticTags] - Tags where ALL instances are fully static (skip JS)
  * @param {string} [islandSource] - Concatenated island modules emitted for this page
  * @param {Record<string, string>} [runtimeImports] - The import map's `imports` object
- * @param {Set<string>} [runtimeAssetsUsed] - Collects the asset paths an emitted import map names
  * @returns {string}
  */
 function injectComponentScripts(
@@ -2118,7 +2131,6 @@ function injectComponentScripts(
   staticTags = new Set<string>(),
   islandSource = "",
   runtimeImports: Record<string, string> = {},
-  runtimeAssetsUsed = new Set<string>(),
 ) {
   // A component reaches a page two ways: as a literal tag in the static HTML, or referenced only
   // From inside an island's client template — in which case the tag exists solely in the island's
@@ -2169,23 +2181,11 @@ function injectComponentScripts(
   // Build import map (needed for @vue/reactivity and lit-html)
   const importMap = renderImportMap(runtimeImports);
   /*
-   * The runtime modules THIS page needs. Kept separate from `runtimeAssetsUsed`, which accumulates
-   * across the whole build so step 6d knows what to bundle — preloading from that set would have
-   * every page hint at every other page's runtime.
+   * The runtime modules THIS page needs — the hints are per page, so they are read from this
+   * page's map rather than from the build-wide set, which would have every page hint at every
+   * other page's runtime.
    */
-  const pageRuntimeAssets: string[] = [];
-  for (const [specifier, url] of Object.entries(runtimeImports)) {
-    /*
-     * A prefix key's value is the DIRECTORY its subpaths are served from — `/assets/lit-html/` —
-     * not a file any build writes. `writeClientRuntime` matches this set against exact asset
-     * paths, so a directory in it bundled nothing and only inflated the count this build logged.
-     */
-    if (isPrefixSpecifier(specifier) || !url.startsWith("/")) {
-      continue;
-    }
-    runtimeAssetsUsed.add(url);
-    pageRuntimeAssets.push(url);
-  }
+  const pageRuntimeAssets = importMapAssets(runtimeImports);
 
   /*
    * An import map declares where a bare specifier lives; it does not tell the browser to go get it.
