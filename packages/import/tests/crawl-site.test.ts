@@ -13,7 +13,9 @@ import type { CapturedStyle } from "../src/style-capture.ts";
 type FakeSite = Record<string, { title: string; bodyHtml: string; links: string[] }>;
 
 let site: FakeSite = {};
-const pageScreenshot = mock(() => Promise.resolve(new Uint8Array([1, 2, 3])));
+const pageScreenshot = mock((_opts?: { fullPage?: boolean; type?: string }) =>
+  Promise.resolve(new Uint8Array([1, 2, 3])),
+);
 
 const capturePage = mock((url: string) => {
   const entry = site[url];
@@ -68,8 +70,8 @@ void mock.module("../src/asset-collect.ts", () => ({ collectAssets }));
 const downloadAssets = mock(() =>
   Promise.resolve({
     rewriteMap: new Map([
-      ["https://crawl.example/logo.png", "public/assets/images/logo.png"],
-      ["https://crawl.example/font.woff2", "public/assets/fonts/font.woff2"],
+      ["https://crawl.example/logo.png", "/assets/images/logo.png"],
+      ["https://crawl.example/font.woff2", "/assets/fonts/font.woff2"],
     ]),
     failed: [],
     skipped: [],
@@ -187,7 +189,7 @@ describe("crawlSite", () => {
     // Assets: font-face rules deduped across pages, font rewrites collected.
     expect(result.fontFaceRules).toEqual(["@font-face { font-family: X }"]);
     expect(result.fontRewriteMap.get("https://crawl.example/font.woff2")).toBe(
-      "public/assets/fonts/font.woff2",
+      "/assets/fonts/font.woff2",
     );
     expect(messages.some((m) => m.includes("robots.txt"))).toBe(true);
   });
@@ -211,6 +213,31 @@ describe("crawlSite", () => {
     expect(collectAssets).not.toHaveBeenCalled();
     // Screenshots still captured for capped pages.
     expect(result.pages[0]?.screenshot).toBeInstanceOf(Buffer);
+    /*
+     * Whole page by default, because the verifier renders the clone the same way. A viewport
+     * reference diffed against a full-page render is compared by padding the shorter image, so the
+     * two would disagree over everything below the fold before a single style was compared.
+     */
+    expect(pageScreenshot.mock.calls.at(-1)?.[0]).toEqual({ fullPage: true, type: "png" });
+  });
+
+  test("honours a viewport-only reference when asked for one", async () => {
+    seedSite();
+    await crawlSite({
+      url: HOME,
+      outDir: outDir(),
+      maxDepth: 0,
+      maxPages: 10,
+      maxNodesPerPage: 5000,
+      skipStyles: true,
+      skipAssets: true,
+      respectRobots: false,
+      captureScreenshots: true,
+      fullPageScreenshots: false,
+      onProgress: () => {},
+    });
+
+    expect(pageScreenshot.mock.calls.at(-1)?.[0]).toEqual({ fullPage: false, type: "png" });
   });
 
   test("survives capture and style failures with warnings", async () => {

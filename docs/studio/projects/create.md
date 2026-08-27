@@ -81,11 +81,13 @@ Beyond the site's URL, the Import tab has four options:
 3. **AI component naming**: let the model name the repeated pieces it finds (a `Card`, a `PricingRow`) instead of numbering them. It costs one model call per component found, so it's worth turning off on a wide crawl.
 4. **Check fidelity against the original**: after the import, build the new project, screenshot every page, and compare it against the site it came from. It roughly doubles the run, and it's the only thing that tells you how well the clone actually came out instead of what got skipped. Off by default.
 
+   The assistant reports the percentage per page, and alongside it the two things a percentage can't tell you: requests the rendered page made and didn't get, and any errors from building the project. A page that scores badly because fifteen images 404 is a different problem from one whose layout came out wrong, and only the first of those is quick to fix.
+
 Under those, a **Model** picker and a box asking what the assistant should do with the site. Both are optional. The model here is for this import only, so it doesn't change the model the assistant uses for everything else. Leave the box empty and the assistant simply gets the site ready for you to work on; fill it in ("keep the layout but modernise the typography") and it carries straight on into that once the import lands.
 
 ### While an import runs
 
-The dialog closes as soon as you click **Import Site**. The import doesn't run in the wizard. It runs in the [AI assistant](/docs/studio/ai), which opens in the Inspector and reports as it goes: the phase it's in, the page it's on, and the last few lines of its log. When it finishes, the project opens in the same window, and the assistant tells you how many pages it captured, what it had to skip, and which pages didn't render faithfully.
+The dialog closes as soon as you click **Import Site**. The import doesn't run in the wizard. It runs in the [AI assistant](/docs/studio/ai), which opens in the Inspector and reports as it goes: the phase it's in, the page it's on, and the last few lines of its log. When it finishes, the project opens in the same window, and the assistant tells you how many pages it captured, what it had to skip, which pages didn't render faithfully, and, when the fidelity check ran, what those pages failed to load.
 
 That's also why it can stop and ask you something. An import guesses at a lot: which pages matter, whether three similar blocks are one component, what to do about a page robots.txt kept it out of. When one of those is genuinely your call, the assistant asks you there in the Inspector and waits for your answer (see **[When the assistant asks you something](/docs/studio/ai/chat)**).
 

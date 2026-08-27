@@ -15,7 +15,14 @@ const importSite = mock(
       outDir: resolve("clone-out"),
       pages: [{ route: "pages/index.json", title: "Cloned", nodeCount: 42 }],
       fileCount: 5,
-      verify: { averageFidelity: 96.3, reportDir: "/tmp/rep" },
+      verify: {
+        averageFidelity: 96.3,
+        buildErrors: [],
+        minFidelity: 25,
+        pages: [{ consoleErrors: 0, failedRequests: 2, fidelity: 96.3, route: "pages/index.json" }],
+        passed: true,
+        reportDir: "/tmp/rep",
+      },
       warnings: [],
     });
   },
@@ -49,6 +56,8 @@ process.argv = [
   "--verify",
   "--verify-threshold",
   "0.3",
+  "--min-fidelity",
+  "40",
 ];
 
 const cliEntry = "../src/cli";
@@ -73,13 +82,20 @@ describe("jx-import CLI", () => {
       baseUrl: "http://llm.local/v1",
       model: "test-model",
     });
-    expect(opts.verify).toEqual({ threshold: 0.3 });
+    /*
+     * `--verify-threshold` is pixelmatch's per-pixel COLOUR tolerance and moves the score;
+     * `--min-fidelity` is the bar that decides the exit code. Conflating them is what let a run
+     * scoring 8% exit 0 (issue #232).
+     */
+    expect(opts.verify).toEqual({ threshold: 0.3, minFidelity: 40, fullPage: true });
   });
 
   test("prints the page summary, fidelity, and Studio handoff", () => {
     const output = logs.join("\n");
     expect(output).toContain('pages/index.json — "Cloned" (42 nodes)');
     expect(output).toContain("Average fidelity: 96.3%");
+    // What a percentage cannot say — read this before wondering why a page scores badly.
+    expect(output).toContain("pages/index.json: 2 failed request(s)");
     expect(output).toContain("Done! Open in Studio:");
   });
 });

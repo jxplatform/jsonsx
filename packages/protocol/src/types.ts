@@ -569,8 +569,19 @@ export interface ImportSiteOptions {
 /** Per-page fidelity from the `verify` pass. */
 export interface ImportVerifyPage {
   route: string;
-  /** 0..1 — the share of pixels that matched the original. */
+  /** 0..100 — the percentage of pixels that matched the original. */
   fidelity: number;
+  /**
+   * Console errors and uncaught exceptions the rendered page produced.
+   *
+   * What a percentage cannot say. A page that 404s on fifteen images scores badly, and only this
+   * and `failedRequests` name the reason (issue #232).
+   */
+  consoleErrors?: number;
+  /** Requests the rendered page made that failed or answered 4xx/5xx. */
+  failedRequests?: number;
+  /** Why this page has no score at all — it could not be rendered. */
+  error?: string;
 }
 
 /**
@@ -587,7 +598,22 @@ export interface ImportSiteSummary {
   /** Soft failures the pipeline recorded: assets that would not download, pages it skipped. */
   warnings?: string[];
   /** Present only when `verify` was requested and reference screenshots were captured. */
-  verify?: { averageFidelity: number; reportDir: string; pages?: ImportVerifyPage[] };
+  verify?: {
+    averageFidelity: number;
+    reportDir: string;
+    pages?: ImportVerifyPage[];
+    /**
+     * Whether the run met its bar: the project built cleanly, every page rendered, and the average
+     * fidelity reached `minFidelity`. Over HTTP that bar is 0 by default, so `passed: false` from
+     * this backend means the project did not build or a page did not render — not that the clone
+     * merely scored low. The `jx-import` CLI sets a real floor and exits non-zero.
+     */
+    passed?: boolean;
+    /** The bar `passed` was measured against, 0..100. */
+    minFidelity?: number;
+    /** Errors the compiler reported building the emitted project. */
+    buildErrors?: string[];
+  };
 }
 
 // ─── AI proxy ────────────────────────────────────────────────────────────────

@@ -25,7 +25,10 @@ Options:
   --ai-components          Use LLM to refine component names and props (Phase 4 AI pass)
   --ai-model <model>       Model for AI componentization (default: gpt-4o-mini)
   --verify                 After import, build and screenshot-diff vs original (Phase 5)
-  --verify-threshold <n>   Pixel diff threshold 0..1 (default: 0.15)
+  --min-fidelity <n>       Fail (exit 1) below this average fidelity 0..100 (default: 25)
+  --verify-threshold <n>   Per-pixel colour tolerance 0..1 for the diff (default: 0.15).
+                           Moves the score; it is NOT the pass bar — --min-fidelity is.
+  --verify-viewport-only   Diff only the first viewport instead of the whole page
 
 Environment:
   OPENAI_API_KEY           Required for --ai-components
@@ -73,6 +76,18 @@ const verifyThreshold =
   verifyThresholdIdx !== -1 && args[verifyThresholdIdx + 1]
     ? Number(args[verifyThresholdIdx + 1]) || 0.15
     : 0.15;
+/*
+ * The floor below which the output is not a clone of anything.
+ *
+ * It is deliberately low rather than a quality bar: a real import of a complicated site lands well
+ * under 100 for reasons nobody can fix from here (a rotating hero, a font that renders a hair
+ * differently), and failing those would train people to pass `--min-fidelity 0` and stop looking.
+ * Under a quarter of pixels matching is a different question — that is the 8%-fidelity Wix clone
+ * that printed `Done!` and exited 0, which is worse than a failure because the only way to see it
+ * is to open the result (issue #232).
+ */
+const minFidelity = parseIntArg(args, "--min-fidelity", 25);
+const verifyFullPage = !args.includes("--verify-viewport-only");
 
 const maxDepth = noCrawl ? 0 : parseIntArg(args, "--depth", 2);
 const maxPages = parseIntArg(args, "--max-pages", 25);
@@ -125,7 +140,9 @@ async function main() {
         respectRobots: !args.includes("--no-robots"),
         componentize: noComponents ? false : { minInstances, minDepth },
         ai,
-        verify: doVerify ? { threshold: verifyThreshold } : false,
+        verify: doVerify
+          ? { threshold: verifyThreshold, minFidelity, fullPage: verifyFullPage }
+          : false,
       },
       (e) => console.log(`  ${e.message}`),
     );
@@ -136,7 +153,39 @@ async function main() {
     }
     if (result.verify) {
       console.log(`  Average fidelity: ${result.verify.averageFidelity}%`);
+      for (const page of result.verify.pages) {
+        const misses = [
+          page.failedRequests > 0 ? `${page.failedRequests} failed request(s)` : "",
+          page.consoleErrors > 0 ? `${page.consoleErrors} console error(s)` : "",
+        ].filter(Boolean);
+        if (misses.length > 0) {
+          console.log(`    ${page.route}: ${misses.join(", ")}`);
+        }
+      }
       console.log(`  Report: ${result.verify.reportDir}/report.json`);
+    }
+
+    /*
+     * A verify that cannot fail is a report, not a gate. An import nobody opens and looks at is
+     * exactly the case the exit code exists for, so a build error or a fidelity under the floor
+     * ends the run non-zero and says which one it was.
+     */
+    if (result.verify && !result.verify.passed) {
+      for (const error of result.verify.buildErrors) {
+        console.error(`Build error: ${error}`);
+      }
+      console.error(
+        `\nVerification FAILED — the project is at ${outDir}, but it does not match the original.`,
+      );
+      if (result.verify.buildErrors.length === 0) {
+        console.error(
+          `  Average fidelity ${result.verify.averageFidelity}% is below the ` +
+            `${result.verify.minFidelity}% minimum. Pass --min-fidelity to change it.`,
+        );
+      }
+      console.error(`  Report: ${result.verify.reportDir}/report.json`);
+      process.exitCode = 1;
+      return;
     }
 
     console.log(`\nDone! Open in Studio:`);
