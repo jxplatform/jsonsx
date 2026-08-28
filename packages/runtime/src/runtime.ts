@@ -23,6 +23,7 @@ import {
   ref,
   toRaw,
 } from "@vue/reactivity";
+import { camelToKebab, pureSchemeOf, resolveAtQuery, schemeSelectors } from "./css.ts";
 import { evaluateExpression, evaluateOperand, isMutating } from "./expression.ts";
 import { readPath } from "./pointer.ts";
 import type { DynamicClass, JxEventHandler, JxPath, JxRenderOptions, JxScope } from "./types.ts";
@@ -2559,15 +2560,19 @@ function mergeProps(def: JxElement, parentState: JxScope): JxScope {
   return child;
 }
 
-/**
- * Convert camelCase to kebab-case.
- *
- * @param {string} s
- * @returns {string}
+/*
+ * The CSS-authoring rules live in `./css.ts`, which imports nothing at all. They are re-exported
+ * here because they always were part of this module's surface and moving them must not break a
+ * consumer; a host that cannot afford the DOM runtime imports `@jxsuite/runtime/css` instead.
  */
-export function camelToKebab(s: string) {
-  return s.replaceAll(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
-}
+export {
+  camelToKebab,
+  COLOR_SCHEME_ATTR,
+  COLOR_SCHEME_STORAGE_KEY,
+  pureSchemeOf,
+  resolveAtQuery,
+  schemeSelectors,
+} from "./css.ts";
 
 /**
  * Convert a style rules object to a CSS text string (skipping nested selectors).
@@ -2580,97 +2585,6 @@ export function toCSSText(rules: Record<string, unknown> | object) {
     .filter(([k, v]) => !isNestedSelector(k) && (v === null || typeof v !== "object"))
     .map(([p, v]) => `${camelToKebab(p)}: ${canvasStyleValue(String(v))}`)
     .join("; ");
-}
-
-// ─── Style At-Rules ───────────────────────────────────────────────────────────
-
-/**
- * The four CSS media types. A media _type_ is bare — `@media print` — while a media _feature_ is
- * parenthesised, so `@media (print)` reads as a boolean feature named `print`, which does not exist
- * and evaluates false.
- */
-const MEDIA_TYPES = new Set(["all", "print", "screen", "speech"]);
-
-/**
- * The media query an `@`-prefixed style key names, or null when the key is some other at-rule
- * (`@supports`, `@starting-style`) that is emitted verbatim.
- *
- * `@--name` resolves through the project's `$media` map. `@(…)` carries its own parentheses, so
- * they are stripped only when what they wrap is a bare media type: `@(print)` must become `@media
- * print`, while `@(min-width: 40rem)` keeps them.
- *
- * @param {string} atKey
- * @param {Record<string, string>} mediaQueries
- * @returns {string | null}
- * @docs framework/concepts/styling
- */
-export function resolveAtQuery(atKey: string, mediaQueries: Record<string, string>): string | null {
-  if (atKey.startsWith("@--")) {
-    return mediaQueries[atKey.slice(1)] ?? atKey.slice(1);
-  }
-  if (atKey.startsWith("@(")) {
-    const inner = atKey.slice(2, -1).trim();
-    return MEDIA_TYPES.has(inner.toLowerCase()) ? inner : atKey.slice(1);
-  }
-  return null;
-}
-
-// ─── Color Schemes ────────────────────────────────────────────────────────────
-
-/**
- * Attribute on the root element (`<html>`) that forces a color scheme. Absent = auto (follow the OS
- * `prefers-color-scheme`). Values: "light" | "dark".
- *
- * @docs framework/concepts/color-schemes
- */
-export const COLOR_SCHEME_ATTR = "data-color-scheme";
-
-/**
- * The localStorage key a site switcher persists the visitor's forced scheme under; read by the
- * compiler-injected pre-paint script. Values: "light" | "dark" (absent = auto).
- *
- * @docs framework/concepts/color-schemes
- */
-export const COLOR_SCHEME_STORAGE_KEY = "jx-color-scheme";
-
-/**
- * The scheme a _pure_ `prefers-color-scheme` media query targets. Compound queries (any other
- * conditions attached) return null — they are not eligible for forced-scheme dual emission.
- *
- * @param {string} query
- * @returns {"light" | "dark" | null}
- * @docs framework/concepts/color-schemes
- */
-export function pureSchemeOf(query: string): "light" | "dark" | null {
-  const m = /^\(\s*prefers-color-scheme\s*:\s*(light|dark)\s*\)$/.exec(query.trim());
-  return (m?.[1] as "light" | "dark") ?? null;
-}
-
-/**
- * Selector pair for a scheme-conditional rule: `auto` applies inside the scheme's media query only
- * while no scheme is forced; `forced` applies unconditionally when the root attribute forces the
- * scheme. Guards are wrapped in `:where()` so specificity matches the unguarded selector and source
- * order decides the cascade.
- *
- * @param {string} selector
- * @param {"light" | "dark"} scheme
- * @returns {{ auto: string; forced: string }}
- * @docs framework/concepts/color-schemes
- */
-export function schemeSelectors(
-  selector: string,
-  scheme: "light" | "dark",
-): { auto: string; forced: string } {
-  if (selector === ":root" || selector === "html") {
-    return {
-      auto: `${selector}:where(:not([${COLOR_SCHEME_ATTR}]))`,
-      forced: `${selector}:where([${COLOR_SCHEME_ATTR}="${scheme}"])`,
-    };
-  }
-  return {
-    auto: `:where(:root:not([${COLOR_SCHEME_ATTR}])) ${selector}`,
-    forced: `:where(:root[${COLOR_SCHEME_ATTR}="${scheme}"]) ${selector}`,
-  };
 }
 
 // ─── Custom Element Registration ──────────────────────────────────────────────

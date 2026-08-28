@@ -13,7 +13,7 @@
  * origin, which passes identity because a browser tab IS the viewport.
  */
 
-import { pureSchemeOf, resolveAtQuery, schemeSelectors, camelToKebab } from "@jxsuite/runtime";
+import { camelToKebab, pureSchemeOf, resolveAtQuery, schemeSelectors } from "@jxsuite/runtime/css";
 
 /** Id of the injected site-style tag (replace-in-place, never accumulate). */
 export const SITE_STYLE_ID = "jx-site-style";

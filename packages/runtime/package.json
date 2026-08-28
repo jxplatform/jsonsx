@@ -15,6 +15,7 @@
   "type": "module",
   "exports": {
     ".": "./src/runtime.ts",
+    "./css": "./src/css.ts",
     "./expression": "./src/expression.ts",
     "./pointer": "./src/pointer.ts",
     "./statements": "./src/statements.ts",
