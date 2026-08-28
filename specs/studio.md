@@ -2,9 +2,9 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.10.0-draft
+**Version:** 0.10.1-draft
 **Status:** Partial
-**Updated:** 2026-08-27
+**Updated:** 2026-08-28
 **License:** MIT
 
 ---
@@ -1823,8 +1823,12 @@ dist-relative, so stripping one segment moves all of them together. `styles/` an
 untouched in both modes, which is why `tokens.css`'s `url("../fonts/…")` holds either way.
 
 **The documents are generated, not rewritten.** `studioShellHtml({ base, boot })` emits the editor
-document for a given mount point, with the chrome stylesheets linked in `STUDIO_STYLESHEETS` order —
-`forced-colors.css` last, because it redraws what Windows High Contrast deletes. `canvasShellHtml`
+document for a given mount point: a `<link rel="icon">` to `STUDIO_FAVICON`, then the chrome
+stylesheets linked in `STUDIO_STYLESHEETS` order — `forced-colors.css` last, because it redraws what
+Windows High Contrast deletes. The favicon link exists for a host whose window chrome has no icon of
+its own to fall back on — a packaged desktop shell running a bare browser engine in app mode reads
+the page's favicon for its title bar, where a full browser would use the OS-level app icon instead.
+`canvasShellHtml`
 rebases the canvas document's single entry reference; that document stays hand-authored, because its
 `<style>` block establishes the query container the runtime transposes viewport units against and
 has to apply before the first paint. Hosts used to rewrite the shipped HTML with a prefix list, and
@@ -2837,6 +2841,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.10.1-draft** (2026-08-28) — studioShellHtml() now links a favicon for hosts whose window chrome has no native icon of its own.
 - **0.10.0-draft** (2026-08-27) — New File chooses a format rather than an extension (Other... preserves arbitrary names); a document converts between formats in place; creating in a collection source routes to New Entry.
 - **0.9.53-draft** (2026-08-27) — A rename or drag-move whose refactor report names references it could not rewrite reports a warning, not a plain success; a drag-move invalidates the usage cache like its siblings.
 - **0.9.52-draft** (2026-08-27) — Open in Browser previews the working tree through the runtime; Build Site keeps the compiler under its own verb.
@@ -2946,4 +2951,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/studio` Specification v0.10.0-draft_
+_`@jxsuite/studio` Specification v0.10.1-draft_

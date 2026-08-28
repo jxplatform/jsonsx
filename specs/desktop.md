@@ -2,9 +2,9 @@
 
 ## Platform Abstraction, Project Loading, and Component Scoping
 
-**Version:** 0.4.7-draft
+**Version:** 0.4.8-draft
 **Status:** Pending
-**Updated:** 2026-08-27
+**Updated:** 2026-08-28
 **License:** MIT
 
 ---
@@ -968,6 +968,13 @@ errors; the icon is a generic square, and everything else about the app still wo
 it survived in the app launcher (which reads the file, never the window) while the taskbar showed
 nothing.
 
+**That is the taskbar/dock icon, and it is a different mechanism from the window's own icon.** A
+window's title bar and alt-tab thumbnail are not drawn from `StartupWMClass` or the `.desktop`
+entry at all — a system `chromium --app` process has no native app icon of its own to give them, so
+Chromium falls back to the loaded page's favicon. `studioShellHtml()` now links one (`STUDIO_FAVICON`,
+studio.md §11.2), which is what lets the window itself show the Jx icon rather than a generic one;
+the two icons can drift independently, and fixing one does not touch the other.
+
 **Which ref a consumer gets.** `packages/desktop/package.nix` builds `src = lib.cleanSource ../..`
 — whatever tree was fetched — so the ref names the release. `main` is the development trunk and
 gives the tip; **`release` holds only released code**, advanced by CI to each `desktop-v*` tag once
@@ -1272,6 +1279,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.4.8-draft** (2026-08-28) — Distinguish the window's own icon (favicon-driven, studio.md 11.2) from the taskbar/dock icon (StartupWMClass) in section 9.3.
 - **0.4.7-draft** (2026-08-27) — The files route answers in stable path order, in every backend.
 - **0.4.6-draft** (2026-08-27) — The PAL is project-relative in both directions; an adapter translates a request space or a reply space, never both.
 - **0.4.5-draft** (2026-08-27) — Both launchers preview the working tree live at real routes; Build Site keeps the compiler, and leaving the webview is stated to be one-way.
@@ -1323,4 +1331,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_Jx Studio Desktop Architecture Specification v0.4.7-draft_
+_Jx Studio Desktop Architecture Specification v0.4.8-draft_

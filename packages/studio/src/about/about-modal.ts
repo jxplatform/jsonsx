@@ -152,8 +152,9 @@ function renderModal() {
  *
  * The rail foot carries **Preferences** and nothing else (plan §3.2 ②). About is not a view you
  * switch to and it is opened roughly once in an app's lifetime, so it costs a rail slot it cannot
- * repay; as a record it stays reachable by name from the palette, which is where a thing you look
- * for by name belongs.
+ * repay; instead it sits at the bottom of the ⬢ Studio menu (`commandbar/overflow`, `group:
+ * "9_help"` sorts after every other group there) and stays reachable by name from the palette
+ * besides.
  */
 export function aboutCommands(): Command[] {
   return [
@@ -162,7 +163,7 @@ export function aboutCommands(): Command[] {
       title: `About ${APP_NAME}`,
       category: "Help",
       level: "application",
-      menus: ["palette"],
+      menus: ["commandbar/overflow", "palette"],
       group: "9_help",
       run: () => {
         openAboutModal();

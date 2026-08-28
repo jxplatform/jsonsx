@@ -68,6 +68,13 @@ export const STUDIO_ASSETS: readonly StudioAsset[] = [
   },
   {
     dir: false,
+    kind: "asset",
+    path: "favicon.ico",
+    required: true,
+    why: "the shell document's <link rel=\"icon\">. A Chromium --app window (the NixOS desktop install) has no native title-bar icon of its own and falls back to the page's favicon, so without this the window chrome shows a generic icon even though the taskbar/dock entry is already branded via the .desktop file.",
+  },
+  {
+    dir: false,
     kind: "entry",
     path: "dist/studio.js",
     required: true,
@@ -143,6 +150,7 @@ export const PUBLISHED_EXTRAS: readonly string[] = ["src", "data"];
 
 export const STUDIO_SHELL = "index.html";
 export const STUDIO_CANVAS = "canvas.html";
+export const STUDIO_FAVICON = "favicon.ico";
 export const STUDIO_ENTRY = "dist/studio.js";
 export const STUDIO_IFRAME_ENTRY = "dist/iframe-entry.js";
 export const STUDIO_BUNDLE_CSS = "dist/studio.css";

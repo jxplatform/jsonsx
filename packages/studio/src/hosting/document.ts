@@ -15,6 +15,7 @@ import {
   assetUrl,
   STUDIO_BUNDLE_CSS,
   STUDIO_ENTRY,
+  STUDIO_FAVICON,
   STUDIO_IFRAME_ENTRY,
   STUDIO_STYLESHEETS,
 } from "./layout";
@@ -71,6 +72,7 @@ export function studioShellHtml(options: DocumentOptions = {}): string {
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>${options.title ?? "Jx Studio"}</title>
+    <link rel="icon" href="${url(STUDIO_FAVICON)}" />
 ${links}
   </head>
   <body>
