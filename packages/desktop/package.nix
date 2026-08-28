@@ -136,12 +136,33 @@ let
   );
 
   registryPort = "48732";
+
+  # The build sysroot is not the typecheck sysroot, and for one release the difference between them
+  # was decided by the FETCHER rather than by the tree.
+  #
+  # `vendor/electrobun` is a git submodule carrying the Electrobun SDK's TypeScript sources — what
+  # `packages/desktop/tsconfig.json` typechecks against, and what no phase below reads. Nothing here
+  # initialises it, so its CONTENT is absent either way. Its DIRECTORY is not: GitHub's tarball, the
+  # thing `github:jxsuite/jx/release` actually fetches, materialises the gitlink as an empty
+  # `vendor/electrobun`, while nix's git-tree source for a plain checkout — what CI builds — has no
+  # `vendor` entry at all. Two empty directories are still two NAR entries, so ONE commit produced
+  # TWO store paths: `671d1spz…` for the consumer, `sq57vgab…` for CI. The release pushed the second.
+  # `nix path-info` then found every byte of what was published and `nix build
+  # github:jxsuite/jx/release --max-jobs 0` still built from source, because the cache was complete
+  # at an address nobody asks for (#250, first release after the submodule landed).
+  #
+  # Filtering it states the invariant instead: `$out` is a function of the tree's CONTENT, not of how
+  # the tree arrived. The two trees are otherwise byte-identical — the NAR hash of the tarball source
+  # minus `vendor` equals the NAR hash of the checkout source exactly.
+  root = ../..;
+  src = lib.cleanSourceWith {
+    src = lib.cleanSource root;
+    filter = path: _type: path != "${toString root}/vendor";
+  };
 in
 stdenv.mkDerivation {
   pname = "jx-studio";
-  inherit version;
-
-  src = lib.cleanSource ../..;
+  inherit version src;
 
   nativeBuildInputs = [
     bun

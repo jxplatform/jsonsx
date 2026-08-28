@@ -24,7 +24,8 @@
 #     `release` branch advances behind. `runner` picks the architecture.
 #   * `schedule`, nightly, which is what keeps that cache warm now that most merges to `main` are
 #     auto-merges and raise no `push` event at all.
-#   * `workflow_dispatch`, to measure what a release would cost a binary cache (see `measure`).
+#   * `workflow_dispatch`, to measure what a release would cost a binary cache (see `measure`), and
+#     to BACKFILL one that shipped without a usable cache entry (see `publish`).
 #
 # A release-PR merge touches packages/desktop/** (the version bump), so it fires the `push` trigger
 # AND the `workflow_call` from release-please. That is two builds of the same commit. It is left
@@ -93,6 +94,15 @@ on:
         description: "Report what one release would cost a binary cache."
         required: false
         default: true
+        type: boolean
+      publish:
+        # Backfill. The release path publishes on its own, but a release whose push landed at a
+        # store path no consumer asks for (#250) leaves a gap that nothing else can close: the tag
+        # is cut, `release` has moved on, and re-running release-please.yml does nothing because
+        # the pull request is already labelled `autorelease: tagged`. Dispatch this on `release`.
+        description: "Push the built closure to the public Cachix cache. Backfills a release."
+        required: false
+        default: false
         type: boolean
 
 permissions:
@@ -233,12 +243,41 @@ jobs:
         continue-on-error: true
         env:
           CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          # The release leg passes the desktop tag; a backfill dispatch runs on `release` itself.
+          # Both name the same commit, and a store path is a function of the tree rather than of the
+          # ref that reached it, so either answers the question this step asks.
+          PUBLISH_REF: ${{ inputs.ref || github.ref_name }}
         run: |
           set -euo pipefail
           if [ -z "${CACHIX_AUTH_TOKEN:-}" ]; then
             echo "::error::publish was requested but CACHIX_AUTH_TOKEN is empty"
             exit 1
           fi
+
+          # A closure is only as useful as the address it lands at, and for desktop-v5.0.0 the two
+          # disagreed. This job builds the CHECKOUT; a consumer evaluates the GITHUB FLAKE, and the
+          # `vendor/electrobun` gitlink made those two trees differ by two empty directory entries —
+          # one commit, two store paths. The push succeeded, `nix path-info` found every byte of what
+          # it sent, and `nix build github:jxsuite/jx/release --max-jobs 0` still built from source.
+          # package.nix now filters `vendor` so the two agree by construction; this is the assertion
+          # that they still do, and it is the sentence the next such divergence will need — the
+          # symptom alone (`verify-cache` reporting a missing path) names no cause at all.
+          #
+          # NOT `2>&1`: `nix eval` prints fetch progress and evaluation warnings to stderr, and
+          # merging those into the VALUE is exactly the defect that had `verify-cache` file five
+          # phantom cache misses (release-please.yml carries that story).
+          system="$(nix eval --raw --impure --expr 'builtins.currentSystem')"
+          built="$(readlink -f ./result)"
+          want="$(nix eval --raw --accept-flake-config \
+            "github:${GITHUB_REPOSITORY}/${PUBLISH_REF}#packages.${system}.default.outPath")"
+          echo "built    -> $built"
+          echo "consumer -> $want"
+          if [ "$built" != "$want" ]; then
+            echo "::error::built $built, but a consumer of github:${GITHUB_REPOSITORY}/${PUBLISH_REF}"\
+                 "asks for $want — publishing this would fill the cache at an address nobody requests"
+            exit 1
+          fi
+
           nix path-info --json --recursive ./result \
             | jq 'if type == "array" then . else (to_entries | map({path: .key} + .value)) end' \
             | jq -r '.[] | select((.signatures // []) | length == 0) | .path' \

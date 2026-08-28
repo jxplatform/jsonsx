@@ -68,6 +68,16 @@ exact release the `electrobun` devDependency names.** `packages/desktop/tsconfig
   and why `.oxlintignore` is inert (oxlint's ignore file is `.eslintignore`, via `--ignore-path`,
   and the lint script passes neither). `vendor` therefore needs an explicit entry in **both**
   `.oxlintrc.json` and `.oxlintrc.typecheck.json`, plus `.oxfmtrc.json` and root `bunfig.toml`.
+- **The Nix derivation is the fifth of those, and the one that cost a release.** `package.nix`
+  takes the whole repository as `src`, so a tracked path is part of the tree whose NAR hash IS the
+  store path `nix run github:jxsuite/jx/release` resolves — and `vendor/electrobun` is the one
+  tracked path whose PRESENCE depends on how the tree was fetched. GitHub's tarball materialises the
+  gitlink as an empty directory; nix's git-tree source for a checkout omits it. The submodule is
+  uninitialised either way, so no build phase notices — but two empty directories are two NAR
+  entries, and `desktop-v5.0.0` had two store paths for one commit. CI published `sq57vgab…` and
+  every consumer asked for `671d1spz…`: the push succeeded, the closure was complete, and the cache
+  was useless (#250). `src` now filters `vendor` so the two agree by construction, asserted in
+  `electrobun-config.test.ts` and re-checked against a live `nix eval` on nix.yml's publish leg.
 - **`.d.ts` remains impossible.** `TS4094` in the SDK's own `index.ts` blocks declaration emit, so
   `skipLibCheck` cannot help and `packages/desktop` keeps its own tsconfig. That carve-out is
   asserted, not just written down, in `packages/desktop/tests/electrobun-config.test.ts`.
