@@ -33,9 +33,9 @@
   },
   "dependencies": {
     "@jxsuite/schema": "workspace:^",
-    "@vue/reactivity": "3.5.41"
+    "@vue/reactivity": "3.5.42"
   },
   "devDependencies": {
-    "@happy-dom/global-registrator": "^20.11.8"
+    "@happy-dom/global-registrator": "^20.11.12"
   }
 }

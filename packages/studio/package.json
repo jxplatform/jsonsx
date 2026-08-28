@@ -102,7 +102,7 @@
     "@spectrum-web-components/toast": "^1.12.2",
     "@spectrum-web-components/tooltip": "^1.12.2",
     "@spectrum-web-components/underlay": "^1.12.2",
-    "@vue/reactivity": "3.5.41",
+    "@vue/reactivity": "3.5.42",
     "ajv": "^8.20.0",
     "ajv-formats": "^3.0.1",
     "lit": "^3.3.3",
@@ -112,7 +112,7 @@
     "yaml": "^2.9.0"
   },
   "devDependencies": {
-    "@happy-dom/global-registrator": "^20.11.8",
+    "@happy-dom/global-registrator": "^20.11.12",
     "@types/mdast": "^4.0.4",
     "@webref/css": "^8.7.3",
     "@webref/elements": "^2.8.0",
