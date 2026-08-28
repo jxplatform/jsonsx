@@ -1,5 +1,32 @@
 # Changelog
 
+## [2.0.0](https://github.com/jxsuite/jx/compare/schema-v1.9.0...schema-v2.0.0) (2026-08-27)
+
+
+### ⚠ BREAKING CHANGES
+
+* **schema,site:** `@jxsuite/schema` no longer exports `./routes`, `./layout`, `./context` or `./head-merger`. Import them from `@jxsuite/site`; the modules and their behaviour are unchanged.
+
+### Features
+
+* Open in Browser previews the working tree through the runtime ([b02e0e5](https://github.com/jxsuite/jx/commit/b02e0e543016879c963810f770b568995023e6ed))
+
+
+### Bug Fixes
+
+* **desktop,import:** the two gates the live preview left red, and the coverage it owed ([72657b7](https://github.com/jxsuite/jx/commit/72657b7c636d63aecb831378e5f16e134b062adb))
+
+
+### Performance Improvements
+
+* **compiler:** minify bundles, inline component CSS, preload the runtime ([f19136e](https://github.com/jxsuite/jx/commit/f19136e35efb629c397923eccf959559af4d28b6))
+* **compiler:** minify bundles, inline component CSS, preload the runtime ([f1a1537](https://github.com/jxsuite/jx/commit/f1a1537b1b7966892fa14cda9d1e3cfcb956cad4))
+
+
+### Code Refactoring
+
+* **schema,site:** site composition gets its own package ([f9d270d](https://github.com/jxsuite/jx/commit/f9d270daf261eef9ac9566192787b7a4bba25135))
+
 ## [1.9.0](https://github.com/jxsuite/jx/compare/schema-v1.8.1...schema-v1.9.0) (2026-08-26)
 
 

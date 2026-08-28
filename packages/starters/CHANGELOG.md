@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.6.5](https://github.com/jxsuite/jx/compare/starters-v1.6.4...starters-v1.6.5) (2026-08-27)
+
+
+### Performance Improvements
+
+* **compiler:** minify bundles, inline component CSS, preload the runtime ([f19136e](https://github.com/jxsuite/jx/commit/f19136e35efb629c397923eccf959559af4d28b6))
+* **compiler:** minify bundles, inline component CSS, preload the runtime ([f1a1537](https://github.com/jxsuite/jx/commit/f1a1537b1b7966892fa14cda9d1e3cfcb956cad4))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * devDependencies
+    * @jxsuite/parser bumped to 1.6.0
+    * @jxsuite/runtime bumped to 3.0.0
+    * @jxsuite/schema bumped to 2.0.0
+
 ## [1.6.4](https://github.com/jxsuite/jx/compare/starters-v1.6.3...starters-v1.6.4) (2026-08-26)
 
 

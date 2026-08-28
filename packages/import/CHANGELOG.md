@@ -1,5 +1,37 @@
 # Changelog
 
+## [0.40.0](https://github.com/jxsuite/jx/compare/import-v0.39.8...import-v0.40.0) (2026-08-27)
+
+
+### Features
+
+* **import:** limit the breakpoints an import keeps, and strip the classes it cannot use ([9ac5b60](https://github.com/jxsuite/jx/commit/9ac5b600a0b6834bb031daa64e1283ab51346cff))
+* **import:** make jx-import --verify able to fail ([71382d5](https://github.com/jxsuite/jx/commit/71382d54e604aad01beba52d08ec99d826b13bee)), closes [#232](https://github.com/jxsuite/jx/issues/232)
+* **import:** the site-import workflow, end to end ([eab1109](https://github.com/jxsuite/jx/commit/eab1109e0fc21a5f311d2f1c8f90626c1d51c55d))
+* Open in Browser previews the working tree through the runtime ([b02e0e5](https://github.com/jxsuite/jx/commit/b02e0e543016879c963810f770b568995023e6ed))
+* **server,studio:** the import stream says what the run found, and can check its own fidelity ([2e4c0e3](https://github.com/jxsuite/jx/commit/2e4c0e3dd1b63aead94bb70379c7ad8738420fd8))
+* **studio:** the site import is an agent turn — model, brief, live status, and a pause to ask ([775abee](https://github.com/jxsuite/jx/commit/775abeeb20a4f1a727072ea60191c32bea5d0d9f))
+
+
+### Bug Fixes
+
+* **desktop,import:** the two gates the live preview left red, and the coverage it owed ([72657b7](https://github.com/jxsuite/jx/commit/72657b7c636d63aecb831378e5f16e134b062adb))
+* **import:** emit a project that actually builds into a working site ([6b808d6](https://github.com/jxsuite/jx/commit/6b808d6811de8ab6ec245ff1028ca681b8ee05c2))
+* **import:** emit a project.json the schema accepts ([352c67f](https://github.com/jxsuite/jx/commit/352c67fb76dda22d5f32d8d33b1baf37d96c5327)), closes [#228](https://github.com/jxsuite/jx/issues/228)
+* **import:** parse srcset without shredding a url that carries commas ([eeb8a7d](https://github.com/jxsuite/jx/commit/eeb8a7d5853175b656290b2b1b21dc434b692abb)), closes [#231](https://github.com/jxsuite/jx/issues/231)
+* **import:** reference an asset by the path the built site serves ([34856ec](https://github.com/jxsuite/jx/commit/34856ec28d3b89eee93b8eb9816010f23c86ded4)), closes [#229](https://github.com/jxsuite/jx/issues/229)
+* **import:** rewrite a font-face url to the font that was downloaded ([cc27b5f](https://github.com/jxsuite/jx/commit/cc27b5f5ce1d71679e40e77f1228558976b63988)), closes [#230](https://github.com/jxsuite/jx/issues/230)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/markup bumped to 0.4.8
+    * @jxsuite/schema bumped to 2.0.0
+  * optionalDependencies
+    * @jxsuite/compiler bumped to 3.0.0
+
 ## [0.39.8](https://github.com/jxsuite/jx/compare/import-v0.39.7...import-v0.39.8) (2026-08-26)
 
 
