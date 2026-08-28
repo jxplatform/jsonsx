@@ -58,14 +58,15 @@ describe("electrobun config", () => {
  * go, and nothing else would ever tell us. When this fails: try deleting `packages/desktop` from
  * the root `exclude` and this package's tsconfig with it.
  */
-describe("the electrobun SDK's shipped types", () => {
-  /* Read as text, not JSON.parse: this tsconfig carries comments. Each paths entry is one line of
-     the form `"electrobun/main": ["../../vendor/electrobun/…"],`. */
-  const targets = readFileSync(resolve(desktopDir, "tsconfig.json"), "utf8")
-    .split(/\r?\n/)
-    .filter((line) => line.trimStart().startsWith('"electrobun'))
-    .flatMap((line) => [...line.matchAll(/"((?:\.\.?\/)[^"]+)"/g)].map((m) => m[1]!));
+/* Read as text, not JSON.parse: this tsconfig carries comments. Each paths entry is one line of
+   the form `"electrobun/main": ["../../vendor/electrobun/…"],`. Hoisted out of the describe below
+   because the Nix invariant at the bottom of this file is stated in terms of the same list. */
+const targets = readFileSync(resolve(desktopDir, "tsconfig.json"), "utf8")
+  .split(/\r?\n/)
+  .filter((line) => line.trimStart().startsWith('"electrobun'))
+  .flatMap((line) => [...line.matchAll(/"((?:\.\.?\/)[^"]+)"/g)].map((m) => m[1]!));
 
+describe("the electrobun SDK's shipped types", () => {
   /* These paths ARE the import, so a `.d.ts` target here would be the end of the carve-out even if
      the SDK still shipped sources everywhere else. */
   test("this package's own paths point at raw .ts", () => {
@@ -86,5 +87,45 @@ describe("the electrobun SDK's shipped types", () => {
         vendored: true,
       });
     }
+  });
+});
+
+// ─── Why the Nix derivation excludes the directory the tsconfig above requires ───────────────
+
+/*
+ * The submodule is the TYPECHECK sysroot. `package.nix` is the BUILD one, and it takes the whole
+ * repository as `src` — so every tracked path is part of the tree whose NAR hash IS the store path a
+ * `nix run github:jxsuite/jx/release` consumer resolves.
+ *
+ * `vendor/electrobun` is the one tracked path whose PRESENCE depends on how the tree was fetched
+ * rather than on what the commit says. GitHub's tarball materialises the gitlink as an empty
+ * directory; nix's git-tree source for a plain checkout omits it entirely. Nothing initialises the
+ * submodule on either path, so its CONTENT is absent both ways and no build phase notices — but two
+ * empty directories are still two NAR entries, and desktop-v5.0.0 therefore had TWO store paths for
+ * ONE commit. CI built and published `sq57vgab…`; every consumer asked for `671d1spz…`. The push
+ * reported success, `nix path-info` found every byte of what it sent, and the cache was useless
+ * (#250) — the first release after the submodule landed, and no release before it affected.
+ *
+ * So the two configs name the same directory for opposite reasons, and that pairing is the
+ * invariant: whatever `vendor/…` prefix the tsconfig resolves through, package.nix must exclude.
+ * Asserted here because nothing else would notice in time — nix.yml's publish leg now checks the
+ * built path against the one a consumer evaluates, but that runs during a release rather than on
+ * the pull request that breaks it.
+ */
+describe("the vendored SDK stays out of the Nix build sysroot", () => {
+  const nix = readFileSync(resolve(desktopDir, "package.nix"), "utf8");
+
+  test("package.nix excludes exactly the directory the typecheck paths resolve through", () => {
+    // `../../vendor/electrobun/…` → `vendor`, the top-level directory as package.nix sees it.
+    expect([...new Set(targets.map((target) => target.split("/")[2]))]).toEqual(["vendor"]);
+    expect(nix).toContain('filter = path: _type: path != "${toString root}/vendor";');
+  });
+
+  test("src is filtered rather than a bare cleanSource", () => {
+    /* `src = lib.cleanSource ../..;` is the form that shipped the divergence. The filter is the
+       whole fix, so a revert to the bare form would read like a simplification and is worth
+       failing on by name. */
+    expect(nix).toContain("lib.cleanSourceWith");
+    expect(nix).not.toMatch(/^\s*src = lib\.cleanSource \.\.\/\.\.;/m);
   });
 });
