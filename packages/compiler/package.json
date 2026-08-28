@@ -50,13 +50,13 @@
     "@jxsuite/runtime": "workspace:^",
     "@jxsuite/schema": "workspace:^",
     "@jxsuite/site": "workspace:^",
-    "@vue/reactivity": "3.5.41",
+    "@vue/reactivity": "3.5.42",
     "esbuild": "^0.28.2",
     "lit-html": "^3.3.3",
     "sharp": "^0.35.4"
   },
   "devDependencies": {
-    "@happy-dom/global-registrator": "^20.11.8",
+    "@happy-dom/global-registrator": "^20.11.12",
     "@jxsuite/connector": "workspace:^",
     "@jxsuite/parser": "workspace:^",
     "@types/mdast": "^4.0.4"

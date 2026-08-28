@@ -44,7 +44,7 @@
     },
     "extensions/auth": {
       "name": "@jxsuite/auth",
-      "version": "0.5.5",
+      "version": "0.5.6",
       "dependencies": {
         "@jxsuite/connector": "workspace:^",
         "@jxsuite/schema": "workspace:^",
@@ -52,13 +52,13 @@
         "kysely": "^0.29.5",
       },
       "devDependencies": {
-        "@happy-dom/global-registrator": "^20.11.8",
+        "@happy-dom/global-registrator": "^20.11.12",
         "ajv": "^8.20.0",
       },
     },
     "extensions/connector": {
       "name": "@jxsuite/connector",
-      "version": "0.5.5",
+      "version": "0.5.6",
       "dependencies": {
         "@jxsuite/schema": "workspace:^",
         "kysely": "^0.29.5",
@@ -74,7 +74,7 @@
     },
     "extensions/feed": {
       "name": "@jxsuite/feed",
-      "version": "0.3.3",
+      "version": "0.3.4",
       "dependencies": {
         "@jxsuite/schema": "workspace:^",
       },
@@ -84,7 +84,7 @@
     },
     "extensions/parser": {
       "name": "@jxsuite/parser",
-      "version": "1.5.6",
+      "version": "1.6.0",
       "dependencies": {
         "@jxsuite/markup": "workspace:^",
         "@jxsuite/schema": "workspace:^",
@@ -104,7 +104,7 @@
         "yaml": "^2.9.0",
       },
       "devDependencies": {
-        "@happy-dom/global-registrator": "^20.11.8",
+        "@happy-dom/global-registrator": "^20.11.12",
         "@jxsuite/runtime": "workspace:^",
         "@types/mdast": "^4.0.4",
         "ajv": "^8.20.0",
@@ -112,7 +112,7 @@
     },
     "extensions/search": {
       "name": "@jxsuite/search",
-      "version": "0.2.4",
+      "version": "0.2.5",
       "dependencies": {
         "@jxsuite/schema": "workspace:^",
         "minisearch": "^7.2.0",
@@ -123,18 +123,18 @@
     },
     "packages/ai": {
       "name": "@jxsuite/ai",
-      "version": "0.36.4",
+      "version": "0.36.5",
       "dependencies": {
         "@jxsuite/protocol": "workspace:^",
-        "@vue/reactivity": "3.5.41",
+        "@vue/reactivity": "3.5.42",
       },
       "devDependencies": {
-        "@happy-dom/global-registrator": "^20.11.8",
+        "@happy-dom/global-registrator": "^20.11.12",
       },
     },
     "packages/collab": {
       "name": "@jxsuite/collab",
-      "version": "0.8.3",
+      "version": "0.8.4",
       "dependencies": {
         "@jxsuite/schema": "workspace:^",
         "lib0": "^0.2.117",
@@ -144,7 +144,7 @@
     },
     "packages/compiler": {
       "name": "@jxsuite/compiler",
-      "version": "2.0.8",
+      "version": "3.0.0",
       "bin": {
         "jx": "./bin/jx.js",
       },
@@ -154,13 +154,13 @@
         "@jxsuite/runtime": "workspace:^",
         "@jxsuite/schema": "workspace:^",
         "@jxsuite/site": "workspace:^",
-        "@vue/reactivity": "3.5.41",
+        "@vue/reactivity": "3.5.42",
         "esbuild": "^0.28.2",
         "lit-html": "^3.3.3",
         "sharp": "^0.35.4",
       },
       "devDependencies": {
-        "@happy-dom/global-registrator": "^20.11.8",
+        "@happy-dom/global-registrator": "^20.11.12",
         "@jxsuite/connector": "workspace:^",
         "@jxsuite/parser": "workspace:^",
         "@types/mdast": "^4.0.4",
@@ -168,7 +168,7 @@
     },
     "packages/create": {
       "name": "@jxsuite/create",
-      "version": "1.3.7",
+      "version": "1.3.8",
       "bin": {
         "create-jxsuite": "./index.ts",
       },
@@ -178,7 +178,7 @@
     },
     "packages/desktop": {
       "name": "@jxsuite/desktop",
-      "version": "4.0.0",
+      "version": "5.0.0",
       "dependencies": {
         "@jxsuite/compiler": "workspace:^",
         "@jxsuite/create": "workspace:^",
@@ -194,7 +194,7 @@
         "zod": "^4.4.3",
       },
       "devDependencies": {
-        "@happy-dom/global-registrator": "^20.11.8",
+        "@happy-dom/global-registrator": "^20.11.12",
         "@jxsuite/connector": "workspace:^",
         "@jxsuite/server": "workspace:^",
         "electrobun": "2.0.1",
@@ -203,7 +203,7 @@
     },
     "packages/formulas": {
       "name": "@jxsuite/formulas",
-      "version": "0.0.14",
+      "version": "0.0.15",
       "dependencies": {
         "@jxsuite/schema": "workspace:^",
       },
@@ -213,7 +213,7 @@
     },
     "packages/import": {
       "name": "@jxsuite/import",
-      "version": "0.39.8",
+      "version": "0.40.0",
       "bin": {
         "jx-import": "./src/cli.ts",
       },
@@ -234,7 +234,7 @@
     },
     "packages/markup": {
       "name": "@jxsuite/markup",
-      "version": "0.4.7",
+      "version": "0.4.8",
       "dependencies": {
         "@jxsuite/schema": "workspace:^",
         "hast-util-from-html": "^2.0.3",
@@ -253,25 +253,25 @@
     },
     "packages/protocol": {
       "name": "@jxsuite/protocol",
-      "version": "2.0.0",
+      "version": "2.1.0",
       "dependencies": {
         "@jxsuite/schema": "workspace:^",
       },
     },
     "packages/runtime": {
       "name": "@jxsuite/runtime",
-      "version": "2.1.0",
+      "version": "3.0.0",
       "dependencies": {
         "@jxsuite/schema": "workspace:^",
-        "@vue/reactivity": "3.5.41",
+        "@vue/reactivity": "3.5.42",
       },
       "devDependencies": {
-        "@happy-dom/global-registrator": "^20.11.8",
+        "@happy-dom/global-registrator": "^20.11.12",
       },
     },
     "packages/schema": {
       "name": "@jxsuite/schema",
-      "version": "1.9.0",
+      "version": "2.0.0",
       "dependencies": {
         "@webref/css": "^8.7.3",
         "@webref/elements": "^2.8.0",
@@ -285,7 +285,7 @@
     },
     "packages/server": {
       "name": "@jxsuite/server",
-      "version": "3.0.0",
+      "version": "4.0.0",
       "dependencies": {
         "@jxsuite/collab": "workspace:^",
         "@jxsuite/compiler": "workspace:^",
@@ -308,7 +308,7 @@
     },
     "packages/site": {
       "name": "@jxsuite/site",
-      "version": "0.1.0",
+      "version": "1.0.0",
       "dependencies": {
         "@jxsuite/runtime": "workspace:^",
         "@jxsuite/schema": "workspace:^",
@@ -316,7 +316,7 @@
     },
     "packages/starters": {
       "name": "@jxsuite/starters",
-      "version": "1.6.4",
+      "version": "1.6.5",
       "devDependencies": {
         "@jxsuite/parser": "workspace:^",
         "@jxsuite/runtime": "workspace:^",
@@ -327,7 +327,7 @@
     },
     "packages/studio": {
       "name": "@jxsuite/studio",
-      "version": "3.0.0",
+      "version": "4.0.0",
       "dependencies": {
         "@atlaskit/pragmatic-drag-and-drop": "^3.0.0",
         "@atlaskit/pragmatic-drag-and-drop-hitbox": "^2.1.0",
@@ -376,7 +376,7 @@
         "@spectrum-web-components/toast": "^1.12.2",
         "@spectrum-web-components/tooltip": "^1.12.2",
         "@spectrum-web-components/underlay": "^1.12.2",
-        "@vue/reactivity": "3.5.41",
+        "@vue/reactivity": "3.5.42",
         "ajv": "^8.20.0",
         "ajv-formats": "^3.0.1",
         "lit": "^3.3.3",
@@ -386,7 +386,7 @@
         "yaml": "^2.9.0",
       },
       "devDependencies": {
-        "@happy-dom/global-registrator": "^20.11.8",
+        "@happy-dom/global-registrator": "^20.11.12",
         "@types/mdast": "^4.0.4",
         "@webref/css": "^8.7.3",
         "@webref/elements": "^2.8.0",
@@ -751,7 +751,7 @@
 
     "@google-automations/git-file-utils": ["@google-automations/git-file-utils@3.2.0", "", { "dependencies": { "@octokit/rest": "^20.1.1", "minimatch": "^10.2.4" } }, "sha512-EtQD1DX17kGpckDNCdI0jvMdF98EWR/TM9uogQtnhK0ODv8z5tPSPMICv2lk54c/9ucUgbfdLDrRdDyx56Sznw=="],
 
-    "@happy-dom/global-registrator": ["@happy-dom/global-registrator@20.11.8", "", { "dependencies": { "@types/node": ">=20.0.0", "happy-dom": "^20.11.8" } }, "sha512-lkgRN26nWeYCsoron3bup+egcmpUTV3VsLS/d4rDyo/hwKivUIl8mkLtuk+sVaIdPZUpGFzcdOpt/1CPaW5Bpg=="],
+    "@happy-dom/global-registrator": ["@happy-dom/global-registrator@20.11.12", "", { "dependencies": { "@types/node": ">=20.0.0", "happy-dom": "^20.11.12" } }, "sha512-Oj9ubX+6/k8D+QSs+SKga0ECVAk8XB2dvbQ1pj54fQSC78EPjEoOQ3aMFFPaI5z4EcvwixVOMaaHf8rxcpAX4Q=="],
 
     "@homebridge/long": ["@homebridge/long@5.2.1", "", {}, "sha512-i5Df8R63XNPCn+Nj1OgAoRdw9e+jHUQb3CNUbvJneI2iu3j4+OtzQj+5PA1Ce+747NR1SPqZSvyvD483dOT3AA=="],
 
@@ -1253,9 +1253,9 @@
 
     "@ungap/structured-clone": ["@ungap/structured-clone@1.3.1", "", {}, "sha512-mUFwbeTqrVgDQxFveS+df2yfap6iuP20NAKAsBt5jDEoOTDew+zwLAOilHCeQJOVSvmgCX4ogqIrA0mnyr08yQ=="],
 
-    "@vue/reactivity": ["@vue/reactivity@3.5.41", "", { "dependencies": { "@vue/shared": "3.5.41" } }, "sha512-rznsqKM0np0x18EjzF8x88MpEhdNsffbvFbckLL5+oUKz1BxAImEmO7J1ArRYSyo6aQaVoBDp7jEkT91OOxydA=="],
+    "@vue/reactivity": ["@vue/reactivity@3.5.42", "", { "dependencies": { "@vue/shared": "3.5.42" } }, "sha512-TzNNfKpb7hDxbQltwAut8VDQA5YP+BuRlxntHUuRjyKwlMvmAPbs3unhCvieijifY6vFfVBwsS7wG/C7uq+bEQ=="],
 
-    "@vue/shared": ["@vue/shared@3.5.41", "", {}, "sha512-IOnwSCma8j+9xJT6b8H0dEYidC80NsYmNMlZxRsukYcSoGaDBohog5hDxzeUXdFeGWFA++vWvxqOmrr96VlqMA=="],
+    "@vue/shared": ["@vue/shared@3.5.42", "", {}, "sha512-2rPxex1jQf4jvl9MOHl6YaXCPcrNqz/FstMOEh3QWY+/OME9nQTvl9WYeCwhW7AFjaR0SnngZGlp/wkR6rkI6g=="],
 
     "@webref/css": ["@webref/css@8.7.3", "", { "peerDependencies": { "css-tree": "^3.2.1" } }, "sha512-iQZOkW9TqVz7p3qnEyv0KsutpXmPh8Ey9oJKHLeo//kn4mrrdG+XLBhmx4IoSWSazlVyK5NTp/FqsvV3U1yc9w=="],
 
@@ -1701,7 +1701,7 @@
 
     "handlebars": ["handlebars@4.7.9", "", { "dependencies": { "minimist": "^1.2.5", "neo-async": "^2.6.2", "source-map": "^0.6.1", "wordwrap": "^1.0.0" }, "optionalDependencies": { "uglify-js": "^3.1.4" }, "bin": { "handlebars": "bin/handlebars" } }, "sha512-4E71E0rpOaQuJR2A3xDZ+GM1HyWYv1clR58tC8emQNeQe3RH7MAzSbat+V0wG78LQBo6m6bzSG/L4pBuCsgnUQ=="],
 
-    "happy-dom": ["happy-dom@20.11.8", "", { "dependencies": { "@types/node": ">=20.0.0", "@types/whatwg-mimetype": "^3.0.2", "@types/ws": "^8.18.1", "buffer-image-size": "^0.6.4", "entities": "^7.0.1", "whatwg-mimetype": "^3.0.0", "ws": "^8.21.0" } }, "sha512-TeAoM8pTDKNVcP5z3MptRTb7UH9q126GrjTFOgormgA19tmT30JTiIxb1CVXs7xljpItypUp/yHSPFD4QRHMsQ=="],
+    "happy-dom": ["happy-dom@20.11.13", "", { "dependencies": { "@types/node": ">=20.0.0", "@types/whatwg-mimetype": "^3.0.2", "@types/ws": "^8.18.1", "buffer-image-size": "^0.6.4", "entities": "^7.0.1", "whatwg-mimetype": "^3.0.0", "ws": "^8.21.0" } }, "sha512-UUGd67JqTs0BaH4UbTaq8jCxdtNoYjvbmZM5iwgQKK60tLad0p2uPc48WcVTj1MxlIP43z48WahJcViKbxnprQ=="],
 
     "hard-rejection": ["hard-rejection@2.1.0", "", {}, "sha512-VIZB+ibDhx7ObhAe7OVtoEbuP4h/MuOTHJ+J8h/eBXotJYl0fBgR72xDFCKgIh22OJZIOVNxBMWuhAr10r8HdA=="],
 
