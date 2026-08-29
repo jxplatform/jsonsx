@@ -2,7 +2,7 @@
 
 ## File-Based Routing, Content Collections, Layouts, and Static Site Generation
 
-**Version:** 0.6.6-draft
+**Version:** 0.6.8-draft
 **Status:** Partial
 **Updated:** 2026-08-29
 **License:** MIT
@@ -1424,6 +1424,19 @@ So the contract binds the engine, both ways:
 - A reference is not always a VALUE, and not always shaped like a file. `project.json`'s `copy` map names the files it copies in its **keys**, and a content collection's `source` may name a **directory**, which carries no extension for the shape rule below to recognise. Both sit at a key the engine already knows by name, so both are read by name. The other half of `copy` is the counterexample that makes the rule: its values are destinations inside `outDir`, a directory no rename inside the project can move, so they are not references and are never rewritten.
 - A rewritten reference keeps the style the author wrote, trailing slash included. A directory `source` re-emitted without one is a diff on a line the rename had no business restyling.
 
+**A file outside the project root has no project-relative name, and that is the whole of why it has
+no usage count.** A collection's `source` may point outside the project (§9.3), and the compiler and
+the dev server both publish its media at the collection's mount URL, so it renders correctly. Nothing
+else about it works, and the pieces agree with each other: the engine drops a mount resolving outside
+the root, because no project-relative path names the file and no rename inside the project could move
+it; and the editing host's file API is project-scoped by containment check, so such a file cannot be
+listed, opened or previewed either. The result is coherent rather than broken — no surface can name
+the file, so no surface reports a confident zero about it, which is the failure this section exists
+to prevent. Closing the gap is not a matter of widening the engine: it means deciding how a file
+outside the project is ADDRESSED at all, most likely a mount-relative identity rather than a
+project-relative path, which is a change to the host's file API and not to the reference engine. That
+decision is not owed until a cross-root collection ships.
+
 Which keys carry a reference is not a fixed list. The document shapes that carry one grow with every extension that defines a media-typed prop, so an engine that enumerates key names is wrong by construction the next time one is added; what it can rely on is that a reference is a string SHAPED like a file, and that precision comes from resolving it and comparing against the file in question.
 
 Only statically referenced files are copied into the build. A `src` computed at runtime belongs in `public/`.
@@ -2690,6 +2703,7 @@ This spec builds on existing Jx primitives wherever possible:
 
 ## Changelog
 
+- **0.6.8-draft** (2026-08-29) — Media reachable only through a cross-root asset mount has no project-relative name, which is why it has no usage count; addressing it is a host file-API question, not an engine one.
 - **0.6.6-draft** (2026-08-29) — A copy map's keys and a directory content source are references the engine reads by name; a copy destination is not, and a rewritten reference keeps its trailing slash.
 - **0.6.5-draft** (2026-08-29) — A media usage query asks about the file once; enumerating a file's authored spellings host-side is the engine's job, not a media surface's.
 - **0.6.4-draft** (2026-08-27) — Record that collection discovery is recursive, so a subdirectory holds entries as well as co-located media.

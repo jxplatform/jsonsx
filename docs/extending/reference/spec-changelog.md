@@ -278,6 +278,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `site-architecture.md`
 
+- **0.6.8-draft** (2026-08-29) — Media reachable only through a cross-root asset mount has no project-relative name, which is why it has no usage count; addressing it is a host file-API question, not an engine one.
 - **0.6.6-draft** (2026-08-29) — A copy map's keys and a directory content source are references the engine reads by name; a copy destination is not, and a rewritten reference keeps its trailing slash.
 - **0.6.5-draft** (2026-08-29) — A media usage query asks about the file once; enumerating a file's authored spellings host-side is the engine's job, not a media surface's.
 - **0.6.4-draft** (2026-08-27) — Record that collection discovery is recursive, so a subdirectory holds entries as well as co-located media.
