@@ -5,6 +5,7 @@ spec:
   - spec.md#9
 code:
   - packages/runtime/src/runtime.ts
+  - packages/runtime/src/css.ts
   - packages/compiler/src/shared.ts
 ---
 
