@@ -80,16 +80,38 @@ Everything else keeps whatever the host already decided. This list corrects a lo
 
 ## Format capabilities
 
-The block declares _what_ the class handles; the class's [capability methods](/docs/extending/extensions/capabilities) declare _how_. Four roles belong to the `format` block:
+The block declares _what_ the class handles; the class's [capability methods](/docs/extending/extensions/capabilities) declare _how_. Five roles belong to the `format` block:
 
 | Role        | Signature                                                     | Consumers                                   |
 | ----------- | ------------------------------------------------------------- | ------------------------------------------- |
 | `parse`     | `(source, options?) → JxDocument`                             | compiler, server, Studio (open file)        |
 | `serialize` | `(doc, options?) → string`                                    | Studio (save), site build (export sidecars) |
+| `rewrite`   | `(source, edits) → string`                                    | the rename refactor (repair a reference)    |
 | `discover`  | `(source, { baseDir }) → string[]`                            | content loading (list entry files)          |
 | `load`      | `(path, { schema, directiveOptions }) → ContentLoaderEntry[]` | content loading (parse one source)          |
 
 A format implements the subset it needs: a read-only format can ship `parse` without `serialize` (Studio then opens files in this format read-only in structural modes); a data-only format like `Csv` needs `discover`/`load` but has no reason to be a page format.
+
+### `rewrite`: repairing a reference without round-tripping
+
+`serialize` promises a lot: that a parsed document turns back into source your author would recognize. A data format often cannot promise it. Re-emitting a CSV means picking a quoting style, a line ending and a column order the author already picked, and the loader has no opinion about any of them.
+
+But a rename does not need a document back. It needs one cell's text changed. That is what `rewrite` is:
+
+```ts
+static rewrite(source: string, edits: readonly { from: string; to: string }[]): string
+```
+
+You are handed the file's own text and a list of authored values to replace, and you return the text with exactly those values replaced and every other byte preserved. Two rules make it safe:
+
+- **Match whole values, never substrings.** `hero.jpg` must not rewrite the middle of `my-hero.jpg`.
+- **Change nothing else.** Padding, quoting and line endings are the author's.
+
+Declare it and the rename refactor repairs references living in your format instead of reporting them as something the author has to fix by hand. Declare both and the refactor prefers `serialize`, because a full round trip can express a change a list of value edits cannot, such as renaming a custom-element tag.
+
+:::doc-note
+`rewrite` is not a weaker `serialize`, and the two are not ranked. Declare either, both, or neither. Only `serialize` makes your format creatable and convertible in Studio; `rewrite` earns nothing but the refactor, which is exactly what a load-only format wants.
+:::
 
 The `Markdown` class implements all four, plus the standard instance `resolve()`, so `{ "$prototype": "Markdown", "src": "./about.md" }` works as runtime state, satisfying the same [external class contract](/docs/extending/extensions/classes) as every other class.
 
@@ -144,7 +166,8 @@ names, so a format extension reaches both by declaring them:
   `parse` and `serialize` for it. Both are needed: without `parse` the file cannot be opened after
   it is created, and without `serialize` its first save falls through to another format and writes
   that format's bytes into it. (This is why the parser extension's `Csv`, which parses rows and has
-  no serializer, is not offered; a `.csv` is still creatable through the picker's **Other…** row.)
+  no serializer, is not offered; a `.csv` is still creatable through the picker's **Other…** row.
+  `Csv` declares `rewrite` instead, which buys it the refactor and not this picker.)
 - **Convert Format…** offers your format as a conversion endpoint when it declares both capabilities
   **and** `page` or `component` in `documentKinds`. That membership is what says `parse` returns a
   Jx document rather than content entries, and the compiler already relies on it to build its page

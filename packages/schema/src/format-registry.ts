@@ -12,11 +12,12 @@
 
 import { mediaTypeEssence, mediaTypeProblem } from "./media-type";
 
-export type FormatCapability = "parse" | "serialize" | "discover" | "load";
+export type FormatCapability = "parse" | "serialize" | "rewrite" | "discover" | "load";
 
 export const FORMAT_CAPABILITIES: readonly FormatCapability[] = [
   "parse",
   "serialize",
+  "rewrite",
   "discover",
   "load",
 ];
@@ -27,6 +28,13 @@ export const FORMAT_CAPABILITIES: readonly FormatCapability[] = [
  * asset emission (`emit`), `<head>` contribution (`head`), static asset mounts (`assets`),
  * server-mount (`mount`), and connector (`dialect`, `deploySchema`, `bindings`, `testConnection`)
  * roles.
+ *
+ * `rewrite` is the narrow sibling of `serialize`, and the two are not ranked: a format may declare
+ * either, both or neither. `serialize` says "this document round-trips through me"; `rewrite` says
+ * only "I can replace these authored values in my own source text and change nothing else". A
+ * load-only format — a CSV collection is read to load entries, never re-emitted as a document — can
+ * honestly promise the second and not the first, which is enough for a rename to repair a reference
+ * living inside it (specs/extensions.md §8).
  */
 export type ExtensionCapability =
   | FormatCapability

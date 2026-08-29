@@ -2,9 +2,9 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.10.1-draft
+**Version:** 0.10.2-draft
 **Status:** Partial
-**Updated:** 2026-08-28
+**Updated:** 2026-08-29
 **License:** MIT
 
 ---
@@ -1040,7 +1040,9 @@ The registry answers three more questions, all derived from the same declaration
 list this app maintains: which formats a new file may be created as (§9.1.1), which pairs a document
 may be converted between (§8.4), and which extensions the rename refactor can write back. `.json` is
 the endpoint every one of them shares, because a registry never claims it. A format extension that
-declares `parse` and `serialize` therefore reaches all three with no edit to the studio.
+declares `parse` and `serialize` therefore reaches all three with no edit to the studio. The refactor
+alone also accepts `rewrite` in place of `serialize`, which is how a format that is read but never
+round-tripped still has its references repaired.
 
 The format's `$studio` block drives the control surface:
 
@@ -1403,10 +1405,12 @@ exists.
 
 **A promise made must be a promise reported on.** The rename sentence commits the refactor pass to
 rewriting the references it counted, and the pass can fail to keep that for a nameable reason — a
-content source with a parser and deliberately no serializer, a document that does not parse. The
-engine names those files rather than dropping them (`site-architecture.md` §9.3), and Studio MUST
-surface the naming: a move whose report carries them reports a **warning** identifying them, not the
-plain success. This binds the drag-move most of all, since it shows no dialog and therefore makes
+document that does not parse, or a tag rename inside a format with no serializer. A format that is
+read but never round-tripped is NOT such a reason: a CSV collection declares the narrower `rewrite`
+capability (`extensions.md` §8), so a reference inside one is repaired cell by cell. Where the pass
+genuinely cannot write, the engine names those files rather than dropping them
+(`site-architecture.md` §9.3), and Studio MUST surface the naming: a move whose report carries them
+reports a **warning** identifying them, not the plain success. This binds the drag-move most of all, since it shows no dialog and therefore makes
 its promise only in retrospect.
 
 ### 9.1.2 The Library
@@ -2841,6 +2845,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.10.2-draft** (2026-08-29) — A format declaring rewrite rather than serialize has its references repaired by the rename refactor, so it is no longer a reported remainder.
 - **0.10.1-draft** (2026-08-28) — studioShellHtml() now links a favicon for hosts whose window chrome has no native icon of its own.
 - **0.10.0-draft** (2026-08-27) — New File chooses a format rather than an extension (Other... preserves arbitrary names); a document converts between formats in place; creating in a collection source routes to New Entry.
 - **0.9.53-draft** (2026-08-27) — A rename or drag-move whose refactor report names references it could not rewrite reports a warning, not a plain success; a drag-move invalidates the usage cache like its siblings.
@@ -2951,4 +2956,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/studio` Specification v0.10.1-draft_
+_`@jxsuite/studio` Specification v0.10.2-draft_

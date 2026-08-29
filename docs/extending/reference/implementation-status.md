@@ -18,18 +18,18 @@ This page is generated from the `> **Status: …**` markers in the specification
 | `collab.md`               | 0.2.5-draft  | Partial     | 2026-08-20 |
 | `compiler.md`             | 0.4.1-draft  | Partial     | 2026-08-27 |
 | `desktop.md`              | 0.4.8-draft  | Pending     | 2026-08-28 |
-| `extensions.md`           | 0.4.1-draft  | Partial     | 2026-08-27 |
+| `extensions.md`           | 0.4.2-draft  | Partial     | 2026-08-29 |
 | `imports.md`              | 0.1.10-draft | Partial     | 2026-08-27 |
 | `jx-markdown.md`          | 0.1.9-draft  | Partial     | 2026-08-27 |
 | `parser.md`               | 0.2.10-draft | Partial     | 2026-08-27 |
 | `relationships.md`        | 0.1.4-draft  | Partial     | 2026-08-15 |
 | `schema.md`               | 0.4.8-draft  | Partial     | 2026-08-16 |
 | `server.md`               | 0.2.21       | Implemented | 2026-08-27 |
-| `site-architecture.md`    | 0.6.8-draft  | Partial     | 2026-08-29 |
+| `site-architecture.md`    | 0.6.9-draft  | Partial     | 2026-08-29 |
 | `spec.md`                 | 0.5.8-draft  | Partial     | 2026-08-26 |
 | `standards.md`            | 0.1.15-draft | Partial     | 2026-08-17 |
 | `studio-ui-guidelines.md` | 0.3.16       | Implemented | 2026-08-27 |
-| `studio.md`               | 0.10.1-draft | Partial     | 2026-08-28 |
+| `studio.md`               | 0.10.2-draft | Partial     | 2026-08-29 |
 
 ## Sections not yet implemented
 

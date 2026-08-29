@@ -14,10 +14,28 @@ import type { FormatRegistry } from "@jxsuite/schema/format-registry";
 /** Normalise a path to forward slashes (Windows `path` returns backslashes). */
 export const fwd = (p: string) => p.replaceAll("\\", "/");
 
-/** A parsed document plus the serializer that round-trips it back to disk (null when none). */
+/** One authored value to replace in a document's own source text. */
+export interface ValueEdit {
+  from: string;
+  to: string;
+}
+
+/** A parsed document and the two ways it might be written back. */
 export interface LoadedDoc {
   doc: unknown;
+  /** Round-trips the whole document. Null when the format declares no `serialize`. */
   serialize: ((doc: unknown) => Promise<string>) | null;
+  /**
+   * Replaces authored values in the file's own bytes, changing nothing else. Null when the format
+   * declares no `rewrite`.
+   *
+   * The narrower of the two, and the only one a load-only format can offer: a CSV collection is a
+   * data source entries are read FROM, so there is no document to serialize — but one cell's text
+   * can be changed without inventing a quoting style. `applyRename` prefers `serialize` where it
+   * exists, because a full round trip can express a change (a tag rename) that a list of value
+   * edits cannot.
+   */
+  rewrite: ((edits: readonly ValueEdit[]) => Promise<string>) | null;
 }
 
 const isJsonPath = (p: string) => p.endsWith(".json");
@@ -58,8 +76,8 @@ export function documentGlob(registry: FormatRegistry): Bun.Glob {
 }
 
 /**
- * Read + parse a file, returning the doc and a matching serializer (null when the format can parse
- * but not serialize). Throws when no parser claims the extension.
+ * Read + parse a file, returning the doc and whichever write-back paths the format declares. Throws
+ * when no parser claims the extension.
  */
 export async function loadDoc(fp: string, registry: FormatRegistry): Promise<LoadedDoc> {
   const raw = await readFile(fp, "utf8");
@@ -67,6 +85,7 @@ export async function loadDoc(fp: string, registry: FormatRegistry): Promise<Loa
     const trailingNewline = raw.endsWith("\n");
     return {
       doc: JSON.parse(raw) as unknown,
+      rewrite: null,
       serialize: (doc) =>
         Promise.resolve(JSON.stringify(doc, null, 2) + (trailingNewline ? "\n" : "")),
     };
@@ -78,8 +97,15 @@ export async function loadDoc(fp: string, registry: FormatRegistry): Promise<Loa
   }
   const doc = await parseEntry.call("parse", raw);
   const serializeEntry = registry.byExtension(ext, "serialize");
+  const rewriteEntry = registry.byExtension(ext, "rewrite");
   return {
     doc,
+    rewrite: rewriteEntry
+      ? async (edits) => {
+          const out = await rewriteEntry.call("rewrite", raw, edits);
+          return typeof out === "string" ? out : String(out);
+        }
+      : null,
     serialize: serializeEntry
       ? async (d) => {
           const out = await serializeEntry.call("serialize", d);

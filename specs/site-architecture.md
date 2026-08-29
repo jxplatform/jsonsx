@@ -2,7 +2,7 @@
 
 ## File-Based Routing, Content Collections, Layouts, and Static Site Generation
 
-**Version:** 0.6.8-draft
+**Version:** 0.6.9-draft
 **Status:** Partial
 **Updated:** 2026-08-29
 **License:** MIT
@@ -1420,7 +1420,8 @@ So the contract binds the engine, both ways:
 
 - A rooted reference resolves through every lane the host serves, and a match against **any** of them is a usage. Where two lanes both name an existing file the reference is genuinely ambiguous, and a warning shown before a destructive action counts both.
 - A rewritten rooted reference is re-emitted through the lanes a **build** publishes, falling back to the project-root lane only for a file no build would publish. A `public/` file must come back as `/hero.jpg`, never `/public/hero.jpg`: the second resolves on a local editing server and 404s on the deployed site, which is the failure mode this section exists to prevent.
-- A reference the engine counts but **cannot** write — a document that fails to parse, or a format that can be read but not round-tripped — is NAMED in the report rather than dropped. A rename that reports success while leaving a reference pointing at a moved file is worse than one that never claimed to fix it, because the claim is what stops the author looking.
+- A reference the engine counts but **cannot** write is NAMED in the report rather than dropped. A rename that reports success while leaving a reference pointing at a moved file is worse than one that never claimed to fix it, because the claim is what stops the author looking.
+- Writing a reference back does not require the document to round-trip. A format that can be read but not re-emitted — a CSV collection is a data source entries are loaded FROM, and re-emitting one would mean choosing a quoting style, a line ending and a column order the author already chose — may instead declare that it can replace authored VALUES in its own source text and change nothing else (`extensions.md` §8's `rewrite`). That is all a rename ever needed, so a reference inside such a file is repaired rather than left as a remainder. What stays un-writable is a document that fails to parse, and a structural change no list of value edits can express: renaming a custom-element tag inside a format with no serializer.
 - A reference is not always a VALUE, and not always shaped like a file. `project.json`'s `copy` map names the files it copies in its **keys**, and a content collection's `source` may name a **directory**, which carries no extension for the shape rule below to recognise. Both sit at a key the engine already knows by name, so both are read by name. The other half of `copy` is the counterexample that makes the rule: its values are destinations inside `outDir`, a directory no rename inside the project can move, so they are not references and are never rewritten.
 - A rewritten reference keeps the style the author wrote, trailing slash included. A directory `source` re-emitted without one is a diff on a line the rename had no business restyling.
 
@@ -2703,6 +2704,7 @@ This spec builds on existing Jx primitives wherever possible:
 
 ## Changelog
 
+- **0.6.9-draft** (2026-08-29) — A reference inside a format that cannot round-trip is repaired through the rewrite capability rather than reported as a remainder.
 - **0.6.8-draft** (2026-08-29) — Media reachable only through a cross-root asset mount has no project-relative name, which is why it has no usage count; addressing it is a host file-API question, not an engine one.
 - **0.6.6-draft** (2026-08-29) — A copy map's keys and a directory content source are references the engine reads by name; a copy destination is not, and a rewritten reference keeps its trailing slash.
 - **0.6.5-draft** (2026-08-29) — A media usage query asks about the file once; enumerating a file's authored spellings host-side is the engine's job, not a media surface's.

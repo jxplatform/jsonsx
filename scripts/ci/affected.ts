@@ -124,12 +124,13 @@ const EXTRA_EDGES: ExtraEdge[] = [
   },
   {
     patterns: ["extensions/feed/src/**", "extensions/parser/src/**"],
-    seeds: ["packages/compiler"],
+    seeds: ["packages/compiler", "packages/server"],
     evidence: [
       "packages/compiler/tests/feed-integration.test.ts",
       "packages/compiler/tests/sitemap-lastmod.test.ts",
+      "packages/server/tests/refactor-apply.test.ts",
     ],
-    why: "Two compiler tests build a real project that loads @jxsuite/parser (and, for feeds, @jxsuite/feed), so a change to either extension's src can break a compiler test. The sitemap one spans three packages by construction: the parser carries an entry's timestamp, the compiler lifts it onto the route, and the sitemap prints it.",
+    why: "Two compiler tests build a real project that loads @jxsuite/parser (and, for feeds, @jxsuite/feed), so a change to either extension's src can break a compiler test. The sitemap one spans three packages by construction: the parser carries an entry's timestamp, the compiler lifts it onto the route, and the sitemap prints it. The refactor engine reads the parser's class descriptors by absolute path to drive its write-back capabilities against the real Csv and Markdown declarations, which is the one thing the parity suite cannot do — it stages starters into a temp directory, where a bare @jxsuite/parser resolves to the PUBLISHED package. Server is already a dependent of compiler, so this seed is redundant today and is named anyway: it is the edge that is actually asserted, and a later narrowing of the compiler seed must not silently un-gate it.",
   },
   {
     patterns: ["packages/starters/sites/portfolio/**", "packages/starters/sites/real-estate/**"],

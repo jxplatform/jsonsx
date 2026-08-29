@@ -622,7 +622,7 @@
           "type": "object"
         },
         "ClassMethodDef": {
-          "description": "A class method or accessor definition. Capability roles (parse, serialize, discover, load) mark static methods that hosts (compiler, server, studio) invoke for format dispatch.",
+          "description": "A class method or accessor definition. Capability roles (parse, serialize, rewrite, discover, load) mark static methods that hosts (compiler, server, studio) invoke for format dispatch.",
           "properties": {
             "$prototype": {
               "const": "Function",
@@ -692,6 +692,7 @@
                 "accessor",
                 "parse",
                 "serialize",
+                "rewrite",
                 "discover",
                 "load",
                 "projectData",
