@@ -9,6 +9,7 @@ export const CLASS_METHOD_ROLES = [
   "accessor",
   "parse",
   "serialize",
+  "rewrite",
   "discover",
   "load",
   "projectData",
@@ -96,7 +97,7 @@ export const classConstructorDefSchema = {
 
 export const classMethodDefSchema = {
   description:
-    "A class method or accessor definition. Capability roles (parse, serialize, discover, load) " +
+    "A class method or accessor definition. Capability roles (parse, serialize, rewrite, discover, load) " +
     "mark static methods that hosts (compiler, server, studio) invoke for format dispatch.",
   properties: {
     $prototype: { const: "Function", type: "string" },

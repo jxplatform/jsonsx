@@ -73,7 +73,7 @@ Renaming a **folder** counts too. If a content collection's `source` points at t
 If Studio cannot count (a backend without project search), the confirmation says so rather than showing a zero. "We could not check" and "nothing uses this" are never displayed as the same thing.
 
 :::doc-note
-A handful of files can be read but not written back: a CSV content collection, for instance, is a data source Studio loads entries from rather than a document it round-trips. A reference living in one still counts toward what a delete would break, and a rename that could not update it says so, reporting a **warning** that names the files instead of a plain "Renamed", so you know where to look. Dragging a file to a new folder in the Files panel does the same refactor, and reports the same way, as does converting one to another format.
+A CSV content collection is a data source Studio loads entries from rather than a document it round-trips, so it is never rewritten wholesale. A reference inside one is still repaired: Studio replaces that cell's text and leaves the rest of the file byte for byte as you wrote it, quoting and line endings included. Where a reference genuinely cannot be updated (a file that will not parse), the rename says so, reporting a **warning** that names the files instead of a plain "Renamed", so you know where to look. Dragging a file to a new folder in the Files panel does the same refactor, and reports the same way, as does converting one to another format.
 :::
 
 ## Which one do I want?

@@ -122,7 +122,7 @@ export async function applyRename(opts: ApplyRenameOptions): Promise<RenameRepor
     }
     const fp = fwd(resolve(opts.root, match));
     try {
-      const { doc, serialize } = await loadDoc(fp, opts.registry);
+      const { doc, rewrite, serialize } = await loadDoc(fp, opts.registry);
       const docNewDir = dirname(fp);
       const docOldDir = isUnder(fp, absTo) ? dirname(absFrom + fp.slice(absTo.length)) : docNewDir;
 
@@ -139,11 +139,29 @@ export async function applyRename(opts: ApplyRenameOptions): Promise<RenameRepor
       if (changes.length === 0 && tagCount === 0) {
         continue;
       }
-      if (!serialize) {
+      /*
+       * Two ways to write a document back, and the narrower one is not a fallback for a broken
+       * format — it is the only honest promise a load-only format can make. A CSV collection has a
+       * parser and deliberately no serializer, so a reference living in one used to be COUNTED and
+       * then reported as a remainder the author had to repair by hand (issue 246). `rewrite`
+       * replaces the authored values in the file's own bytes and changes nothing else, which is all
+       * a rename ever needed.
+       *
+       * `serialize` still wins where it exists: a full round trip can express a change a list of
+       * value edits cannot. A TAG rename is exactly such a change, so a document carrying one and
+       * no serializer is still named in the report rather than half-written.
+       */
+      const written =
+        serialize === null
+          ? tagCount === 0 && rewrite !== null
+            ? await rewrite(changes)
+            : null
+          : await serialize(doc);
+      if (written === null) {
         report.errors.push({ error: `No serializer for "${match}"`, path: fwd(match) });
         continue;
       }
-      await writeFile(fp, await serialize(doc));
+      await writeFile(fp, written);
 
       if (changes.length > 0) {
         report.references.files.push({ changes, count: changes.length, path: fwd(match) });

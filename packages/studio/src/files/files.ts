@@ -1910,10 +1910,12 @@ function renameStatus(newName: string, report: RenameResult): string {
  *
  * The dialog above a rename states, in a modal the user has to accept, that N references "will be
  * updated automatically. Nothing else changes." The engine keeps that promise for every document it
- * can write — but some it cannot: a content source like a `.csv` collection has a parser and
- * deliberately no serializer, and a document that fails to parse cannot be rewritten either. In
- * both cases `applyRename` names the file rather than dropping it, and this is the half that makes
- * the naming reach a person. Silence here is what turns a stated promise into a false one.
+ * can write, and it can write more than it round-trips: a `.csv` collection has a parser and
+ * deliberately no serializer, but declares the narrower `rewrite` capability, so a reference in one
+ * is repaired cell by cell. What is left over is a document that fails to parse, and a tag rename
+ * inside a format with no serializer. In those `applyRename` names the file rather than dropping
+ * it, and this is the half that makes the naming reach a person. Silence here is what turns a
+ * stated promise into a false one.
  *
  * A drag-move makes no promise at all — it has no dialog — which is exactly why it needs this more,
  * not less. A format CONVERSION makes the strongest promise of the three, and shares this for that

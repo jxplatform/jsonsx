@@ -2,9 +2,9 @@
 
 ## Extension Packages, Schema Composition, and the Capability Contract
 
-**Version:** 0.4.1-draft
+**Version:** 0.4.2-draft
 **Status:** Partial
-**Updated:** 2026-08-27
+**Updated:** 2026-08-29
 **License:** MIT
 
 Supersedes v1 ("Format-Extension Classes and the Capability Contract"). The
@@ -534,6 +534,7 @@ implementation class without constructing an instance. The instance
 | -------------- | ----------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
 | `parse`        | `format`    | `(source, options?) → JxDocument \| ContentLoaderEntry[]`                   | compiler, server, studio (open file, convert a file)                               |
 | `serialize`    | `format`    | `(doc, options?) → string`                                                  | studio (save, create a file, convert a file), site build (export sidecars)         |
+| `rewrite`      | `format`    | `(source, edits) → string`                                                  | rename refactor (repair a reference inside a format that does not round-trip)      |
 | `discover`     | `format`    | `(source, { baseDir }) → string[]`                                          | content loading (list entry files)                                                 |
 | `load`         | `format`    | `(path, { schema, directiveOptions }) → ContentLoaderEntry[]`               | content loading (parse one source)                                                 |
 | `projectData`  | `project`   | `(sectionValue, { projectConfig, root, registry, io }) → unknown`           | compiler site build, dev server resolve — result stored as `_project[<key>]`       |
@@ -552,6 +553,21 @@ globs from `documentExtensions("page"|"component")` and casts every `parse` resu
 already load-bearing in the build. A format declaring only `content` makes no such claim, and may
 return `ContentLoaderEntry[]` — the parser's `Csv` does exactly that, which is why it declares no
 `serialize`.
+
+**`rewrite` is not a weaker `serialize`, and the two are not ranked.** `serialize` says _this
+document round-trips through me_; `rewrite` says only _I can replace these authored values in my own
+source text and change nothing else_. A format may declare either, both or neither, and a load-only
+format can honestly promise the second while never being able to promise the first: re-emitting a
+CSV collection would mean choosing a quoting style, a line ending and a column order the author
+already chose, while replacing one cell's text requires no opinion about any of them.
+
+`edits` is a list of `{ from, to }` naming values as `parse` produced them, and a match is on the
+WHOLE value, never a substring — `hero.jpg` must not rewrite the middle of `my-hero.jpg`. Every
+other byte of the source is preserved. That is the whole contract, and it is enough for the rename
+refactor: a reference living inside a collection is repaired rather than reported as a remainder the
+author has to fix by hand (§9.3 of site-architecture.md). Where a format declares both, a rename
+prefers `serialize`, because a full round trip can express a change — a custom-element tag rename —
+that a list of value edits cannot.
 
 Studio reads the pair to answer two questions it used to have no answer for:
 
@@ -1164,6 +1180,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.4.2-draft** (2026-08-29) — A format may declare rewrite: replace authored values in its own source text, for a format that is read but never round-tripped.
 - **0.4.1-draft** (2026-08-27) — Studio conversion and creation are parse/serialize consumers; what parse returns is decided by documentKinds.
 - **0.4.0-draft** (2026-08-26) — §8.4: an emitter must not emit the same content twice — the search index carries page preamble plus sections, not the corpus twice.
 - **0.3.11-draft** (2026-08-25) — §8.5: record that a host which cannot execute extension code sees only content-section mounts.
@@ -1192,4 +1209,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_Jx Extensions Specification v0.4.1-draft_
+_Jx Extensions Specification v0.4.2-draft_
