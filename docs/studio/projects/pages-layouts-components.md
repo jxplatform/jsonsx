@@ -65,6 +65,9 @@ Every delete, rename and convert confirmation carries that same count, so you ca
 
 - **Deleting** a file tells you how many references stop resolving, and that the files holding them stay exactly where they are. Only the references break.
 - **Renaming** a file tells you how many references will be **updated automatically**. Studio rewrites them across the project, in pages, layouts, components, `project.json`, and the front matter of content entries. For a component it renames the element tag to match the new filename too.
+
+Renaming a **folder** counts too. If a content collection's `source` points at the folder you are moving, `project.json` follows it, and so does a file named by `project.json`'s `copy` map, which lists the extra files a build copies into the output. The copy map's destinations are paths inside the built site, so those are left alone: moving a file in your project does not move where the build puts it.
+
 - **[Converting](/docs/studio/interface#converting-a-file-to-another-format)** a file to another format tells you the same, in its own words: those references are repaired, but the file itself is not the file it was, so the rename's "nothing else changes" would be untrue. It adds what the file is becoming, and whether it will read back identically.
 
 If Studio cannot count (a backend without project search), the confirmation says so rather than showing a zero. "We could not check" and "nothing uses this" are never displayed as the same thing.

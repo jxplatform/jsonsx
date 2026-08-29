@@ -179,7 +179,7 @@ const FILE_SEGMENT_RE = /^[^.][^/]*\.[A-Za-z0-9]{0,7}[A-Za-z][A-Za-z0-9]{0,7}$/;
 /**
  * True when a string is shaped like a file a document could reference.
  *
- * The walker in refs.ts knows nine keys that carry references by name. The commonest media
+ * The walker in refs.ts knows eleven keys that carry references by name. The commonest media
  * reference in a real project is under none of them — a schema-typed component prop (`$props.bg`),
  * a content entry's frontmatter (`cover:`), `project.json`'s `defaults.layout` — so the walker
  * falls back to SHAPE for every other key, and this is the shape test.
@@ -208,6 +208,19 @@ export function looksLikeFileRef(value: string): boolean {
   }
   const last = cls.core.slice(cls.core.lastIndexOf("/") + 1);
   return FILE_SEGMENT_RE.test(last);
+}
+
+/**
+ * Restore a trailing slash the path math dropped, when the author wrote one.
+ *
+ * `normalizeSegments` discards empty segments, so `./content/posts/` resolves and re-emits as
+ * `./content/posts`. For a file that is invisible; for a DIRECTORY reference — a content
+ * collection's `source` — it is a gratuitous edit to a line the rename had no business restyling,
+ * and `rewriteRef`'s contract is to preserve the authored style. A bare `/` is left alone: it is
+ * already only a slash.
+ */
+function keepTrailingSlash(out: string, core: string): string {
+  return core.endsWith("/") && core !== "/" && !out.endsWith("/") ? `${out}/` : out;
 }
 
 /** Context describing a single rename, shared by every reference rewrite within one document. */
@@ -269,7 +282,7 @@ export function rewriteRef(
   } else {
     out = rel;
   }
-  out += suffix;
+  out = keepTrailingSlash(out, core) + suffix;
   return out === core + suffix ? null : out;
 }
 
@@ -301,7 +314,7 @@ function rewriteSiteUrl(core: string, suffix: string, ctx: RemapCtx): string | n
     if (url === null) {
       continue;
     }
-    const out = url + suffix;
+    const out = keepTrailingSlash(url, core) + suffix;
     return out === core + suffix ? null : out;
   }
   return null;
