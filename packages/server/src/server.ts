@@ -18,7 +18,12 @@ import { buildAll } from "./build.ts";
 import { createCollabRegistry } from "./collab.ts";
 import { createWatcher, injectSSE } from "./watch.ts";
 import { handleJxMounts } from "./jx-mounts.ts";
-import { handleResolve, handleServerFunction, projectAssetMounts } from "./resolve.ts";
+import {
+  handleResolve,
+  handleServerFunction,
+  projectAssetMounts,
+  projectSiteBase,
+} from "./resolve.ts";
 import {
   assertAccessible,
   assertCreatableParent,
@@ -301,6 +306,25 @@ export async function createDevServer(options: {
       }
       // Keep the un-collapsed decoded path: the static branch detects a POSIX-absolute "//abs" prefix.
       let { path } = decoded;
+
+      /*
+       * A subpath deployment's base, stripped once at the edge (site-architecture.md §5).
+       *
+       * A project whose `url` carries a path is SERVED from that path, and a build emits every URL
+       * under it — so a preview that only answered the bare path would exercise URLs the deployed
+       * site never uses, which is the class of bug that is only found in production. Stripping
+       * rather than moving the dev root means both spellings work: `localhost:3000/` is unchanged,
+       * and `localhost:3000/m/my-site/assets/x.js` resolves to the same file.
+       *
+       * `url` is mutated too, because everything downstream routes on it — the extension mounts
+       * match `url.pathname` against their own basePath, which is declared bare.
+       */
+      const siteBase = await projectSiteBase(activeProjectRoot ?? absRoot);
+      if (siteBase !== "" && (path === siteBase || path.startsWith(`${siteBase}/`))) {
+        path = path.slice(siteBase.length) || "/";
+        url.pathname = url.pathname.slice(siteBase.length) || "/";
+      }
+
       if (path.endsWith("/")) {
         path += "index.html";
       } else if (path === "") {

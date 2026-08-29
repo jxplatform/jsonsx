@@ -96,7 +96,7 @@ It's a warning and never an error, and three things never trigger it: any relati
 { "tagName": "link", "rel": "https://example.com/rel/pricing", "href": "/pricing/" }
 ```
 
-Two tags are added automatically: `<link rel="canonical">` (built from `url` in `project.json` plus the page route, when `url` is set) and the `<html lang>` attribute. Both lose to one you write yourself.
+Two tags are added automatically: `<link rel="canonical">` (built from `url` in `project.json` plus the page route, when `url` is set) and the `<html lang>` attribute. Both lose to one you write yourself. If your `url` includes a folder, as in `https://example.com/docs/`, the folder is kept: the canonical for `/about` is `https://example.com/docs/about`, not `https://example.com/about`. See [serving from a subfolder](/docs/framework/site/deployment#serving-from-a-subfolder).
 
 `lang` comes from the page's `$lang` if it has one, otherwise `defaults.lang`, otherwise `"en"`. A page can also set `$dir` (or the site `defaults.dir`) for right-to-left content:
 
@@ -166,7 +166,7 @@ Template strings resolve inside the object, at any depth, so the block can refer
 
 When `url` is set in `project.json`, the build emits `dist/sitemap.xml` from the route table, one `<url>` per compiled page, with:
 
-- `<loc>`: absolute, built from `url` + the route, identical to the page's canonical URL
+- `<loc>`: absolute, built from `url` + the route, identical to the page's canonical URL, folder included
 - `<lastmod>`: a full timestamp (`2025-03-04T16:00:00Z`), taken from the page source file, or from the content entry when the page was generated from one
 
 Dynamic routes appear as their expanded concrete URLs, each dated by **its own content entry** rather than by the `[slug]` template. That matters more than it sounds: you edit a template far more often than the posts under it, and dating by the template made every post in an archive announce itself as changed each time, the opposite of what `<lastmod>` is for. A route with no entry behind it (an authored page, or a `$paths` listing plain values) is still dated by its own file.

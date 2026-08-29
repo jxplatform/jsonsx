@@ -1,5 +1,6 @@
 /** Resolve.js — Generic $src module proxy + timing: "server" function proxy */
 
+import { siteBasePath } from "@jxsuite/schema/asset-paths";
 import { dirname, relative, resolve } from "node:path";
 import { errorMessage, parseClassDef } from "@jxsuite/schema/parse";
 import { existsSync, readFileSync, statSync } from "node:fs";
@@ -97,6 +98,22 @@ async function loadProjectEntry(projectRoot: string) {
   } catch {
     return null;
   }
+}
+
+/**
+ * The path a project says it is deployed under, or `""` for a site at an origin root.
+ *
+ * Read off `project.json`'s `url` (`@jxsuite/schema/asset-paths`), through the same mtime-keyed
+ * cache the asset mounts use — a second cache on the same file would be a second thing to
+ * invalidate, and this is asked on every request.
+ *
+ * @param {string} projectRoot
+ * @returns {Promise<string>} A path with a leading slash and no trailing one, or `""`
+ */
+export async function projectSiteBase(projectRoot: string): Promise<string> {
+  const entry = await loadProjectEntry(projectRoot);
+  const config = entry?.context.config as ProjectConfig | undefined;
+  return siteBasePath(config?.url);
 }
 
 /**

@@ -12,6 +12,7 @@
  * @docs framework/site/i18n
  */
 
+import { siteAbsoluteUrl } from "@jxsuite/schema/asset-paths";
 import {
   canonicalizeLocale,
   localeDirection,
@@ -298,13 +299,13 @@ export function localeAlternates(
     let alternates = built.get(members);
     if (alternates === undefined) {
       alternates = members.map((m) => ({
-        href: new URL(m.urlPattern, siteUrl).href,
+        href: siteAbsoluteUrl(m.urlPattern, siteUrl),
         hreflang: m.locale,
       }));
       const fallback = members.find((m) => m.locale === i18n.defaultLocale);
       if (fallback !== undefined) {
         alternates.push({
-          href: new URL(fallback.urlPattern, siteUrl).href,
+          href: siteAbsoluteUrl(fallback.urlPattern, siteUrl),
           hreflang: "x-default",
         });
       }

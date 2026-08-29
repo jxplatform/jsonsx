@@ -18,6 +18,7 @@
  * Cloudflare Worker serving a live preview — assemble the same `<head>` the build does.
  */
 
+import { siteAbsoluteUrl } from "@jxsuite/schema/asset-paths";
 import type { JxHeadEntry } from "@jxsuite/schema/types";
 
 /** What a page knows about itself while its `<head>` is being merged. */
@@ -74,7 +75,10 @@ export function mergeHead(
 
   // Add canonical URL if provided
   if (context.pageUrl && context.siteUrl) {
-    const canonical = new URL(context.pageUrl, context.siteUrl).href;
+    /* Resolved as a RELATIVE-path reference so a `siteUrl` with a path keeps it: RFC 3986 §5.2
+       replaces the whole path for an absolute-path reference, which would point every canonical
+       link and `og:url` on a subpath deployment at a page the origin root does not serve. */
+    const canonical = siteAbsoluteUrl(context.pageUrl, context.siteUrl);
     /*
      * An author-supplied canonical wins, like every other auto-injected entry (§8.4). This used a
      * hand-written `link:canonical` key that `headEntryKey` never produces, so the author's entry

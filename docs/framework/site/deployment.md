@@ -3,12 +3,14 @@ title: "Build output and adapters"
 description: "What bunx jx build writes to dist/, how trailingSlash shapes URLs, and the deployment adapters for static hosts, Cloudflare, Node, and Bun."
 spec:
   - site-architecture.md#14
+  - site-architecture.md#14.7
 code:
   - packages/compiler/src/site/site-build.ts
   - packages/compiler/src/site/headers-emitter.ts
   - packages/compiler/src/site/csp.ts
   - packages/compiler/src/site/well-known.ts
   - packages/compiler/src/site/service-worker.ts
+  - packages/compiler/src/site/base-path.ts
   - packages/compiler/src/cli.ts
 ---
 
@@ -269,6 +271,40 @@ Details worth knowing:
 - On Cloudflare Pages, `_routes.json` limits worker invocation to `/_jx/*`, so static assets are served without waking the worker. A Pages site with no server functions and no mounts gets no worker at all, and the deployment stays purely static.
 - A project with dynamic sections (a non-empty `data`/`connections` or `auth` section, served by extension mounts) **must** set a server-capable adapter. On static the build stops with an error naming the offending sections, since a static site has nothing to serve live data with.
 - Switching hosts means switching the adapter; your source never changes.
+
+## Serving from a subfolder
+
+Most sites live at the root of a domain. Some don't: a preview at `example.pages.dev/m/my-site/`, a
+docs site under `/docs/`, a project parked in a subfolder of a bigger server. Every link and asset a
+build writes starts with a slash, which means _from the site root_, so a build that assumed the
+root would ask the host for `/assets/app.js` when the file is actually at `/m/my-site/assets/app.js`.
+The page comes up blank, because the runtime scripts are the first things to 404.
+
+You don't configure this. **Set `url` to where the site actually lives**, including the path:
+
+```json
+{
+  "url": "https://example.pages.dev/m/my-site/"
+}
+```
+
+That is the same `url` that already drives canonical links and the sitemap, and now it also tells
+the build where the site's root is. Everything follows from it: page links and images, the import
+map, component scripts, `_headers` patterns, `_redirects` on both sides, the service worker's
+precache list and scope, and `manifest.webmanifest`. Canonical links and `sitemap.xml` keep the
+folder in their absolute URLs instead of dropping it.
+
+Nothing changes for a site at a domain root. `"url": "https://example.com"` has no path, so there is
+no prefix and the output is byte-for-byte what it was.
+
+Three things stay as you wrote them, because they don't mean _from the site root_ in the first
+place: full URLs (`https://…`), links that start with `./` or `../`, and plain fragments (`#top`).
+
+:::doc-tip
+`bunx jx dev` answers both spellings. `localhost:3000/` works exactly as before, and
+`localhost:3000/m/my-site/` serves the same pages, so you can click through the URLs the build
+actually emits without deploying first.
+:::
 
 ## Hooking up a host
 

@@ -2,7 +2,7 @@
 
 ## File-Based Routing, Content Collections, Layouts, and Static Site Generation
 
-**Version:** 0.6.9-draft
+**Version:** 0.6.10-draft
 **Status:** Partial
 **Updated:** 2026-08-29
 **License:** MIT
@@ -209,26 +209,26 @@ The `project.json` file at the project root defines site-wide settings. It is th
 
 ### 3.1 Configuration Properties
 
-| Property           | Type     | Description                                                                                               |
-| ------------------ | -------- | --------------------------------------------------------------------------------------------------------- |
-| `name`             | `string` | Site name, used in default `<title>` and meta tags                                                        |
-| `url`              | `string` | Production URL, used for canonical URLs and sitemap generation                                            |
-| `defaults.layout`  | `string` | Default layout applied to all pages that don't specify `$layout`                                          |
-| `defaults.lang`    | `string` | Default `<html lang>` attribute                                                                           |
-| `defaults.charset` | `string` | Default charset (always `utf-8`)                                                                          |
-| `$head`            | `array`  | Global `<head>` elements injected into every page                                                         |
-| `$media`           | `object` | Named media query breakpoints, available to all components                                                |
-| `style`            | `object` | Root-level CSS custom properties and global styles                                                        |
-| `state`            | `object` | Site-wide state accessible to all pages and components                                                    |
-| `redirects`        | `object` | Static redirect rules (see §11)                                                                           |
-| `imports`          | `object` | Import map: `$prototype` name → `.class.json` path (see spec §12.4)                                       |
-| `extensions`       | `array`  | Extension packages (bare npm names or relative paths) providing formats, connectors, and project sections |
-| `content`          | `object` | Content type definitions: name → `source`/`format`/`schema` (see §6)                                      |
-| `copy`             | `object` | Declarative file copy map: source path (project-root relative) → destination path (relative to `outDir`)  |
-| `$defs`            | `object` | Global type definitions available to all pages                                                            |
-| `$elements`        | `array`  | Global custom element dependencies (`$ref` objects or npm specifier strings)                              |
-| `build`            | `object` | Build output configuration (see §14)                                                                      |
-| `images`           | `object` | Image optimization settings (see §9.2)                                                                    |
+| Property           | Type     | Description                                                                                                                                           |
+| ------------------ | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`             | `string` | Site name, used in default `<title>` and meta tags                                                                                                    |
+| `url`              | `string` | Production URL. The base URI every emitted reference resolves against — canonical links, the sitemap, and the path the site is deployed under (§14.7) |
+| `defaults.layout`  | `string` | Default layout applied to all pages that don't specify `$layout`                                                                                      |
+| `defaults.lang`    | `string` | Default `<html lang>` attribute                                                                                                                       |
+| `defaults.charset` | `string` | Default charset (always `utf-8`)                                                                                                                      |
+| `$head`            | `array`  | Global `<head>` elements injected into every page                                                                                                     |
+| `$media`           | `object` | Named media query breakpoints, available to all components                                                                                            |
+| `style`            | `object` | Root-level CSS custom properties and global styles                                                                                                    |
+| `state`            | `object` | Site-wide state accessible to all pages and components                                                                                                |
+| `redirects`        | `object` | Static redirect rules (see §11)                                                                                                                       |
+| `imports`          | `object` | Import map: `$prototype` name → `.class.json` path (see spec §12.4)                                                                                   |
+| `extensions`       | `array`  | Extension packages (bare npm names or relative paths) providing formats, connectors, and project sections                                             |
+| `content`          | `object` | Content type definitions: name → `source`/`format`/`schema` (see §6)                                                                                  |
+| `copy`             | `object` | Declarative file copy map: source path (project-root relative) → destination path (relative to `outDir`)                                              |
+| `$defs`            | `object` | Global type definitions available to all pages                                                                                                        |
+| `$elements`        | `array`  | Global custom element dependencies (`$ref` objects or npm specifier strings)                                                                          |
+| `build`            | `object` | Build output configuration (see §14)                                                                                                                  |
+| `images`           | `object` | Image optimization settings (see §9.2)                                                                                                                |
 
 ### 3.2 Inheritance
 
@@ -2501,6 +2501,66 @@ the page's own resources makes the first visit slower, and that is the visit tha
 emitted only when a worker exists: registering a tombstone from the page trying to shed it would be
 self-defeating.
 
+### 14.7 Deployment Base Path
+
+> **Status: Implemented.** Derived from `url`, applied to every output a host reads, and answered
+> by the dev server alongside the bare path.
+
+A site is not always served from an origin root. Deployed at
+`https://example.pages.dev/m/my-site/`, every absolute-path reference the build emits —
+`/assets/vue-reactivity.js`, `/components/site-counter.js`, `/images/hero.jpg` — resolves against
+`example.pages.dev/` instead, where nothing is. The page renders blank rather than merely wrong,
+because the runtime assets 404 before anything can draw.
+
+**The base is `url`'s path, and there is no second key for it.** Every URL a build emits is a URI
+reference and `url` is the base URI it is resolved against ([RFC 3986](https://www.rfc-editor.org/rfc/rfc3986) §5).
+The site above has already said where it lives. A `build.base` beside it would be a second writer on
+one fact — free to disagree with the canonical links and the sitemap that are built from the same
+value — so the base is READ BACK off `url`'s pathname, and a site with no `url`, or one at an origin
+root, has a base of `""` and is unaffected in every particular.
+
+What went wrong was narrower than a missing option: the compiler resolved against the base's
+**origin** and discarded its path, which is what §5.2 does to an absolute-path reference and is not
+what a deployment means by one.
+
+Two rules follow, and they are different operations:
+
+1. **An absolute-path reference is re-rooted.** `/assets/x.js` becomes `/m/my-site/assets/x.js`. It
+   is the only form whose meaning is "from the site root", and therefore the only form that moves
+   when the site root does. An absolute URL, a protocol-relative reference, a fragment, a query and
+   every relative path already resolve against something else and are left exactly as written.
+2. **An absolute URL built FROM `url` keeps its path.** `<link rel="canonical">`, `og:url`,
+   `sitemap.xml`'s `<loc>`, the `hreflang` alternates and `robots.txt`'s `Sitemap:` line resolve
+   the route as a relative-path reference, because §5.2 resolution of an absolute-path reference
+   would replace `url`'s whole path and name a page the origin root does not serve.
+
+Every output a host reads carries the base, not only the page:
+
+| Output                         | Why it moves                                                                                                                                                                                |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Page HTML                      | Import map and its modulepreloads, component and island scripts, images and `srcset`, `url()` in a `<style>` block or a `style` attribute, `$head` entries, and every link the author wrote |
+| `_headers` (§14.3)             | A pattern is matched against the REQUEST path, so a rule at the bare path matches nothing                                                                                                   |
+| `_redirects` (§11)             | The source is matched against the request path; the destination is where the visitor is sent                                                                                                |
+| `sw.js` (§14.6)                | Precache entries, the cache-first prefix and the registration's scope are all request paths; a scope the worker's own URL is not inside fails to register                                   |
+| `manifest.webmanifest` (§14.5) | `start_url`, `scope` and icon `src` are fetched or navigated to                                                                                                                             |
+| The generated worker (§14.1)   | It IS the origin: the request it sees carries the prefix, so its routes and its extension mounts are registered under the base                                                              |
+
+**The page rewrite happens on finished HTML, deliberately.** The alternative is to thread a prefix
+through every emitter that can put a URL on a page — the import map, three page-template tiers that
+each write their own map, component scripts, island modules, sidecar and npm bundles, image
+`srcset`, `$head`, and whatever the author wrote by hand. That list is complete until the next
+emitter is added, and a build has already shipped an import map naming files a different emitter
+never wrote. One pass over the bytes that ship cannot drift from them. Re-rooting is idempotent, so
+an emitter that already prefixed is unaffected.
+
+**`jx dev` answers both spellings.** It strips a leading base at the edge rather than moving the dev
+root, so `localhost:3000/` is unchanged for every project that never sets a `url` path, and the
+based URL a build emits resolves to the same file. A preview that only answered the bare path would
+exercise URLs the deployed site never uses, which is the class of bug that is only found in
+production (`server.md` §3).
+
+---
+
 ---
 
 ## 15. Application Tier
@@ -2558,6 +2618,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 | [RFC 5005](https://www.rfc-editor.org/rfc/rfc5005)                                        | **Subset**    | §6.7              | extensions/feed/src/feed.ts, extensions/feed/tests/feed.test.ts                                                                                                         | The archived-feeds flavour (§2) plus `<fh:complete/>` (§4), which is the one designed for static hosting. Paged feeds (§3) are not offered: they are explicitly unstable for subscription, which is the only thing a static site publishes.                                                                                                                                                                                                                                                                                                                                                                         |
 | [RFC 9309](https://www.rfc-editor.org/rfc/rfc9309)                                        | **Adopted**   | §8.4.1            | packages/compiler/src/site/site-build.ts                                                                                                                                | A minimal `robots.txt` is created when none was provided, and an existing one is appended to rather than replaced. The `Sitemap:` line the build adds is a sitemaps.org extension, not part of this standard.                                                                                                                                                                                                                                                                                                                                                                                                       |
 | [Sitemaps 0.9](https://www.sitemaps.org/protocol.html)                                    | **Subset**    | §8.4.1, §13.5     | packages/compiler/src/site/site-build.ts, packages/compiler/src/site/pages-discovery.ts, packages/compiler/tests/sitemap-lastmod.test.ts                                | `<loc>`, a full RFC 3339 `<lastmod>` — taken from the content entry a generated route came from, not from the template that rendered it — and `xhtml:link` alternates for translated pages. Absent: `<changefreq>` and `<priority>`, both advisory and widely ignored, and the sitemap index, which is for sites past the 50,000-URL limit.                                                                                                                                                                                                                                                                         |
+| [RFC 3986](https://www.rfc-editor.org/rfc/rfc3986)                                        | **Subset**    | §14.7             | packages/schema/src/asset-paths.ts, packages/compiler/src/site/base-path.ts, packages/schema/tests/asset-paths.test.ts, packages/compiler/tests/base-path.test.ts       | §5 reference resolution against `url` as the base URI, in the two directions a build needs: an absolute-path reference is re-rooted onto the base's path, and a route resolved to an absolute URL is resolved as a relative-path reference so §5.2 does not replace that path. The other reference forms are classified and left alone. Not implemented: §6 normalization and comparison, and §5's full merge algorithm — the base is always an absolute URL with a path, which is the one case that arises.                                                                                                        |
 | [WHATWG URLPattern](https://urlpattern.spec.whatwg.org/)                                  | **Subset**    | §11.1             | packages/compiler/src/site/site-build.ts                                                                                                                                | Pattern strings are passed through to `_redirects` verbatim; the compiler neither parses nor validates them, so a malformed pattern is a deploy-time failure rather than a build-time one.                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110)                                        | **Subset**    | §11.3, §13.6      | packages/compiler/src/site/site-build.ts, packages/compiler/src/site/locale-negotiation.ts                                                                              | All five §15.4 redirection statuses are accepted and validated — 301, 302, 303, 307 and 308 — so a redirect can preserve a request method. A rewrite is modelled as `{destination, rewrite: true}` rather than as status `200`, which was never a redirection status but the host's own convention for serving another URL's content in place. Not implemented: content negotiation, `Retry-After` on 503, or any conditional-request handling — a static host owns those. Also §12.5.4 `Accept-Language`, parsed for locale negotiation: quality order, and `q=0` read as a refusal rather than a weak preference. |
 | [RFC 8288](https://www.rfc-editor.org/rfc/rfc8288)                                        | **Subset**    | §8.1, §8.3, §13.5 | packages/site/src/head-merger.ts, packages/compiler/src/site/link-relations.ts, packages/site/tests/head-merger.test.ts, packages/compiler/tests/link-relations.test.ts | Link identity accounts for the target attributes — `rel`, `href`, and whichever of `hreflang`, `type`, `media` or `sizes` distinguishes two links sharing the first two. That is what lets a set of `alternate` links coexist. Relation types are checked against a snapshot of the IANA registry, with RFC 8288 §2.1.2 extension URIs accepted; unregistered values warn once per build. Absent: the header form of `Link:` — Jx expresses every relation in HTML.                                                                                                                                                 |
@@ -2704,6 +2765,7 @@ This spec builds on existing Jx primitives wherever possible:
 
 ## Changelog
 
+- **0.6.10-draft** (2026-08-29) — A site deployed under a subpath: url's path is the base every emitted reference resolves against, applied to every output a host reads and answered by the dev server alongside the bare path.
 - **0.6.9-draft** (2026-08-29) — A reference inside a format that cannot round-trip is repaired through the rewrite capability rather than reported as a remainder.
 - **0.6.8-draft** (2026-08-29) — Media reachable only through a cross-root asset mount has no project-relative name, which is why it has no usage count; addressing it is a host file-API question, not an engine one.
 - **0.6.6-draft** (2026-08-29) — A copy map's keys and a directory content source are references the engine reads by name; a copy destination is not, and a rewritten reference keeps its trailing slash.
