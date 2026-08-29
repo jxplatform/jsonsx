@@ -644,6 +644,85 @@ describe("values that look like a file and are not", () => {
 });
 
 /*
+ * The read side of the two reference positions the walk could not see before: a map KEY and a
+ * DIRECTORY value. Both matter here rather than only in the rewrite, because the count is the
+ * promise — a delete confirmation that reports zero is what stops the author looking.
+ */
+describe("findReferences — copy keys and collection sources", () => {
+  test("a copy map key counts as a reference to the file it names", async () => {
+    write("project.json", { copy: { "assets/brochure.pdf": "brochure.pdf" }, name: "p" });
+    write("assets/brochure.pdf", "%PDF-");
+
+    const result = await findReferences({
+      path: "assets/brochure.pdf",
+      registry: await registry(),
+      root,
+    });
+    expect(result.files).toEqual([
+      {
+        count: 1,
+        path: "project.json",
+        refs: [{ count: 1, ref: "assets/brochure.pdf", refType: "copy" }],
+      },
+    ]);
+  });
+
+  test("a copy DESTINATION naming a project file is not a reference to it", async () => {
+    write("project.json", { copy: { "assets/a.pdf": "brochure.pdf" }, name: "p" });
+    write("brochure.pdf", "%PDF-");
+
+    const result = await findReferences({ path: "brochure.pdf", registry: await registry(), root });
+    expect(result.refsTotal).toBe(0);
+  });
+
+  test("a directory source counts as a reference to the collection directory", async () => {
+    write("project.json", {
+      content: { posts: { format: "Markdown", source: "./content/posts/" } },
+      name: "p",
+    });
+    write("content/posts/hello.json", { children: [] });
+
+    const result = await findReferences({
+      path: "content/posts",
+      registry: await registry(),
+      root,
+    });
+    expect(result.files.map((f) => f.path)).toEqual(["project.json"]);
+    expect(result.files[0]!.refs).toEqual([
+      { count: 1, ref: "./content/posts/", refType: "source" },
+    ]);
+  });
+
+  test("a directory source is not a reference to each entry beneath it", async () => {
+    // The collection names the DIRECTORY. An entry inside it is discovered, not referenced, and
+    // Reporting the `source` line as a usage of every file under it would inflate every count.
+    write("project.json", {
+      content: { posts: { format: "Markdown", source: "./content/posts/" } },
+      name: "p",
+    });
+    write("content/posts/hello.json", { children: [] });
+
+    const result = await findReferences({
+      path: "content/posts/hello.json",
+      registry: await registry(),
+      root,
+    });
+    expect(result.refsTotal).toBe(0);
+  });
+
+  test("renaming a parent of the collection directory still counts the source", async () => {
+    write("project.json", {
+      content: { posts: { format: "Markdown", source: "./content/posts/" } },
+      name: "p",
+    });
+    write("content/posts/hello.json", { children: [] });
+
+    const result = await findReferences({ path: "content", registry: await registry(), root });
+    expect(result.files.map((f) => f.path)).toEqual(["project.json"]);
+  });
+});
+
+/*
  * The shape test on its own. Precision is not its job — the resolve-and-compare gate above is —
  * but refusing prose is, and these are the values that decide whether a rename dialog offers to
  * rewrite a sentence, a MIME type or a version number.

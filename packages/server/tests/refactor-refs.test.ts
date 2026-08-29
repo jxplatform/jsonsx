@@ -116,6 +116,149 @@ describe("rewriteDocRefs — recognized reference forms", () => {
   });
 });
 
+/*
+ * `project.json`'s copy map names its sources in its KEYS and its destinations in its values, and
+ * for both halves that fact is the whole test: a key must be rewritten (issue 242) and a value must
+ * not, because the value lives in `outDir` and no rename inside the project can move it.
+ */
+describe("rewriteDocRefs — copy map keys", () => {
+  const copyCtx = (over: Partial<RemapCtx> = {}): RemapCtx =>
+    ctx({
+      docNewDir: "/p",
+      docOldDir: "/p",
+      newAbs: "/p/assets/prospectus.pdf",
+      oldAbs: "/p/assets/brochure.pdf",
+      ...over,
+    });
+
+  test("renames a copy key naming the moved file, leaving its destination value alone", () => {
+    const doc: { copy: Record<string, string> } = {
+      copy: { "assets/brochure.pdf": "brochure.pdf" },
+    };
+    const { changes } = rewriteDocRefs(doc, copyCtx());
+    expect(doc.copy).toEqual({ "assets/prospectus.pdf": "brochure.pdf" });
+    expect(changes).toEqual([
+      { from: "assets/brochure.pdf", refType: "copy", to: "assets/prospectus.pdf" },
+    ]);
+  });
+
+  test("a copy key is project-root-relative, not document-relative", () => {
+    // A page deep in the tree could never carry `copy`, but the base choice is what makes the key
+    // Resolve at all — read from the project root, exactly as the build resolves it.
+    const doc: { copy: Record<string, string> } = {
+      copy: { "assets/brochure.pdf": "files/brochure.pdf" },
+    };
+    rewriteDocRefs(doc, copyCtx({ docNewDir: "/p/pages", docOldDir: "/p/pages" }));
+    expect(doc.copy).toEqual({ "assets/prospectus.pdf": "files/brochure.pdf" });
+  });
+
+  test("a copy DESTINATION that happens to name a real project file is never rewritten", () => {
+    /* The value is a path inside `outDir`. Before the `copy` case existed the shape fallback
+       offered it, so renaming `/p/brochure.pdf` rewrote a destination that merely shared its
+       name — a silent edit to the built site's layout. */
+    const doc = { copy: { "assets/a.pdf": "brochure.pdf" } };
+    const { changes } = rewriteDocRefs(
+      doc,
+      copyCtx({ newAbs: "/p/prospectus.pdf", oldAbs: "/p/brochure.pdf" }),
+    );
+    expect(doc.copy).toEqual({ "assets/a.pdf": "brochure.pdf" });
+    expect(changes).toHaveLength(0);
+  });
+
+  test("renaming a directory rewrites every key beneath it and preserves insertion order", () => {
+    const doc = {
+      copy: {
+        "assets/a.pdf": "a.pdf",
+        "assets/deep/b.pdf": "b.pdf",
+        "other/c.pdf": "c.pdf",
+      },
+    };
+    rewriteDocRefs(doc, copyCtx({ newAbs: "/p/files", oldAbs: "/p/assets" }));
+    expect(Object.entries(doc.copy)).toEqual([
+      ["files/a.pdf", "a.pdf"],
+      ["files/deep/b.pdf", "b.pdf"],
+      ["other/c.pdf", "c.pdf"],
+    ]);
+  });
+
+  test("a copy map matching nothing is left untouched, and a non-object copy is ignored", () => {
+    const doc = { copy: { "assets/other.pdf": "other.pdf" } };
+    expect(rewriteDocRefs(doc, copyCtx()).changes).toHaveLength(0);
+    const odd = { copy: "assets/brochure.pdf" };
+    expect(rewriteDocRefs(odd, copyCtx()).changes).toHaveLength(0);
+    expect(odd.copy).toBe("assets/brochure.pdf");
+  });
+});
+
+/*
+ * A collection's `source` is the one reference whose value may be a DIRECTORY, and a directory
+ * carries no extension — which is exactly what `looksLikeFileRef` requires. So the shape fallback
+ * resolved the single-file form for free and could never admit the directory form (issue 243).
+ */
+describe("rewriteDocRefs — content collection sources", () => {
+  const sourceCtx = (over: Partial<RemapCtx>): RemapCtx =>
+    ctx({ docNewDir: "/p", docOldDir: "/p", ...over });
+
+  test("rewrites a directory source and keeps the trailing slash the author wrote", () => {
+    const doc = { content: { posts: { format: "Markdown", source: "./content/posts/" } } };
+    const { changes } = rewriteDocRefs(
+      doc,
+      sourceCtx({ newAbs: "/p/content/articles", oldAbs: "/p/content/posts" }),
+    );
+    expect(doc.content.posts.source).toBe("./content/articles/");
+    expect(changes).toEqual([
+      { from: "./content/posts/", refType: "source", to: "./content/articles/" },
+    ]);
+  });
+
+  test("rewrites a directory source with no trailing slash, and adds none", () => {
+    const doc = { content: { posts: { source: "content/posts" } } };
+    rewriteDocRefs(doc, sourceCtx({ newAbs: "/p/content/articles", oldAbs: "/p/content/posts" }));
+    expect(doc.content.posts.source).toBe("content/articles");
+  });
+
+  test("a locale placeholder inside the source survives the rewrite", () => {
+    const doc = { content: { shows: { source: "./content/exhibitions/{locale}/" } } };
+    rewriteDocRefs(
+      doc,
+      sourceCtx({ newAbs: "/p/content/shows", oldAbs: "/p/content/exhibitions" }),
+    );
+    expect(doc.content.shows.source).toBe("./content/shows/{locale}/");
+  });
+
+  test("the single-file source form still rewrites, as it did through the shape fallback", () => {
+    const doc = { content: { listings: { source: "./content/listings.csv" } } };
+    const { changes } = rewriteDocRefs(
+      doc,
+      sourceCtx({ newAbs: "/p/content/homes.csv", oldAbs: "/p/content/listings.csv" }),
+    );
+    expect(doc.content.listings.source).toBe("./content/homes.csv");
+    expect(changes[0]!.refType).toBe("source");
+  });
+
+  test("a remote source and an unrelated directory are both left alone", () => {
+    const doc = {
+      content: {
+        remote: { source: "https://example.com/sheet.csv" },
+        other: { source: "./content/authors/" },
+      },
+    };
+    const { changes } = rewriteDocRefs(
+      doc,
+      sourceCtx({ newAbs: "/p/content/articles", oldAbs: "/p/content/posts" }),
+    );
+    expect(doc.content.remote.source).toBe("https://example.com/sheet.csv");
+    expect(doc.content.other.source).toBe("./content/authors/");
+    expect(changes).toHaveLength(0);
+  });
+
+  test("a rooted directory source keeps its trailing slash too", () => {
+    const doc = { content: { docs: { source: "/content/guides/" } } };
+    rewriteDocRefs(doc, sourceCtx({ newAbs: "/p/content/manuals", oldAbs: "/p/content/guides" }));
+    expect(doc.content.docs.source).toBe("/content/manuals/");
+  });
+});
+
 describe("rewriteTagName", () => {
   test("renames every tagName instance and the definition root, leaving file refs", () => {
     const doc = {
