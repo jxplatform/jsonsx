@@ -278,6 +278,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `site-architecture.md`
 
+- **0.6.5-draft** (2026-08-29) — A media usage query asks about the file once; enumerating a file's authored spellings host-side is the engine's job, not a media surface's.
 - **0.6.4-draft** (2026-08-27) — Record that collection discovery is recursive, so a subdirectory holds entries as well as co-located media.
 - **0.6.3-draft** (2026-08-27) — Reference resolution through the asset lanes is the refactor engine's contract, in both directions: a rooted ref is counted through every lane, rewritten through the lanes a build publishes, and named in the report when it cannot be written.
 - **0.6.2-draft** (2026-08-27) — Routing, layout, context and head-merge move to @jxsuite/site; standards evidence follows.

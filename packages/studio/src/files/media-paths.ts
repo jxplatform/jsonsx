@@ -15,14 +15,19 @@
  * mount (specs/site-architecture.md §9.3), so the same file can also be named
  * `/content/blog/images/hero.png` when the collection's `source` is not already `content/blog`.
  *
- * **Why this module exists at all.** `findReferences` resolves each authored ref the way the
- * compiler does — rooted values against the project root, relative ones against the referencing
- * document — and compares the RESULT to the path it was asked about. Ask it about `public/hero.jpg`
- * and every `/hero.jpg` in the project resolves to `hero.jpg`, matches nothing, and the answer is a
- * confident zero. That is the exact shape of bug that makes a delete look safe: seven pages break
- * and the dialog says nothing else refers to it. {@link authoredRefTargets} is the fix — it
- * enumerates what an authored reference to this file RESOLVES to, so the query is keyed on the ref
- * as written rather than on the file as stored.
+ * **Why this module exists at all.** A surface that has a FILE and needs a URL cannot get one by
+ * prefixing a slash. The library grid did exactly that, so every `public/` image asked for
+ * `/public/hero.jpg` — a URL the site does not publish — and every content-collection image skipped
+ * its mount entirely. {@link mediaSiteUrl} and {@link previewFileSrc} are the answer, and they take
+ * a FILE PATH: an authored reference is a different thing and resolves through
+ * `canvas/asset-refs`.
+ *
+ * This module used to carry a third function, `authoredRefTargets`, enumerating every path an
+ * authored reference to a file could resolve to, so a usage query could ask about all of them and
+ * union the answers. That existed because `findReferences` resolved a rooted reference against the
+ * project root alone; the engine now resolves every lane itself (`site-architecture.md` §9.3), on
+ * the write side as well as the read side, which a client-side union never could. Asking once is
+ * both simpler and more correct, so the helper is gone.
  *
  * Everything here is pure string math over project-relative, forward-slashed paths. The only input
  * from outside is the open project's content sections, read the same way `canvas/asset-refs.ts`
@@ -99,40 +104,6 @@ export function mediaSiteUrl(path: string): string {
   }
   const mount = mountOf(normalized);
   return mount ? `/${mountedPath(normalized, mount)}` : `/${normalized}`;
-}
-
-/**
- * Every path an authored reference to this media file resolves to — the keys a usage query must ask
- * about, most literal first.
- *
- * 1. The file itself. A sibling's `./images/hero.png`, a rooted `/content/blog/images/hero.png` and a
- *    bare `assets/logo.svg` all land here.
- * 2. Its served path, for `public/` media. `/hero.jpg` resolves to `hero.jpg`, which is not a file on
- *    disk and does not need to be — the sweep compares resolved strings, and this is the string
- *    every reference to a public asset produces.
- * 3. Its asset-mount path, when a collection's `source` differs from its mount prefix. Identical to
- *    (1) for the ordinary `content/<type>/` layout, and deduplicated when it is.
- *
- * The list is a UNION and is deliberately generous: over-counting a reference makes a delete dialog
- * more alarming than it needs to be, while missing one makes it lie.
- */
-export function authoredRefTargets(path: string): string[] {
-  const normalized = normalizeProjectPath(path);
-  if (normalized === "") {
-    return [];
-  }
-  const targets = [normalized];
-  if (normalized.startsWith(`${PUBLIC_DIR}/`)) {
-    targets.push(normalized.slice(PUBLIC_DIR.length + 1));
-  }
-  const mount = mountOf(normalized);
-  if (mount) {
-    const mounted = mountedPath(normalized, mount);
-    if (!targets.includes(mounted)) {
-      targets.push(mounted);
-    }
-  }
-  return targets;
 }
 
 /**

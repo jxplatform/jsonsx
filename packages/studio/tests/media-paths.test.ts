@@ -1,16 +1,21 @@
 /**
- * The three names one media file has, and the query keys that follow from them.
+ * The three names one media file has, and the URL a surface holding the FILE must build.
  *
- * The assertion this file exists for is `authoredRefTargets("public/hero.jpg")` containing
- * `"hero.jpg"`. Without it a usage query about a public image asks about a path no document ever
- * resolves to, gets zero, and a delete confirmation calls a seven-page image unused.
+ * The assertion this file exists for is that `mediaSiteUrl("public/hero.jpg")` is `/hero.jpg`.
+ * Prefixing a file path with a slash gives `/public/hero.jpg`, a URL the site does not publish, and
+ * a content-collection image needs its mount rather than its directory.
+ *
+ * This file also used to assert `authoredRefTargets`, which enumerated every path an authored
+ * reference could resolve to so a usage query could ask about all of them. The engine resolves
+ * those lanes itself now (`site-architecture.md` §9.3), so both the helper and its tests are gone —
+ * `refactor-find-refs.test.ts` and `refactor-parity.test.ts` are where that behaviour is asserted,
+ * against a real project rather than against string math.
  */
 
 import "./with-dom.js";
 import { beforeEach, describe, expect, test } from "bun:test";
 import { installMockPlatform, resetStudioState } from "./harness";
 import {
-  authoredRefTargets,
   baseName,
   dirName,
   mediaSiteUrl,
@@ -118,45 +123,5 @@ describe("previewFileSrc", () => {
     expect(previewFileSrc("content/posts/images/my photo.png")).toBe(
       "https://studio.example.com/p/o/r/main/raw/content/posts/images/my%20photo.png",
     );
-  });
-});
-
-describe("authoredRefTargets", () => {
-  test("a public image is ALSO asked about under its served path", () => {
-    // The whole point: `/hero.jpg` in a document resolves to `hero.jpg`, never `public/hero.jpg`.
-    expect(authoredRefTargets("public/hero.jpg")).toEqual(["public/hero.jpg", "hero.jpg"]);
-  });
-
-  test("an ordinary file is asked about once", () => {
-    expect(authoredRefTargets("assets/logo.svg")).toEqual(["assets/logo.svg"]);
-  });
-
-  test("a content asset whose source is its mount is not asked about twice", () => {
-    withCollections({ blog: { source: "content/blog" } });
-    expect(authoredRefTargets("content/blog/images/hero.png")).toEqual([
-      "content/blog/images/hero.png",
-    ]);
-  });
-
-  test("a remapped collection adds its mount path", () => {
-    withCollections({ blog: { source: "posts" } });
-    expect(authoredRefTargets("posts/images/hero.png")).toEqual([
-      "posts/images/hero.png",
-      "content/blog/images/hero.png",
-    ]);
-  });
-
-  test("input spelling does not change the answer", () => {
-    expect(authoredRefTargets("./public/hero.jpg")).toEqual(["public/hero.jpg", "hero.jpg"]);
-  });
-
-  test("there is no target for an empty path", () => {
-    expect(authoredRefTargets("")).toEqual([]);
-    expect(authoredRefTargets("./")).toEqual([]);
-  });
-
-  test("a project with no content section is not a crash", () => {
-    resetStudioState({ projectConfig: {} });
-    expect(authoredRefTargets("posts/images/hero.png")).toEqual(["posts/images/hero.png"]);
   });
 });

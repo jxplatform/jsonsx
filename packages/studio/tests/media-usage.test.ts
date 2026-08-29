@@ -1,11 +1,19 @@
 /**
- * "What breaks if I delete this image?" — asked in the shape an author wrote, not the shape the
- * file is stored in.
+ * "What breaks if I delete this image?" — one question, one query, one answer.
  *
- * The regression this file locks down: `findReferences` resolves `/hero.jpg` to `hero.jpg`, so a
- * query keyed on `public/hero.jpg` matches nothing and the delete dialog calls a seven-page image
- * unused. Every assertion below is about that gap, or about the other way to lie — assembling a
- * total out of lanes when one of them failed.
+ * This file used to lock down a client-side UNION: `findReferences` resolved a rooted reference
+ * against the project root alone, so a query keyed on `public/hero.jpg` matched no `/hero.jpg` and
+ * a delete dialog called a seven-page image unused. Studio's answer was to ask about every authored
+ * spelling and merge the results.
+ *
+ * The engine resolves those lanes itself now (`site-architecture.md` §9.3), on the write side as
+ * well as the read side, so the union is gone and so are the assertions about merging, per-lane
+ * failure and per-lane error dedup. What survives is everything the union was NOT doing: a media
+ * path is normalized before it becomes a query, an empty path FAILS rather than reporting zero, and
+ * a query that could not be answered says **unknown** — never "nothing uses this".
+ *
+ * That the lanes are all found is asserted where the behaviour now lives:
+ * `packages/server/tests/refactor-find-refs.test.ts` and `refactor-parity.test.ts`.
  */
 
 import "./with-dom.js";
@@ -16,7 +24,6 @@ import { invalidateUsages, usageWarning } from "../src/services/references";
 import {
   loadMediaUsages,
   mediaUsageHeadline,
-  mediaUsageQueries,
   peekMediaUsages,
   retryMediaUsages,
 } from "../src/files/media-usage";
@@ -64,87 +71,36 @@ beforeEach(() => {
   resetStudioState();
 });
 
-describe("mediaUsageQueries", () => {
-  test("a public image is asked about under both its names", () => {
-    expect(mediaUsageQueries("public/hero.jpg")).toEqual([
-      { path: "public/hero.jpg" },
-      { path: "hero.jpg" },
-    ]);
-  });
-
-  test("an empty path has nothing to ask", () => {
-    expect(mediaUsageQueries("")).toEqual([]);
-  });
-});
-
 describe("loadMediaUsages", () => {
-  test("finds the references a file-keyed query cannot see", async () => {
+  test("asks the engine about the file, once, and passes its answer through", async () => {
     const { asked } = install({
-      "hero.jpg": result("hero.jpg", [
+      "public/hero.jpg": result("public/hero.jpg", [
         hit("pages/index.json", "/hero.jpg"),
         hit("pages/about.json", "/hero.jpg"),
       ]),
     });
     const state = await loadMediaUsages("public/hero.jpg");
-    expect(asked).toEqual(["public/hero.jpg", "hero.jpg"]);
+
+    /* One entry, and it is the FILE path. The engine resolves `/hero.jpg` through its public lane;
+       Studio asking a second time under the served name would be a second implementation of that. */
+    expect(asked).toEqual(["public/hero.jpg"]);
     expect(state.status).toBe("ready");
     expect(state.status === "ready" && state.result.refsTotal).toBe(2);
     // The sentence a delete confirmation shows is the shared one, not a second vocabulary.
     expect(usageWarning(state, "delete")).toContain("2 references in 2 files");
   });
 
-  test("unions the lanes and reports the file that was asked about", async () => {
-    install({
-      "hero.jpg": result("hero.jpg", [hit("pages/index.json", "/hero.jpg")]),
-      "public/hero.jpg": result("public/hero.jpg", [hit("layouts/base.json", "./public/hero.jpg")]),
+  test("two spellings of one file are one query, not two cache entries", async () => {
+    const { asked } = install({
+      "public/hero.jpg": result("public/hero.jpg", [hit("pages/index.json", "/hero.jpg")]),
     });
-    const state = await loadMediaUsages("public/hero.jpg");
-    expect(state.status === "ready" && state.result.path).toBe("public/hero.jpg");
-    expect(state.status === "ready" && state.result.files.map((f) => f.path)).toEqual([
-      "layouts/base.json",
-      "pages/index.json",
-    ]);
-    expect(state.status === "ready" && state.result.filesReferencing).toBe(2);
+    await loadMediaUsages("./public/hero.jpg");
+    await loadMediaUsages("public/hero.jpg");
+    expect(asked).toEqual(["public/hero.jpg"]);
   });
 
-  test("one file named under two lanes is one row with both refs", async () => {
-    install({
-      "hero.jpg": result("hero.jpg", [hit("pages/index.json", "/hero.jpg", 2)]),
-      "public/hero.jpg": result("public/hero.jpg", [
-        hit("pages/index.json", "./public/hero.jpg", 1, "$src"),
-      ]),
-    });
-    const state = await loadMediaUsages("public/hero.jpg");
-    expect(state.status === "ready" && state.result.files).toHaveLength(1);
-    expect(state.status === "ready" && state.result.files[0]?.count).toBe(3);
-    expect(state.status === "ready" && state.result.files[0]?.refs).toHaveLength(2);
-    expect(state.status === "ready" && state.result.refsTotal).toBe(3);
-  });
-
-  test("the same ref counted twice in one lane sums rather than duplicating", async () => {
-    const twice = result("hero.jpg", [hit("pages/index.json", "/hero.jpg", 2)]);
-    install({ "hero.jpg": twice, "public/hero.jpg": twice });
-    const state = await loadMediaUsages("public/hero.jpg");
-    expect(state.status === "ready" && state.result.files[0]?.refs).toHaveLength(1);
-    expect(state.status === "ready" && state.result.files[0]?.refs[0]?.count).toBe(4);
-  });
-
-  test("unreadable documents are reported once, not once per lane", async () => {
-    const broken = { error: "bad json", path: "pages/broken.json" };
-    install({
-      "hero.jpg": { ...result("hero.jpg", []), errors: [broken] },
-      "public/hero.jpg": { ...result("public/hero.jpg", []), errors: [broken] },
-    });
-    const state = await loadMediaUsages("public/hero.jpg");
-    expect(state.status === "ready" && state.result.errors).toEqual([broken]);
-    expect(usageWarning(state, "delete")).toBe("Nothing else in this project refers to it.");
-  });
-
-  test("a lane that failed makes the whole answer unknown, never a partial total", async () => {
-    install({
-      "hero.jpg": new Error("index unavailable"),
-      "public/hero.jpg": result("public/hero.jpg", [hit("pages/index.json", "./public/hero.jpg")]),
-    });
+  test("a failed query is unknown, never a zero", async () => {
+    install({ "public/hero.jpg": new Error("index unavailable") });
     const state = await loadMediaUsages("public/hero.jpg");
     expect(state.status).toBe("failed");
     expect(mediaUsageHeadline(state)).toBe("Usage unknown");
@@ -160,15 +116,34 @@ describe("loadMediaUsages", () => {
   });
 
   test("an empty path fails rather than reporting nothing uses it", async () => {
-    install({});
-    const state = await loadMediaUsages("");
-    expect(state).toEqual({ message: "no media file to look for", status: "failed" });
+    const { asked } = install({});
+    expect(await loadMediaUsages("")).toEqual({
+      message: "no media file to look for",
+      status: "failed",
+    });
+    expect(await loadMediaUsages("./")).toEqual({
+      message: "no media file to look for",
+      status: "failed",
+    });
+    expect(asked).toEqual([]);
+  });
+
+  test("unreadable documents ride along in the result", async () => {
+    const broken = { error: "bad json", path: "pages/broken.json" };
+    install({
+      "public/hero.jpg": { ...result("public/hero.jpg", []), errors: [broken] },
+    });
+    const state = await loadMediaUsages("public/hero.jpg");
+    expect(state.status === "ready" && state.result.errors).toEqual([broken]);
+    expect(usageWarning(state, "delete")).toBe("Nothing else in this project refers to it.");
   });
 });
 
 describe("peekMediaUsages", () => {
-  test("is null until every lane has an answer", async () => {
-    install({ "hero.jpg": result("hero.jpg", [hit("pages/index.json", "/hero.jpg")]) });
+  test("is null until the query has an answer, then reports it", async () => {
+    install({
+      "public/hero.jpg": result("public/hero.jpg", [hit("pages/index.json", "/hero.jpg")]),
+    });
     expect(peekMediaUsages("public/hero.jpg")).toBeNull();
     await loadMediaUsages("public/hero.jpg");
     const state = peekMediaUsages("public/hero.jpg");
@@ -176,8 +151,8 @@ describe("peekMediaUsages", () => {
     expect(state?.status === "ready" && state.result.refsTotal).toBe(1);
   });
 
-  test("reports pending while a lane is in flight", async () => {
-    install({ "hero.jpg": result("hero.jpg", []) });
+  test("reports pending while the query is in flight", async () => {
+    install({ "public/hero.jpg": result("public/hero.jpg", []) });
     const running = loadMediaUsages("public/hero.jpg");
     expect(peekMediaUsages("public/hero.jpg")?.status).toBe("pending");
     expect(mediaUsageHeadline(peekMediaUsages("public/hero.jpg"))).toBe("Counting references…");
@@ -191,7 +166,7 @@ describe("peekMediaUsages", () => {
 });
 
 describe("retryMediaUsages", () => {
-  test("asks every lane again after a failure", async () => {
+  test("asks again after a failure", async () => {
     let fail = true;
     registerPlatform({
       findReferences: async (target: { path?: string }) => {
@@ -206,7 +181,7 @@ describe("retryMediaUsages", () => {
     fail = false;
     const state = await retryMediaUsages("public/hero.jpg");
     expect(state.status).toBe("ready");
-    expect(state.status === "ready" && state.result.refsTotal).toBe(2);
+    expect(state.status === "ready" && state.result.refsTotal).toBe(1);
   });
 
   test("an empty path has nothing to retry", async () => {
@@ -223,7 +198,7 @@ describe("mediaUsageHeadline", () => {
 
   test("a real count uses the shared wording", async () => {
     install({
-      "hero.jpg": result("hero.jpg", [
+      "public/hero.jpg": result("public/hero.jpg", [
         hit("pages/index.json", "/hero.jpg"),
         hit("layouts/base.json", "/hero.jpg"),
       ]),
