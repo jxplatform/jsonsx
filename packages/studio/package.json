@@ -21,6 +21,7 @@
     "dist/workers",
     "index.html",
     "canvas.html",
+    "favicon.ico",
     "styles",
     "fonts"
   ],

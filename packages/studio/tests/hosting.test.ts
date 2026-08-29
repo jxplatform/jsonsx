@@ -18,6 +18,7 @@ import {
   STUDIO_ASSETS,
   STUDIO_BUNDLE_CSS,
   STUDIO_ENTRY,
+  STUDIO_FAVICON,
   STUDIO_HOST_API,
   STUDIO_IFRAME_ENTRY,
   STUDIO_STYLESHEETS,
@@ -57,6 +58,13 @@ describe("the manifest", () => {
     const codicon = STUDIO_ASSETS.find((a) => a.path === "dist/codicon.ttf");
     expect(codicon).toBeDefined();
     expect(codicon!.required).toBe(true);
+  });
+
+  test("includes the favicon a Chromium --app window falls back to for its own icon", () => {
+    const favicon = STUDIO_ASSETS.find((a) => a.path === STUDIO_FAVICON);
+    expect(favicon).toBeDefined();
+    expect(favicon!.required).toBe(true);
+    expect(favicon!.dir).toBe(false);
   });
 
   test("the directories that ship wholesale are marked as directories", () => {
@@ -113,10 +121,18 @@ describe("assetUrl", () => {
 });
 
 describe("studioShellHtml", () => {
-  test("links the bundle stylesheet and the chrome, in cascade order", () => {
+  test("links the favicon, then the bundle stylesheet and the chrome, in cascade order", () => {
     const html = studioShellHtml();
     const hrefs = [...html.matchAll(/href="([^"]+)"/g)].map((m) => m[1]);
-    expect(hrefs).toEqual([`./${STUDIO_BUNDLE_CSS}`, ...STUDIO_STYLESHEETS.map((s) => `./${s}`)]);
+    expect(hrefs).toEqual([
+      `./${STUDIO_FAVICON}`,
+      `./${STUDIO_BUNDLE_CSS}`,
+      ...STUDIO_STYLESHEETS.map((s) => `./${s}`),
+    ]);
+  });
+
+  test("the favicon link is a plain icon, not a stylesheet", () => {
+    expect(studioShellHtml()).toContain(`<link rel="icon" href="./${STUDIO_FAVICON}" />`);
   });
 
   /* `forced-colors.css` redraws what Windows High Contrast deletes, so it has to win. Order here is
