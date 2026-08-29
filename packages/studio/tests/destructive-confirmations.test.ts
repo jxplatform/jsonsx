@@ -6,12 +6,18 @@
  * dialog SAYS — that a delete and a rename say different things about the same number, and that a
  * host which cannot count says nothing at all rather than implying zero.
  *
- * The **media** section is about which index the dialog asks. A media file's authored reference
- * usually resolves to a path that is not the file — `/hero.jpg` for `public/hero.jpg`, the asset
- * mount for an asset inside a collection — so the generic index returns a confident zero for uses
- * that are really there. Those cases are asserted through `confirmFileDelete` itself, and the query
- * log is asserted too: a dialog that happened to say the right number while asking only one
- * question would be right by accident.
+ * The **media** section is about a number the dialog once got wrong. A media file's authored
+ * reference usually resolves to a path that is not the file — `/hero.jpg` for `public/hero.jpg`,
+ * the asset mount for an asset inside a collection — and a query that could not see those returned
+ * a confident zero for uses that are really there. Studio used to compensate by asking about every
+ * authored spelling and unioning the answers; the ENGINE resolves those lanes now
+ * (`site-architecture.md` §9.3), so the dialog asks once, about the file.
+ *
+ * The query log is still asserted, and now for the opposite reason. It used to prove the dialog
+ * asked enough questions; it proves it asks exactly ONE, because a second question here would be a
+ * second implementation of a rule the engine owns — and the client copy is the one that cannot fix
+ * the rewrite. Which lanes the engine finds is asserted where the resolution lives:
+ * `packages/server/tests/refactor-find-refs.test.ts` and `refactor-parity.test.ts`.
  */
 
 import { resetStudioState, mountOverlayLayers } from "./harness";
@@ -159,11 +165,12 @@ describe("rename prompt", () => {
  * A project whose blog collection lives in `posts/` — a `source` that differs from the mount
  * prefix.
  *
- * This is the layout §9.3 exists for, and the one the generic index gets wrong: the collection is
- * published at `/content/blog`, so an asset the author stores beside their entries is addressed
- * `./images/hero.png` from inside the collection (resolving to `posts/images/hero.png`) and
- * `/content/blog/images/hero.png` from anywhere else (resolving to a path that is not a file at
- * all). One file, two resolved names, and a delete has to know about both.
+ * This is the layout §9.3 exists for: the collection is published at `/content/blog`, so an asset
+ * the author stores beside their entries is addressed `./images/hero.png` from inside the
+ * collection and `/content/blog/images/hero.png` from anywhere else. One file, two authored
+ * spellings, and a delete has to know about both — which is now the engine's job, so the fake below
+ * answers the way the real one does: everything that resolves to the file, under the file's own
+ * path.
  */
 const BLOG_IN_POSTS = { content: { blog: { source: "./posts/" } } };
 
@@ -171,10 +178,15 @@ const BLOG_IN_POSTS = { content: { blog: { source: "./posts/" } } };
 let asked: string[] = [];
 
 /**
- * A fake index that answers per RESOLVED path, the way the real sweep does.
+ * A fake index that answers per QUERIED path, the way the real sweep does.
  *
- * @param hits — resolved path the sweep compares against → the files whose refs produced it, each
- *   with the string the author actually wrote.
+ * The sweep resolves each authored reference through every lane and compares the result to the file
+ * it was asked about, so one query about a file returns every spelling that reaches it. The fake
+ * mirrors that: the key is the path the caller asks about, and the value is every reference the
+ * engine would have matched to it, however it was written.
+ *
+ * @param hits — queried path → the files whose refs resolve to it, each with the string the author
+ *   actually wrote.
  */
 function installIndex(hits: Record<string, { file: string; ref: string }[]>): void {
   asked = [];
@@ -205,30 +217,32 @@ describe("deleting media", () => {
 
   test("counts the content-relative reference AND the asset-mount one — the file's own name is not the only name it has", async () => {
     installIndex({
-      // What `./images/hero.png` in `posts/hello.md` resolves to — relative to the entry.
-      "posts/images/hero.png": [{ file: "posts/hello.md", ref: "./images/hero.png" }],
-      // What `/content/blog/images/hero.png` in a page resolves to — the collection's asset mount,
-      // Which is not a path on disk, and is invisible to a query keyed on the file.
-      "content/blog/images/hero.png": [
+      // One query, both spellings: `./images/hero.png` in `posts/hello.md` resolves relative to the
+      // Entry, and `/content/blog/images/hero.png` in a page resolves through the collection's
+      // Asset mount. The engine matches both to this file, so both come back under it.
+      "posts/images/hero.png": [
+        { file: "posts/hello.md", ref: "./images/hero.png" },
         { file: "pages/index.json", ref: "/content/blog/images/hero.png" },
       ],
     });
     const pending = confirmFileDelete({ name: "hero.png", path: "posts/images/hero.png" });
     await tick();
 
-    // Both lanes were asked. Asking only the file is what returned 1 and made the delete look safe.
-    expect(asked.toSorted()).toEqual(["content/blog/images/hero.png", "posts/images/hero.png"]);
+    // Exactly one question, and it names the FILE. Studio re-deriving the mount here would be a
+    // Second copy of lane resolution, and the copy that cannot repair the rewrite.
+    expect(asked).toEqual(["posts/images/hero.png"]);
     expect(dialogText()).toContain("2 references in 2 files will break");
 
     settle("cancel");
     await pending;
   });
 
-  test("counts a public asset by its served path, which shares no segment with the file", async () => {
+  test("counts a public asset written by its served path, which shares no segment with the file", async () => {
     installIndex({
-      // `<img src="/hero.jpg">` — `public/` is served from the site root, so this is what a
-      // Reference to `public/hero.jpg` resolves to. The file's own path matches nothing.
-      "hero.jpg": [
+      // `<img src="/hero.jpg">` — `public/` is served from the site root, so a reference to
+      // `public/hero.jpg` is written with no segment in common with it. The engine's public lane
+      // Is what closes that gap, and it answers under the file the caller asked about.
+      "public/hero.jpg": [
         { file: "pages/index.json", ref: "/hero.jpg" },
         { file: "layouts/main.json", ref: "/hero.jpg" },
       ],
@@ -236,7 +250,7 @@ describe("deleting media", () => {
     const pending = confirmFileDelete({ name: "hero.jpg", path: "public/hero.jpg" });
     await tick();
 
-    expect(asked.toSorted()).toEqual(["hero.jpg", "public/hero.jpg"]);
+    expect(asked).toEqual(["public/hero.jpg"]);
     expect(dialogText()).toContain("2 references in 2 files will break");
 
     settle("cancel");
@@ -252,24 +266,11 @@ describe("deleting media", () => {
     await pending;
   });
 
-  test("one failed lane makes the whole answer unknown, never a total of the lanes that worked", async () => {
+  test("a media count that failed is unknown, never a zero and never a partial", async () => {
     asked = [];
     install(async (query) => {
-      const path = query.path ?? "";
-      asked.push(path);
-      if (path === "hero.jpg") {
-        throw new Error("sweep timed out");
-      }
-      return {
-        errors: [],
-        files: [
-          { count: 1, path: "pages/index.json", refs: [{ count: 1, ref: "x", refType: "path" }] },
-        ],
-        filesReferencing: 1,
-        path,
-        refsTotal: 1,
-        tagName: null,
-      } satisfies ReferencesResult;
+      asked.push(query.path ?? "");
+      throw new Error("sweep timed out");
     });
     const pending = confirmFileDelete({ name: "hero.jpg", path: "public/hero.jpg" });
     await tick();
@@ -277,19 +278,23 @@ describe("deleting media", () => {
     const text = dialogText();
     expect(text).toContain("could not be counted");
     expect(text).toContain("sweep timed out");
-    // The lane that DID answer found one reference; reporting it would read like a complete count.
-    expect(text).not.toContain("1 reference in 1 file");
+    /* Neither a number nor the reassurance. "Nothing else refers to it" is the sentence a delete
+       must never invent, and it reads identically whether the sweep found nothing or fell over. */
+    expect(text).not.toContain("references in");
+    expect(text).not.toContain("Nothing else in this project");
 
     settle("cancel");
     await pending;
   });
 
-  test("a rename of media says the same union will be repaired", async () => {
+  test("a rename of media promises to repair every spelling the delete would have broken", async () => {
+    /* The two dialogs must agree, and this is the pair that used to be able to disagree: the count
+       and the rewrite are one engine now, so a promise made here is one `applyRename` can keep. */
     installIndex({
-      "content/blog/images/hero.png": [
+      "posts/images/hero.png": [
+        { file: "posts/hello.md", ref: "./images/hero.png" },
         { file: "pages/index.json", ref: "/content/blog/images/hero.png" },
       ],
-      "posts/images/hero.png": [{ file: "posts/hello.md", ref: "./images/hero.png" }],
     });
     const text = textOf(await renamePromptMessage("posts/images/hero.png"));
     expect(text).toContain("2 references in 2 files will be updated automatically");

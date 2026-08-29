@@ -2,9 +2,9 @@
 
 ## File-Based Routing, Content Collections, Layouts, and Static Site Generation
 
-**Version:** 0.6.4-draft
+**Version:** 0.6.5-draft
 **Status:** Partial
-**Updated:** 2026-08-27
+**Updated:** 2026-08-29
 **License:** MIT
 
 ---
@@ -1442,11 +1442,13 @@ path and asks where that file publishes. `public/hero.jpg` is written `/hero.jpg
 shares not one segment with it — so a preview built by prefixing a file path with a slash names a
 URL the site does not publish.
 
-**Usage is keyed on the AUTHORED reference, not the resolved one.** A content-relative `./images/`
-reference previews at its asset-mount URL while the source keeps the authored form, so keying on
-what the browser fetched would under-count every content-relative use — and an under-count is what
-makes a delete look safe when it is not. A delete states its reference count, and where the count
-cannot be answered it says **unknown**, never zero.
+**Usage is asked about the FILE, once.** A content-relative `./images/` reference previews at its
+asset-mount URL while the source keeps the authored form, so a media surface holds at least three
+names for one file and could ask under any of them. It asks under the file: §9.3 binds the engine to
+resolve every authored spelling, so a host that enumerated the spellings itself would be a second
+implementation of that rule — and the half that can fix a count but never a rewrite. Under-counting
+is what makes a delete look safe when it is not, so a delete states its reference count, and where
+the count cannot be answered it says **unknown**, never zero.
 
 Studio adds media to a project from four places: the Upload button on any image field, a file
 dropped on the canvas, a file dropped on the Files tree, and the Library's drop zone — which names
@@ -2686,6 +2688,7 @@ This spec builds on existing Jx primitives wherever possible:
 
 ## Changelog
 
+- **0.6.5-draft** (2026-08-29) — A media usage query asks about the file once; enumerating a file's authored spellings host-side is the engine's job, not a media surface's.
 - **0.6.4-draft** (2026-08-27) — Record that collection discovery is recursive, so a subdirectory holds entries as well as co-located media.
 - **0.6.3-draft** (2026-08-27) — Reference resolution through the asset lanes is the refactor engine's contract, in both directions: a rooted ref is counted through every lane, rewritten through the lanes a build publishes, and named in the report when it cannot be written.
 - **0.6.2-draft** (2026-08-27) — Routing, layout, context and head-merge move to @jxsuite/site; standards evidence follows.
