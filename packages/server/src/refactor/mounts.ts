@@ -19,6 +19,14 @@
  * dropped: its files are not addressable by a project-relative path, so no rename can reach them
  * and no reference to them can be counted. `projectPathsForSiteUrl` declines the same case by
  * name.
+ *
+ * That drop is deliberate and is not the near half of a bug. A collection's `source` may point
+ * outside the project (site-architecture.md §9.3), and its media renders — the compiler and the dev
+ * server both publish it at the mount URL — but the editing host's file API is project-scoped by
+ * containment check, so no surface can list, open or ask about the file either. Nothing therefore
+ * reports a confident zero about it, which is the failure the lane math exists to prevent. Reaching
+ * such a file means giving it a mount-relative identity in that file API, not widening this filter;
+ * see §9.3, which records the decision (issue 244).
  */
 
 import { relative } from "node:path";
