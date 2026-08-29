@@ -2,7 +2,8 @@ import { afterAll, beforeEach, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { buildProjectFormatRegistry } from "@jxsuite/compiler/format-host";
+import { buildProjectFormatRegistry, createNodeFormatIO } from "@jxsuite/compiler/format-host";
+import { buildFormatRegistry } from "@jxsuite/schema/format-registry";
 import { applyRename, deriveTag } from "../src/refactor/index";
 import type { AssetMount } from "@jxsuite/schema/asset-paths";
 import type { ProjectConfig } from "@jxsuite/schema/types";
@@ -458,5 +459,92 @@ describe("applyRename — rooted references through an asset mount", () => {
       serialized({ children: [{ src: "/m/y.png", tagName: "img" }] }),
     );
     expect(report.references.refsUpdated).toBe(1);
+  });
+});
+
+/*
+ * The two write-back capabilities, driven through the parser extension's REAL class descriptors.
+ *
+ * A hand-written fake would assert that `applyRename` calls whatever it was handed; the point here
+ * is that `Csv` declares `rewrite` and no `serialize`, `Markdown` declares `serialize`, and the
+ * engine does the right thing with each. `refactor-parity.test.ts` cannot cover this: it stages
+ * starters into a temp directory, where a bare `@jxsuite/parser` resolves to the PUBLISHED package
+ * rather than to this workspace.
+ */
+describe("applyRename — write-back capabilities", () => {
+  const PARSER_SRC = join(import.meta.dir, "../../../extensions/parser/src");
+
+  const CSV_BEFORE =
+    "Title,slug,image\r\n" +
+    'Cedar Lane,"cedar-lane",/images/listing-1.jpg\r\n' +
+    "Lakeview,lakeview,/images/listing-10.jpg\r\n";
+
+  const CSV_AFTER =
+    "Title,slug,image\r\n" +
+    'Cedar Lane,"cedar-lane",/images/villa.jpg\r\n' +
+    "Lakeview,lakeview,/images/listing-10.jpg\r\n";
+
+  /** A registry built from the workspace's own class descriptors, by absolute path. */
+  async function workspaceRegistry() {
+    return buildFormatRegistry(
+      {
+        Csv: join(PARSER_SRC, "Csv.class.json"),
+        Markdown: join(PARSER_SRC, "Markdown.class.json"),
+      },
+      createNodeFormatIO(root),
+    );
+  }
+
+  test("Csv declares rewrite and no serialize; Markdown declares serialize", async () => {
+    const registry = await workspaceRegistry();
+    const csv = registry.byName("Csv")!;
+    expect(csv.capabilities.rewrite).toBeDefined();
+    expect(csv.capabilities.serialize).toBeUndefined();
+    expect(registry.byName("Markdown")!.capabilities.serialize).toBeDefined();
+  });
+
+  test("a reference inside a CSV collection is rewritten, not reported as a remainder", async () => {
+    write("project.json", JSON.stringify({ name: "p" }));
+    write("content/listings.csv", CSV_BEFORE);
+    write("public/images/listing-1.jpg", "jpg");
+    write("public/images/listing-10.jpg", "jpg");
+
+    renameSync(join(root, "public/images/listing-1.jpg"), join(root, "public/images/villa.jpg"));
+    const report = await applyRename({
+      absFrom: join(root, "public/images/listing-1.jpg"),
+      absTo: join(root, "public/images/villa.jpg"),
+      registry: await workspaceRegistry(),
+      root,
+    });
+
+    expect(report.errors).toEqual([]);
+    expect(report.references.refsUpdated).toBe(1);
+    /* Byte-for-byte outside the one cell: the quoting, the padding and the CRLF line endings are
+       the author's, and a rename has no business restyling any of them. The sibling row proves the
+       match is on the whole cell — `/images/listing-1.jpg` is a prefix of `/images/listing-10.jpg`. */
+    expect(read("content/listings.csv")).toBe(CSV_AFTER);
+  });
+
+  test("a tag rename in a format with rewrite but no serialize is still named in the report", async () => {
+    /* `rewrite` replaces authored VALUES. A tag rename is a structural change no list of value
+       edits can express, so the honest answer is the one the engine already gave: name the file
+       rather than half-write it. */
+    const rows = "tagName,image\r\nmy-counter,/hero.jpg\r\n";
+    write("project.json", JSON.stringify({ name: "p" }));
+    write("content/rows.csv", rows);
+    write("components/counter.json", JSON.stringify({ children: [], tagName: "my-counter" }));
+
+    renameSync(join(root, "components/counter.json"), join(root, "components/my-button.json"));
+    const report = await applyRename({
+      absFrom: join(root, "components/counter.json"),
+      absTo: join(root, "components/my-button.json"),
+      registry: await workspaceRegistry(),
+      root,
+    });
+
+    expect(report.errors).toEqual([
+      { error: 'No serializer for "content/rows.csv"', path: "content/rows.csv" },
+    ]);
+    expect(read("content/rows.csv")).toBe(rows);
   });
 });

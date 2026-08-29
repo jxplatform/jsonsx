@@ -2,9 +2,14 @@
  * Csv — CSV content format for Jx
  *
  * RFC 4180-style CSV parsing with schema-driven type coercion, packaged as a Jx
- * format-extension class. `parse` is pure and browser-safe; `discover`, `load`, and
+ * format-extension class. `parse` and `rewrite` are pure and browser-safe; `discover`, `load`, and
  * instance `resolve` touch the filesystem (or fetch remote URLs) and dynamically
  * import node modules so the module itself stays importable in the browser.
+ *
+ * There is no `serialize`, and there will not be one: a collection is a data source entries are
+ * loaded FROM, and re-emitting one would mean choosing a quoting style, a line ending and a column
+ * order the author already chose. `rewrite` is the narrower promise that covers the case that
+ * actually needed it — a rename repairing a reference a row names (specs/extensions.md §8).
  *
  * @module @jxsuite/parser/csv
  * @license MIT
@@ -90,6 +95,164 @@ export function parseCSV(csv: string): Record<string, string>[] {
   return rows;
 }
 
+// ─── Cell-level rewriting ────────────────────────────────────────────────────
+
+/** One authored value to replace, wherever a data cell holds exactly it. */
+export interface CsvEdit {
+  /** The cell value as `parse` produced it — unquoted and trimmed. */
+  from: string;
+  /** What to write in its place. */
+  to: string;
+}
+
+/** One field of a CSV source: where its bytes are, and what {@link parseCSV} made of it. */
+interface CsvField {
+  /** Row index in the source. Row 0 is the header. */
+  row: number;
+  /** Offsets of the field's raw text within the source, delimiting commas excluded. */
+  start: number;
+  end: number;
+  /** The value {@link parseCSV} produces for it — unquoted and trimmed. */
+  value: string;
+}
+
+/**
+ * Row spans, splitting on newlines that are not inside quotes.
+ *
+ * A deliberate mirror of {@link parseCSV}'s first pass, offsets instead of text: the two must agree
+ * on where a row ends or a rewrite would splice into the wrong cell. The accumulated text there is
+ * exactly `source.slice(start, end)` here, because the only characters that pass are contiguous.
+ */
+function scanRows(csv: string): { start: number; end: number }[] {
+  const rows: { start: number; end: number }[] = [];
+  let start = 0;
+  let inQuotes = false;
+  for (let i = 0; i < csv.length; i++) {
+    const ch = csv[i];
+    if (ch === '"') {
+      if (inQuotes && csv[i + 1] === '"') {
+        i += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if ((ch === "\n" || (ch === "\r" && csv[i + 1] === "\n")) && !inQuotes) {
+      rows.push({ end: i, start });
+      if (ch === "\r") {
+        i += 1;
+      }
+      start = i + 1;
+    }
+  }
+  // The same test {@link parseCSV} applies to its final accumulated row, which is exactly this
+  // Slice: a trailing newline leaves whitespace behind, and that is not a row.
+  if (csv.slice(start).trim()) {
+    rows.push({ end: csv.length, start });
+  }
+  return rows;
+}
+
+/** Field spans within one row, mirroring {@link parseCSV}'s second pass. */
+function scanRowFields(csv: string, row: number, span: { start: number; end: number }): CsvField[] {
+  const line = csv.slice(span.start, span.end);
+  const fields: CsvField[] = [];
+  let fieldStart = 0;
+  let value = "";
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        value += '"';
+        i += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (ch === "," && !inQuotes) {
+      fields.push({
+        end: span.start + i,
+        row,
+        start: span.start + fieldStart,
+        value: value.trim(),
+      });
+      value = "";
+      fieldStart = i + 1;
+    } else {
+      value += ch;
+    }
+  }
+  fields.push({ end: span.end, row, start: span.start + fieldStart, value: value.trim() });
+  return fields;
+}
+
+/** Every field of a CSV source in document order, with the offsets a splice needs. */
+function scanFields(csv: string): CsvField[] {
+  return scanRows(csv).flatMap((span, row) => scanRowFields(csv, row, span));
+}
+
+/**
+ * Write `value` into the space a field's raw text occupied, keeping that field's own conventions.
+ *
+ * Padding survives because it is the author's, and quoting survives for the same reason — a column
+ * written `"a","b"` stays quoted even when the new value would not need it. A value that WOULD be
+ * misread unquoted (a comma, a quote, a newline, or padding of its own) is quoted regardless, which
+ * is the only case where the output style is not simply the input's.
+ */
+function encodeField(raw: string, value: string): string {
+  const lead = raw.slice(0, raw.length - raw.trimStart().length);
+  const trail = raw.slice(raw.trimEnd().length);
+  const core = raw.trim();
+  const wasQuoted = core.length >= 2 && core.startsWith('"') && core.endsWith('"');
+  const mustQuote = /["\r\n,]/.test(value) || value.trim() !== value;
+  return lead + (wasQuoted || mustQuote ? `"${value.replaceAll('"', '""')}"` : value) + trail;
+}
+
+/**
+ * Replace authored cell values in CSV source text, preserving every other byte.
+ *
+ * The `rewrite` capability (specs/extensions.md §8), and deliberately narrower than `serialize`. A
+ * CSV collection is a data source entries are loaded FROM, not a document Jx round-trips, so it has
+ * no serializer and never will — quoting style, line endings and column order are the author's and
+ * the loader has no opinion about any of them. But the rename refactor does not need a document
+ * back; it needs one cell's text changed. Without that, renaming a file a CSV row names updated
+ * every other reference and reported this one as a remainder the author had to repair by hand
+ * (issue 246).
+ *
+ * Matching is on the WHOLE cell value as {@link parseCSV} produced it, never on a substring:
+ * `hero.jpg` must not rewrite the middle of `my-hero.jpg`. The HEADER row is never touched — it
+ * names columns rather than files, `parse` does not expose it as a value, and an edit derived from
+ * `parse` output therefore cannot legitimately name it.
+ *
+ * @param source — the CSV file's original text
+ * @param edits — authored values to replace
+ * @returns The source with exactly those cells rewritten
+ */
+export function rewriteCSV(source: string, edits: readonly CsvEdit[]): string {
+  const replacements = new Map<string, string>();
+  for (const edit of edits) {
+    if (edit.from !== edit.to) {
+      replacements.set(edit.from, edit.to);
+    }
+  }
+  if (replacements.size === 0) {
+    return source;
+  }
+  let out = "";
+  let cursor = 0;
+  for (const field of scanFields(source)) {
+    if (field.row === 0) {
+      continue;
+    }
+    const to = replacements.get(field.value);
+    if (to === undefined) {
+      continue;
+    }
+    out += source.slice(cursor, field.start);
+    out += encodeField(source.slice(field.start, field.end), to);
+    cursor = field.end;
+  }
+  return out + source.slice(cursor);
+}
+
 // ─── Type coercion ───────────────────────────────────────────────────────────
 
 export interface CsvOptions {
@@ -169,6 +332,18 @@ export class Csv {
   /** Parse CSV source text into content entries (pure, browser-safe). */
   static parse(source: string, options: CsvOptions = {}): ContentLoaderEntry[] {
     return coerceCSVRows(parseCSV(source), options.schema, options.idField);
+  }
+
+  /**
+   * Replace authored cell values, preserving every other byte (pure, browser-safe).
+   *
+   * The `rewrite` capability. Csv declares it and deliberately declares no `serialize`: rows are
+   * loaded, not round-tripped, so there is no document to write back — but one cell's text can be
+   * changed without inventing an opinion about quoting, line endings or column order. See
+   * {@link rewriteCSV}.
+   */
+  static rewrite(source: string, edits: readonly CsvEdit[] = []): string {
+    return rewriteCSV(source, edits);
   }
 
   /** List .csv entry files for a content-type source (file path or directory). */

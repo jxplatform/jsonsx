@@ -131,6 +131,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `extensions.md`
 
+- **0.4.2-draft** (2026-08-29) — A format may declare rewrite: replace authored values in its own source text, for a format that is read but never round-tripped.
 - **0.4.1-draft** (2026-08-27) — Studio conversion and creation are parse/serialize consumers; what parse returns is decided by documentKinds.
 - **0.4.0-draft** (2026-08-26) — §8.4: an emitter must not emit the same content twice — the search index carries page preamble plus sections, not the corpus twice.
 - **0.3.11-draft** (2026-08-25) — §8.5: record that a host which cannot execute extension code sees only content-section mounts.
@@ -278,6 +279,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `site-architecture.md`
 
+- **0.6.9-draft** (2026-08-29) — A reference inside a format that cannot round-trip is repaired through the rewrite capability rather than reported as a remainder.
 - **0.6.8-draft** (2026-08-29) — Media reachable only through a cross-root asset mount has no project-relative name, which is why it has no usage count; addressing it is a host file-API question, not an engine one.
 - **0.6.6-draft** (2026-08-29) — A copy map's keys and a directory content source are references the engine reads by name; a copy destination is not, and a rewritten reference keeps its trailing slash.
 - **0.6.5-draft** (2026-08-29) — A media usage query asks about the file once; enumerating a file's authored spellings host-side is the engine's job, not a media surface's.
@@ -476,6 +478,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `studio.md`
 
+- **0.10.2-draft** (2026-08-29) — A format declaring rewrite rather than serialize has its references repaired by the rename refactor, so it is no longer a reported remainder.
 - **0.10.1-draft** (2026-08-28) — studioShellHtml() now links a favicon for hosts whose window chrome has no native icon of its own.
 - **0.10.0-draft** (2026-08-27) — New File chooses a format rather than an extension (Other... preserves arbitrary names); a document converts between formats in place; creating in a collection source routes to New Entry.
 - **0.9.53-draft** (2026-08-27) — A rename or drag-move whose refactor report names references it could not rewrite reports a warning, not a plain success; a drag-move invalidates the usage cache like its siblings.

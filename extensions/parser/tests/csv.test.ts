@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { Csv, coerceCSVRows, parseCSV } from "../src/csv";
+import { Csv, coerceCSVRows, parseCSV, rewriteCSV } from "../src/csv";
 
 const TMP = resolve(import.meta.dir, "__test-csv__");
 
@@ -144,5 +144,81 @@ describe("Csv.discover / Csv.load / resolve", () => {
     const entries = await csv.resolve();
     expect(entries.length).toBe(1);
     expect(entries[0]!.data.name).toBe("Widget");
+  });
+});
+
+/*
+ * The `rewrite` capability, which exists because a CSV collection has a parser and deliberately no
+ * serializer (issue 246). Everything here is a byte-level assertion on purpose: the whole promise
+ * is that a rename changes one cell and leaves the file otherwise untouched, and a test comparing
+ * parsed rows would pass while the quoting, the padding and the line endings were all rewritten.
+ */
+describe("rewriteCSV", () => {
+  const SRC =
+    "Title,slug,image\r\n" +
+    'Cedar Lane,"cedar-lane",/images/listing-1.jpg\r\n' +
+    "Harbor View,harbor-view, /images/listing-1.jpg \r\n" +
+    "Lakeview,lakeview,/images/listing-10.jpg\r\n";
+
+  test("replaces every data cell holding the value, preserving quoting, padding and CRLF", () => {
+    const out = rewriteCSV(SRC, [{ from: "/images/listing-1.jpg", to: "/images/villa.jpg" }]);
+    expect(out).toBe(
+      "Title,slug,image\r\n" +
+        'Cedar Lane,"cedar-lane",/images/villa.jpg\r\n' +
+        "Harbor View,harbor-view, /images/villa.jpg \r\n" +
+        "Lakeview,lakeview,/images/listing-10.jpg\r\n",
+    );
+  });
+
+  test("matches the whole cell, never a substring", () => {
+    // `/images/listing-1.jpg` is a prefix of `/images/listing-10.jpg`. A textual replace would
+    // Corrupt the third row into `/images/villa.jpg0.jpg`.
+    const out = rewriteCSV(SRC, [{ from: "/images/listing-1.jpg", to: "/images/villa.jpg" }]);
+    expect(out).toContain("/images/listing-10.jpg");
+  });
+
+  test("never rewrites the header row", () => {
+    // The header names columns, not files. `parse` does not expose it as a value, so an edit
+    // Derived from parse output cannot legitimately name it — and renaming a column would be a
+    // Data-loss bug wearing a rename's clothes.
+    expect(rewriteCSV(SRC, [{ from: "image", to: "photo" }])).toBe(SRC);
+  });
+
+  test("a value that would be misread unquoted is quoted, and quotes inside it are doubled", () => {
+    const out = rewriteCSV("a,b\nx,hero.jpg\n", [{ from: "hero.jpg", to: 'my, "big" hero.jpg' }]);
+    expect(out).toBe('a,b\nx,"my, ""big"" hero.jpg"\n');
+  });
+
+  test("a cell that was quoted stays quoted even when it no longer needs to be", () => {
+    const out = rewriteCSV('a,b\nx,"hero, one.jpg"\n', [{ from: "hero, one.jpg", to: "hero.jpg" }]);
+    expect(out).toBe('a,b\nx,"hero.jpg"\n');
+  });
+
+  test("a quoted cell spanning a newline is one cell, and its row indexing survives", () => {
+    const src = 'a,b\n"line\none",hero.jpg\nz,other.jpg\n';
+    expect(rewriteCSV(src, [{ from: "hero.jpg", to: "villa.jpg" }])).toBe(
+      'a,b\n"line\none",villa.jpg\nz,other.jpg\n',
+    );
+  });
+
+  test("no matching cell, a no-op edit, and an empty edit list all return the source unchanged", () => {
+    expect(rewriteCSV(SRC, [{ from: "/images/nothing.jpg", to: "/x.jpg" }])).toBe(SRC);
+    expect(rewriteCSV(SRC, [{ from: "/images/listing-1.jpg", to: "/images/listing-1.jpg" }])).toBe(
+      SRC,
+    );
+    expect(rewriteCSV(SRC, [])).toBe(SRC);
+  });
+
+  test("a file with no trailing newline, and one with only a header, are both handled", () => {
+    expect(rewriteCSV("a,b\nx,hero.jpg", [{ from: "hero.jpg", to: "villa.jpg" }])).toBe(
+      "a,b\nx,villa.jpg",
+    );
+    expect(rewriteCSV("a,b\n", [{ from: "a", to: "z" }])).toBe("a,b\n");
+    expect(rewriteCSV("", [{ from: "a", to: "z" }])).toBe("");
+  });
+
+  test("Csv.rewrite is the capability entry point and defaults to no edits", () => {
+    expect(Csv.rewrite(SRC, [{ from: "/images/listing-1.jpg", to: "/x.jpg" }])).toContain("/x.jpg");
+    expect(Csv.rewrite(SRC)).toBe(SRC);
   });
 });

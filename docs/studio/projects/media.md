@@ -123,7 +123,7 @@ A count Studio could not produce is reported as **unknown**, never as zero. If t
 Studio finds those references wherever they are written. An image is referenced as a site URL (`/images/hero.jpg`), and the same file might be named by a page's `src`, by a component property you filled in on the canvas, by a content entry's front matter, or by the social card in your project settings. All of them count, and all of them are rewritten when the file moves. If the file leaves `public/`, the rewritten reference follows it, and Studio picks the form the published site will actually serve.
 
 :::doc-note
-Some files can be read but not written back. A CSV collection is a data source Studio loads entries from, not a document it round-trips. A reference in one still counts toward what a delete breaks, and a rename that could not update it reports a **warning** naming the file rather than a plain success. The same applies when you drag a file to a new folder.
+A CSV collection is a data source Studio loads entries from, not a document it round-trips, so it is never rewritten wholesale. A reference in one is still repaired: Studio replaces that cell's text and leaves the rest of the file exactly as you wrote it. Where a reference genuinely cannot be updated (a file that will not parse), the rename reports a **warning** naming the file rather than a plain success. The same applies when you drag a file to a new folder.
 :::
 
 ## What the build does to images

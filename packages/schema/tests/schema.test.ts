@@ -137,6 +137,7 @@ describe("generateClassSchema", () => {
       "accessor",
       "parse",
       "serialize",
+      "rewrite",
       "discover",
       "load",
       "projectData",

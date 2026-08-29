@@ -115,6 +115,37 @@
         "returnType": { "$ref": "#/$defs/returnTypes/ContentLoaderEntries" },
         "description": "Parse CSV text into typed content entries (pure, browser-safe)"
       },
+      "rewrite": {
+        "role": "rewrite",
+        "$prototype": "Function",
+        "access": "public",
+        "scope": "static",
+        "identifier": "rewrite",
+        "timing": ["compiler", "server", "client"],
+        "parameters": [
+          {
+            "identifier": "source",
+            "type": { "type": "string" },
+            "description": "Raw CSV text"
+          },
+          {
+            "identifier": "edits",
+            "type": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "from": { "type": "string" },
+                  "to": { "type": "string" }
+                }
+              }
+            },
+            "description": "Authored cell values to replace, matched whole against a data cell"
+          }
+        ],
+        "returnType": { "type": "string" },
+        "description": "Replace authored cell values in CSV source text, preserving every other byte"
+      },
       "discover": {
         "role": "discover",
         "$prototype": "Function",
