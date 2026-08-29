@@ -21,7 +21,15 @@ import {
 import { createHash } from "node:crypto";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { isMappedArray, isRef } from "@jxsuite/schema/guards";
-import { isNpmSpecifier, npmAssetPath, sidecarAssetPath } from "@jxsuite/schema/asset-paths";
+import {
+  isNpmSpecifier,
+  npmAssetPath,
+  sidecarAssetPath,
+  siteAbsoluteUrl,
+  siteBasePath,
+  withBase,
+} from "@jxsuite/schema/asset-paths";
+import { rewriteHtmlBase } from "./base-path.ts";
 import {
   CLIENT_EXTERNALS,
   bundleEntry,
@@ -40,6 +48,7 @@ import {
 import {
   buildHeaderRules,
   contentTypeRules,
+  rebaseHeaderRules,
   writeHeaders,
   writeNoJekyll,
 } from "./headers-emitter.ts";
@@ -519,6 +528,12 @@ export async function buildSite(
   // Sitemap is generated from the route table when a production `url` is configured
   // (absolute <loc> URLs require it) and not explicitly disabled via build.sitemap: false.
   const siteUrl = projectConfig.url;
+  /*
+   * The path the site is deployed under, read back off `url` (RFC 3986 §5 — see `base-path.ts`).
+   * `""` for a site at an origin root, which is every deployment Jx documents, so every use below
+   * is a no-op there rather than a branch.
+   */
+  const basePath = siteBasePath(siteUrl);
   const sitemapEnabled = Boolean(siteUrl) && projectConfig.build.sitemap !== false;
   const sitemapEntries: SitemapEntry[] = [];
 
@@ -714,7 +729,9 @@ export async function buildSite(
       // Determine output path
       const outPath = routeToOutputPath(route.urlPattern, outDir, trailingSlash);
       mkdirSync(dirname(outPath), { recursive: true });
-      writeFileSync(outPath, result.html, "utf8");
+      /* Last, after the scans above: they ask what this page REFERENCES, and the answer is a
+         build-output path, not a deployed URL. Re-rooting first would make every one of them miss. */
+      writeFileSync(outPath, rewriteHtmlBase(result.html, basePath), "utf8");
       fileCount += 1;
 
       // Record a sitemap entry for this concrete page (skip unexpanded dynamic routes and
@@ -735,7 +752,7 @@ export async function buildSite(
             typeof route.sourceMtime === "string" && route.sourceMtime !== ""
               ? route.sourceMtime
               : toRfc3339(statSync(route.sourcePath).mtime),
-          loc: new URL(route.urlPattern, siteUrl).href,
+          loc: siteAbsoluteUrl(route.urlPattern, siteUrl),
           ...(routeAlternates.length > 0 && { alternates: routeAlternates }),
         });
       }
@@ -835,7 +852,13 @@ export async function buildSite(
     const skipWorker = adapter === "cloudflare-pages" && deduped.size === 0 && mounts.length === 0;
     const workerSource = skipWorker
       ? null
-      : compileSiteServer([...deduped.values()], { adapter, connectors, i18n, mounts });
+      : compileSiteServer([...deduped.values()], {
+          adapter,
+          base: basePath,
+          connectors,
+          i18n,
+          mounts,
+        });
 
     if (workerSource) {
       // Bundle the worker self-contained for the adapter's runtime (compiler.md §12): mount
@@ -1014,6 +1037,7 @@ export async function buildSite(
     log("Generating redirects...");
     const compiledUrls = new Set(routes.map((r) => r.urlPattern));
     const redirects = generateRedirects(projectConfig.redirects, outDir, {
+      basePath,
       compiledUrls,
       trailingSlash: projectConfig.build.trailingSlash,
     });
@@ -1091,7 +1115,8 @@ export async function buildSite(
   {
     const sw = normalizeServiceWorker(projectConfig.serviceWorker);
     if (sw !== null) {
-      const output = sw === false ? tombstoneServiceWorker() : buildServiceWorker(sw, outDir);
+      const output =
+        sw === false ? tombstoneServiceWorker() : buildServiceWorker(sw, outDir, basePath);
       for (const warning of output.warnings) {
         console.warn(warning);
       }
@@ -1115,7 +1140,7 @@ export async function buildSite(
     );
     errors.push(...headerErrors);
     // Runs here, after every emitter, so it can see which of these files the build actually wrote.
-    const rules = [...securityRules, ...contentTypeRules(outDir)];
+    const rules = rebaseHeaderRules([...securityRules, ...contentTypeRules(outDir)], basePath);
     if (rules.length > 0) {
       log("Writing response headers...");
       fileCount += writeHeaders(outDir, rules);
@@ -1215,6 +1240,10 @@ async function compilePage(
   /** Registers a page's npm `$elements` set as one bundle and returns its URL. */
   registerElementBundle: (specifiers: string[]) => string,
 ) {
+  /* Derived rather than passed as a seventeenth parameter: it is a pure function of
+     `projectConfig.url`, which is already here, so the two cannot disagree. */
+  const basePath = siteBasePath(projectConfig.url);
+
   // Load the raw page document (.json natively, other formats via the registry)
   const pageDoc = await readPageDocument(route.sourcePath as string, formatRegistry);
 
@@ -1364,7 +1393,7 @@ async function compilePage(
   const swHead: JxHeadEntry[] =
     swConfig === null || swConfig === false
       ? []
-      : [{ tagName: "script", textContent: registrationScript(swConfig.scope ?? "/") }];
+      : [{ tagName: "script", textContent: registrationScript(swConfig.scope ?? "/", basePath) }];
 
   const resolvedSiteHead = [
     // The manifest link and theme colour are first-party and unconditional once declared, so they
@@ -1528,6 +1557,7 @@ function buildMountSpecs(
   if (activeMounts.length === 0) {
     return { connectors: [], mounts: [] };
   }
+  const base = siteBasePath(projectConfig.url);
 
   const sections: Record<string, unknown> = {};
   for (const contribution of registry.projectContributions()) {
@@ -1546,11 +1576,15 @@ function buildMountSpecs(
           `to generate a deployable worker`,
       );
     }
+    /* Both are request paths in the deployed worker: the route it registers, and the prefix the
+       mount strips to find its own sub-path. They must carry the same base or the handler would
+       answer a URL and then mis-read it. */
+    const mountBase = withBase(base, server.basePath);
     return {
-      basePath: server.basePath,
+      basePath: mountBase,
       className: (entry.classDef.title as string | undefined) ?? entry.name,
       module,
-      options: { basePath: server.basePath, sections },
+      options: { basePath: mountBase, sections },
       order: server.order ?? 100,
     };
   });
@@ -2369,7 +2403,7 @@ function generateRedirects(
     string | { destination: string; status?: number } | { destination: string; rewrite: true }
   >,
   outDir: string,
-  opts: { compiledUrls?: Set<string>; trailingSlash?: string } = {},
+  opts: { compiledUrls?: Set<string>; trailingSlash?: string; basePath?: string } = {},
 ) {
   let files = 0;
   const errors: string[] = [];
@@ -2396,7 +2430,11 @@ function generateRedirects(
       continue;
     }
 
-    redirectLines.push(`${source} ${dest} ${status}`);
+    /* Both halves are site URLs, and the host matches the source against a REQUEST path — which
+       arrives under the base. A rule left at the old root would never fire, and one that did would
+       send the visitor out of the deployment. */
+    const rebased = opts.basePath ?? "";
+    redirectLines.push(`${withBase(rebased, source)} ${withBase(rebased, dest)} ${status}`);
 
     // A pattern source cannot be a file on disk, so it lives only in `_redirects`.
     if (source.includes(":") || source.includes("*")) {
@@ -2563,7 +2601,7 @@ function ensureRobotsSitemap(outDir: string, siteUrl: string) {
   if (!content.endsWith("\n")) {
     content += "\n";
   }
-  content += `\nSitemap: ${new URL("/sitemap.xml", siteUrl).href}\n`;
+  content += `\nSitemap: ${siteAbsoluteUrl("/sitemap.xml", siteUrl)}\n`;
   writeFileSync(robotsPath, content, "utf8");
   return existed ? 0 : 1;
 }

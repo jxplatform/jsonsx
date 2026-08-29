@@ -11,6 +11,7 @@
  * @docs framework/site/deployment
  */
 
+import { withBase } from "@jxsuite/schema/asset-paths";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { buildCspHeaders, normalizeCspConfig } from "./csp.ts";
@@ -179,6 +180,25 @@ export function contentTypeRules(outDir: string): HeaderRule[] {
     });
   }
   return rules;
+}
+
+/**
+ * Re-root every rule's pattern onto the deployment base.
+ *
+ * A `_headers` pattern is matched against the REQUEST path, so on a site served from `/m/my-site/`
+ * a rule for `/assets/*` matches nothing at all — which is silent, because a missing cache header
+ * is a slow site rather than a broken one. The generated patterns and the author's `build.headers`
+ * rules go through together: both describe the same URL space.
+ *
+ * @param {readonly HeaderRule[]} rules
+ * @param {string} base - From `siteBasePath`; `""` returns the rules untouched
+ * @returns {HeaderRule[]}
+ */
+export function rebaseHeaderRules(rules: readonly HeaderRule[], base: string): HeaderRule[] {
+  if (base === "") {
+    return [...rules];
+  }
+  return rules.map((rule) => ({ headers: rule.headers, pattern: withBase(base, rule.pattern) }));
 }
 
 /** Render rules in the Netlify / Cloudflare Pages `_headers` format. */

@@ -5,6 +5,7 @@
  * file.
  */
 
+import { withBase } from "@jxsuite/schema/asset-paths";
 import { dereference } from "@apidevtools/json-schema-ref-parser";
 import { collectServerEntries } from "../shared.ts";
 import { localeNegotiationMiddleware } from "../site/locale-negotiation.ts";
@@ -110,15 +111,21 @@ export function compileSiteServer(
     mounts?: SiteMountSpec[];
     connectors?: SiteConnectorSpec[];
     i18n?: ResolvedI18n | null;
+    base?: string;
   } = {},
 ) {
-  const {
-    baseUrl = "/_jx/server",
-    adapter = null,
-    mounts = [],
-    connectors = [],
-    i18n = null,
-  } = opts;
+  const { adapter = null, mounts = [], connectors = [], i18n = null, base = "" } = opts;
+  /*
+   * Routes are registered under the deployment base (`site/base-path.ts`), because the worker IS
+   * the origin: the request it sees is the one the visitor's browser sent, and on a site served
+   * from `/m/my-site/` that path carries the prefix. A route left at the bare path would simply
+   * never match — the 404 nobody attributes to a config value.
+   *
+   * The dev server takes the opposite approach and strips the base at the edge (`server.ts`), so
+   * everything behind it routes on the bare path. Each is internally consistent: production serves
+   * exactly one URL space, while `jx dev` deliberately answers both.
+   */
+  const baseUrl = withBase(base, opts.baseUrl ?? "/_jx/server");
   if (entries.length === 0 && mounts.length === 0 && !adapter) {
     return null;
   }

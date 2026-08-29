@@ -538,3 +538,89 @@ export function formatSrcset(candidates: readonly SrcsetCandidate[]): string {
     .map(({ url, descriptor }) => (descriptor ? `${url} ${descriptor}` : url))
     .join(", ");
 }
+
+// ─── Deployment base path (RFC 3986 §5) ──────────────────────────────────────
+
+/**
+ * The path a site is deployed under, derived from `project.json`'s `url`.
+ *
+ * **There is no second key for this, on purpose.** Every URL the build emits is a URI reference,
+ * and `url` is the base URI it is resolved against (RFC 3986 §5). A site at
+ * `https://example.pages.dev/m/my-site/` has already said where it lives; a `build.base` beside it
+ * would be a second writer on one fact, free to disagree with the canonical links and the sitemap
+ * that are built from the same value.
+ *
+ * What went wrong was narrower than a missing option: the compiler resolved its references against
+ * the base's ORIGIN and discarded its path, which is what §5.2 does to an absolute-path reference
+ * (`/assets/x.js`) and is not what a deployment means by one. So the fix is to stop discarding it.
+ *
+ * Returns `""` for a site at an origin root, a missing `url`, or a `url` that will not parse — all
+ * three mean "prefix nothing", and a malformed URL must not take the build down when the only thing
+ * it can affect is a prefix. Never has a trailing slash, so `base + "/assets/x"` is well-formed.
+ *
+ * @param {string | undefined} url - `project.json`'s `url`
+ * @returns {string} `""` or a path with a leading slash and no trailing one
+ */
+export function siteBasePath(url: string | undefined | null): string {
+  if (typeof url !== "string" || url === "") {
+    return "";
+  }
+  let pathname: string;
+  try {
+    ({ pathname } = new URL(url));
+  } catch {
+    return "";
+  }
+  const trimmed = pathname.replace(/\/+$/, "");
+  if (trimmed === "" || trimmed === "/") {
+    return "";
+  }
+  return trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+}
+
+/**
+ * Re-root a site-absolute URL onto the deployment base.
+ *
+ * Only an absolute-path reference is affected — the one form whose meaning is "from the site root",
+ * and therefore the one form that moves when the site root does. A protocol-relative `//host/x`, an
+ * absolute URL, a fragment, a query and every relative path already resolve against something else
+ * and are returned untouched.
+ *
+ * **Idempotent**, because a URL may reach this more than once: an emitter that already prefixed and
+ * an output pass that prefixes everything must not compound. A value already under the base is
+ * returned as-is.
+ *
+ * @param {string} base - From {@link siteBasePath}
+ * @param {string} url - A URL as emitted
+ * @returns {string} The URL a browser should be given
+ */
+export function withBase(base: string, url: string): string {
+  if (base === "" || !url.startsWith("/") || url.startsWith("//")) {
+    return url;
+  }
+  if (url === base || url.startsWith(`${base}/`)) {
+    return url;
+  }
+  return base + url;
+}
+
+/**
+ * An absolute URL for a site route, keeping the base's path.
+ *
+ * `new URL("/about", "https://x.dev/m/site/")` is `https://x.dev/about` — RFC 3986 §5.2 replaces
+ * the whole path for an absolute-path reference, which is exactly right for the RFC and exactly
+ * wrong for a canonical link. Resolving the route as a RELATIVE-path reference keeps the base, so
+ * `<link rel="canonical">`, `sitemap.xml` and `robots.txt` name pages that exist.
+ *
+ * @param {string} route - A site route (`/about`), leading slash optional
+ * @param {string} siteUrl - `project.json`'s `url`
+ * @returns {string} The absolute URL
+ */
+export function siteAbsoluteUrl(route: string, siteUrl: string): string {
+  const base = new URL(siteUrl);
+  // A base whose path does not end in "/" would drop its last segment under §5.2's merge.
+  if (!base.pathname.endsWith("/")) {
+    base.pathname += "/";
+  }
+  return new URL(route.replace(/^\/+/, ""), base).href;
+}

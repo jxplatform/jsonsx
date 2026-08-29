@@ -22,8 +22,11 @@ import {
   resolveAssetUrl,
   SIDECAR_ASSET_DIR,
   sidecarAssetPath,
+  siteAbsoluteUrl,
+  siteBasePath,
   siteUrlForPath,
   splitRefSuffix,
+  withBase,
 } from "../src/asset-paths.ts";
 import type { AssetMount } from "../src/asset-paths.ts";
 
@@ -549,5 +552,80 @@ describe("the shared constants", () => {
   test("PUBLIC_DIR and ASSET_KEYS mirror the content loader", () => {
     expect(PUBLIC_DIR).toBe("public");
     expect(ASSET_KEYS).toEqual(["src", "poster"]);
+  });
+});
+
+/*
+ * The deployment base (RFC 3986 §5). There is no `build.base` key: `url` is the base URI every
+ * emitted reference is resolved against, and the defect these three close is that the compiler was
+ * resolving against its ORIGIN and throwing the path away (issue 235).
+ */
+describe("siteBasePath", () => {
+  test.each([
+    ["https://example.pages.dev/m/my-site/", "/m/my-site"],
+    ["https://example.pages.dev/m/my-site", "/m/my-site"],
+    ["https://example.com/", ""],
+    ["https://example.com", ""],
+    ["https://example.com/a/b/c///", "/a/b/c"],
+  ])("%p → %p", (url, expected) => {
+    expect(siteBasePath(url)).toBe(expected);
+  });
+
+  test("a missing or unparseable url is no base, not a build failure", () => {
+    // All three mean "prefix nothing", and the only thing a malformed url can affect here is a
+    // Prefix — taking the build down over it would be the wrong trade.
+    const absent: string | undefined = undefined;
+    expect(siteBasePath(absent)).toBe("");
+    expect(siteBasePath(null)).toBe("");
+    expect(siteBasePath("")).toBe("");
+    expect(siteBasePath("not a url")).toBe("");
+  });
+});
+
+describe("withBase", () => {
+  test("re-roots an absolute-path reference and nothing else", () => {
+    expect(withBase("/m/s", "/assets/x.js")).toBe("/m/s/assets/x.js");
+    expect(withBase("/m/s", "/")).toBe("/m/s/");
+    // Each of these already resolves against something other than the site root.
+    expect(withBase("/m/s", "//cdn.example/x.js")).toBe("//cdn.example/x.js");
+    expect(withBase("/m/s", "https://ext/x")).toBe("https://ext/x");
+    expect(withBase("/m/s", "./rel.js")).toBe("./rel.js");
+    expect(withBase("/m/s", "#frag")).toBe("#frag");
+    expect(withBase("/m/s", "")).toBe("");
+  });
+
+  test("an empty base is the identity", () => {
+    expect(withBase("", "/assets/x.js")).toBe("/assets/x.js");
+  });
+
+  test("is idempotent, because a URL can reach it more than once", () => {
+    // An emitter that already prefixed and an output pass that prefixes everything must not
+    // Compound; `rewriteHtmlBase` relies on exactly this.
+    expect(withBase("/m/s", "/m/s/assets/x.js")).toBe("/m/s/assets/x.js");
+    expect(withBase("/m/s", "/m/s")).toBe("/m/s");
+  });
+
+  test("a sibling path that merely shares a prefix is still re-rooted", () => {
+    // `/m/site/x` is not under `/m/s` — the boundary is a segment, not a character count.
+    expect(withBase("/m/s", "/m/site/x")).toBe("/m/s/m/site/x");
+  });
+});
+
+describe("siteAbsoluteUrl", () => {
+  test("keeps the base's path, which §5.2 resolution would discard", () => {
+    /* `new URL("/about", "https://x.dev/m/site/")` is `https://x.dev/about`: an absolute-path
+       reference replaces the whole path. That is right for the RFC and wrong for a canonical link,
+       so the route is resolved as a relative-path reference instead. */
+    expect(siteAbsoluteUrl("/about", "https://x.dev/m/site/")).toBe("https://x.dev/m/site/about");
+    expect(siteAbsoluteUrl("about", "https://x.dev/m/site/")).toBe("https://x.dev/m/site/about");
+  });
+
+  test("a base with no trailing slash does not lose its last segment to the merge", () => {
+    expect(siteAbsoluteUrl("/about", "https://x.dev/m/site")).toBe("https://x.dev/m/site/about");
+  });
+
+  test("an origin-root site is unaffected", () => {
+    expect(siteAbsoluteUrl("/about", "https://x.dev")).toBe("https://x.dev/about");
+    expect(siteAbsoluteUrl("/", "https://x.dev/m/site/")).toBe("https://x.dev/m/site/");
   });
 });

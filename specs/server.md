@@ -2,9 +2,9 @@
 
 ## Development Server with Live Reload, Proxy Resolution, and Studio API
 
-**Version:** 0.2.21
+**Version:** 0.2.22
 **Status:** Implemented
-**Updated:** 2026-08-27
+**Updated:** 2026-08-29
 **License:** MIT
 
 ---
@@ -60,8 +60,18 @@ A non-site root gets a plain `createDevServer`. `parseDevArgs` and `createDistMi
 
 ## 3. Core Endpoints
 
-The request path is matched in this order (`src/server.ts`):
+The request path is matched in this order (`src/server.ts`), after a leading **deployment base** is
+stripped from it:
 
+0. **The base.** A project whose `url` carries a path is served from that path, and a build emits
+   every URL under it ([site-architecture.md §14.7](./site-architecture.md)). The server strips that
+   prefix once, at the edge, rather than moving the dev root: `localhost:3000/` is unchanged for
+   every project that never sets one, and `localhost:3000/m/my-site/assets/x.js` resolves to the
+   same file the deployed site serves. Answering only the bare path would mean previewing URLs the
+   deployed site never uses, which is the class of bug that is only found in production. The
+   boundary is a segment, so `/m/my-sitefile` is not under `/m/my-site`. Everything below — the
+   extension mounts included — therefore routes on the bare path, which is the opposite of the
+   generated worker, where the base is on the routes themselves because that worker IS the origin.
 1. `GET /__reload` — SSE live reload (when watching)
 2. `POST /__jx_resolve__` — `$prototype`/`$src` proxy
 3. `POST /__jx_server__` — `timing: "server"` function proxy
@@ -448,6 +458,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.2.22** (2026-08-29) — A deployment base declared by the project's url is stripped from the request path at the edge, so the dev server answers both the bare and the based spelling.
 - **0.2.21** (2026-08-27) — A rename resets any co-editing room keyed to the old path, so a shutdown flush cannot recreate the moved file.
 - **0.2.20** (2026-08-27) — Directory listing and project-wide search answer in stable path order, in both implementations.
 - **0.2.19** (2026-08-27) — The Studio API's path space is written down: server-root-relative in, project-relative out; a refactor target outside the active project is a 400, not a zero-result 200.
@@ -483,4 +494,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/server` Specification v0.2.21_
+_`@jxsuite/server` Specification v0.2.22_

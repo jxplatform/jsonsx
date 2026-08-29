@@ -9,6 +9,7 @@
  * @docs framework/site/deployment
  */
 
+import { siteBasePath, withBase } from "@jxsuite/schema/asset-paths";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { canonicalizeLocale } from "@jxsuite/schema/locale";
@@ -48,17 +49,27 @@ export function buildManifest(projectConfig: ProjectConfig): WellKnownOutput {
   }
 
   const name = config.name ?? projectConfig.name ?? "Jx Site";
-  const icons = config.icons ?? [];
+  /*
+   * Every URL in a manifest is fetched or navigated to by the browser, so all three carry the
+   * deployment base (`base-path.ts`). `scope` is the one that fails loudly — a scope the manifest's
+   * own URL is not inside makes the manifest invalid and the site uninstallable — while a
+   * `start_url` at the old root just opens the wrong page from the home screen.
+   */
+  const base = siteBasePath(projectConfig.url);
+  const icons = [];
+  for (const icon of config.icons ?? []) {
+    icons.push(typeof icon.src === "string" ? { ...icon, src: withBase(base, icon.src) } : icon);
+  }
   const manifest: Record<string, unknown> = {
     display: config.display ?? "standalone",
     icons,
     name,
     short_name: config.shortName ?? name,
-    start_url: config.startUrl ?? "/",
+    start_url: withBase(base, config.startUrl ?? "/"),
     ...(config.description === undefined ? {} : { description: config.description }),
     ...(config.themeColor === undefined ? {} : { theme_color: config.themeColor }),
     ...(config.backgroundColor === undefined ? {} : { background_color: config.backgroundColor }),
-    ...(config.scope === undefined ? {} : { scope: config.scope }),
+    ...(config.scope === undefined ? {} : { scope: withBase(base, config.scope) }),
     ...(config.orientation === undefined ? {} : { orientation: config.orientation }),
     ...(config.lang === undefined ? {} : { lang: config.lang }),
     ...(config.dir === undefined ? {} : { dir: config.dir }),
