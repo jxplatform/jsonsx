@@ -50,7 +50,7 @@
     "@jxsuite/starters": "workspace:^",
     "chokidar": "^5.0.0",
     "kysely": "^0.29.5",
-    "zod": "^4.4.3"
+    "zod": "^4.5.4"
   },
   "devDependencies": {
     "@jxsuite/auth": "workspace:^",
