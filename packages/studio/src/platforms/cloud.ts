@@ -6,9 +6,9 @@
  * `/api/v1/ai/chat`. The session is pre-bound to one (repo, branch) — the shell picks the project
  * before Studio boots — while project-less mode (null) powers the /studio welcome screen.
  *
- * Cloud omissions (Studio degrades per @jxsuite/protocol's route table): pickDirectory/importSite,
- * package install/outdated/set-versions (package ops are manifest-only edits), multi-window,
- * gitClone, resolveClass, component discovery, code services.
+ * Cloud omissions (Studio degrades per @jxsuite/protocol's route table): pickDirectory, package
+ * install/outdated/set-versions (package ops are manifest-only edits), multi-window, gitClone,
+ * resolveClass, component discovery, code services.
  */
 
 import { negotiateCollab } from "@jxsuite/collab/negotiate";
@@ -16,6 +16,7 @@ import type { CollabNegotiation } from "@jxsuite/collab/negotiate";
 import type { WsCollabConnection } from "@jxsuite/collab/client";
 import type { ProjectConfig } from "@jxsuite/schema/types";
 import { componentMetaFrom } from "@jxsuite/schema/component-meta";
+import { streamImport } from "../services/import-client";
 import type {
   AccountStatus,
   CfAccountSummary,
@@ -29,6 +30,9 @@ import type {
   GitBranchesResult,
   GitLogEntry,
   GitStatusResult,
+  ImportProgressEvent,
+  ImportReadyEvent,
+  ImportSiteOptions,
   PackageInfo,
   ProjectListEntry,
   SiteBuildResult,
@@ -1030,6 +1034,33 @@ export function createCloudPlatform(project: CloudProject | null): StudioPlatfor
         }),
         config: { name: opts.name } as ProjectConfig,
       };
+    },
+
+    /**
+     * AI-guided site import, streamed from the PLATFORM's import route rather than a session one.
+     *
+     * Deliberately not routed through `api()`: importing is how a cloud project comes into
+     * existence, so the one mode it has to work in is the project-less hub, where `api()` rejects
+     * before a request is ever made and `base` is "".
+     *
+     * The path is same-origin and relative, so `streamImport`'s plain `fetch` carries the session
+     * cookie under the default `same-origin` credentials mode — the same authority every
+     * `/api/v1/*` call here sends `credentials: "include"` for, with no cloud-shaped option added
+     * to the shared client. A bring-your-own-key run rides on the headers that client already sets,
+     * so the backend sees `X-Api-Key` / `X-Api-Base-URL` exactly as the OSS server does.
+     *
+     * `onReady` is forwarded and this backend never calls it, which is a difference worth naming:
+     * adopting the project mid-run would navigate this page to the editor and abort the request
+     * still writing the import, so the stream carries no `ready` line and the caller adopts on
+     * `done`. That is the same path a backend older than `ready` has always taken.
+     */
+    async importSite(
+      opts: ImportSiteOptions,
+      onProgress: (evt: ImportProgressEvent) => void,
+      signal?: AbortSignal,
+      onReady?: (evt: ImportReadyEvent) => void,
+    ) {
+      return await streamImport("/api/v1/import/site", opts, onProgress, signal, onReady);
     },
 
     // ─── Identity & Cloudflare publish surface ──────────────────────────────

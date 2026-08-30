@@ -1,9 +1,10 @@
 /**
  * Ai-import-tools.ts — `import_site`, the assistant's other way to bootstrap a project.
  *
- * A sibling of `create_project` (`ai-project-tools.ts`) with a different backend: it drives the
- * headless-Chrome pipeline behind `POST /__studio/import-site`, streams its progress into a record
- * the transcript draws, and then adopts the result exactly as a scaffold is adopted. Its own module
+ * A sibling of `create_project` (`ai-project-tools.ts`) with a different backend: it drives whatever
+ * import pipeline the platform's `importSite` reaches — a local headless Chrome, or a hosted one —
+ * streams its progress into a record the transcript draws, and then adopts the result exactly as a
+ * scaffold is adopted. Its own module
  * rather than an eighth tool in `ai-project-tools.ts`, which is already 650 lines under a per-file
  * coverage bar.
  *
@@ -113,6 +114,40 @@ function breakpointPolicyFor(
 /** Absolute on POSIX or Windows — the test `create_project` already applies to its `location`. */
 function isAbsolutePath(path: string): boolean {
   return /^(?:[a-zA-Z]:[/\\]|\/)/.test(path);
+}
+
+/**
+ * `owner/repo`, conservatively — the destination a `createDestination: "repo"` platform writes to.
+ *
+ * Narrower than GitHub's own rules on purpose: this guards a string the MODEL may supply, and the
+ * cost of refusing an exotic-but-legal name is one clarifying question, while the cost of accepting
+ * a path-shaped or query-shaped one is a request the backend has to defend against.
+ */
+const REPO_DESTINATION = /^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?\/[A-Za-z0-9._-]+$/;
+
+/**
+ * Whether `destination` is a shape THIS platform can write to, or the sentence saying why not.
+ *
+ * The platform's `createDestination` decides, not the string's own look: a hosted backend creates a
+ * GitHub repository and has no filesystem to hold an absolute path, and a desktop backend has no
+ * repository to create. Answering by inspecting the string would accept `owner/repo` on desktop,
+ * where it silently means a relative directory nobody named.
+ *
+ * @param {string} destination - The resolved destination, from the model or the wizard's brief
+ * @returns {string | null} The refusal, or null when it is usable
+ */
+function destinationProblem(destination: string): string | null {
+  if (getPlatform().createDestination === "repo") {
+    if (!REPO_DESTINATION.test(destination)) {
+      return `"directory" must name a repository as "owner/repo": ${destination}`;
+    }
+  } else if (!isAbsolutePath(destination)) {
+    return `"directory" must be an absolute path: ${destination}`;
+  }
+  if (destination.split(/[/\\]/).includes("..")) {
+    return `"directory" must not contain "..": ${destination}`;
+  }
+  return null;
 }
 
 /**
@@ -242,8 +277,10 @@ export function registerImportTools(
           directory: {
             type: "string",
             description:
-              "Absolute destination folder. Omit it when an import was started from the New " +
-              "Project form — that destination is the one the user chose, and it wins.",
+              "Where the project goes, in whichever form this studio's backend uses: an absolute " +
+              'folder on a filesystem host, or "owner/repo" on a host where a project IS a ' +
+              "repository. Omit it when an import was started from the New Project form — that " +
+              "destination is the one the user chose, and it wins.",
           },
           depth: {
             type: "number",
@@ -361,15 +398,16 @@ export function registerImportTools(
         const destination = requested || brief?.directory || "";
         if (!destination) {
           return toolError(
-            'Pass "directory" — the absolute folder to create the project in. Ask the user where ' +
-              "the project should live rather than guessing.",
+            platform.createDestination === "repo"
+              ? 'Pass "directory" — the "owner/repo" to create the project as. Ask the user which ' +
+                  "account and repository name rather than guessing."
+              : 'Pass "directory" — the absolute folder to create the project in. Ask the user ' +
+                  "where the project should live rather than guessing.",
           );
         }
-        if (!isAbsolutePath(destination)) {
-          return toolError(`"directory" must be an absolute path: ${destination}`);
-        }
-        if (destination.split(/[/\\]/).includes("..")) {
-          return toolError(`"directory" must not contain "..": ${destination}`);
+        const problem = destinationProblem(destination);
+        if (problem) {
+          return toolError(problem);
         }
 
         const id = currentToolCallId();

@@ -1368,3 +1368,80 @@ describe("the cloud adapter's buildSite", () => {
     expect((failure as Error | undefined)?.message).toContain("No project is open");
   });
 });
+
+describe("importSite", () => {
+  /** An NDJSON body, since `streamImport` reads a stream rather than a JSON document. */
+  function ndjson(lines: string[]): Call[] {
+    const calls: Call[] = [];
+    globalThis.fetch = ((url: string, init?: RequestInit) => {
+      calls.push({ url, init });
+      return Promise.resolve(
+        new Response(lines.map((line) => `${line}\n`).join(""), {
+          headers: { "Content-Type": "application/x-ndjson" },
+          status: 200,
+        }),
+      );
+    }) as unknown as typeof fetch;
+    return calls;
+  }
+
+  test("posts to the platform route with no project open, and adopts on done", async () => {
+    /* Importing is how a cloud project comes into existence, so the ONE mode it has to work in is
+       the project-less hub — where a session-scoped path has no base to be scoped to. The route is
+       deliberately not under /p/<owner>/<repo>/<branch>/studio for exactly that reason.
+
+       And this backend sends no `ready` line: adopting mid-run would navigate the page to the
+       editor and abort the request still writing the import. A caller that waited for `ready`
+       would hang forever, so the adoption has to come off `done`. */
+    const calls = ndjson([
+      '{"type":"progress","phase":"crawl","message":"Reading the site"}',
+      '{"type":"done","root":"acme/site@main","config":{"name":"Site"}}',
+    ]);
+    const phases: string[] = [];
+    const ready: string[] = [];
+    const result = await createCloudPlatform(null).importSite!(
+      {
+        aiComponents: false,
+        depth: 0,
+        directory: "acme/site",
+        maxPages: 1,
+        name: "Site",
+        url: "https://clone.example/",
+      },
+      (evt) => phases.push(evt.phase),
+      undefined,
+      ({ root }) => ready.push(root),
+    );
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.url).toBe("/api/v1/import/site");
+    expect(calls[0]!.init?.method).toBe("POST");
+    expect(phases).toEqual(["crawl"]);
+    expect(ready).toEqual([]);
+    expect(result.root).toBe("acme/site@main");
+  });
+
+  test("a bring-your-own-key run forwards its key and base URL", async () => {
+    /* The hosted backend brokers Workers AI, but a user who has typed their own key is entitled to
+       spend it here too — and the only way the backend learns that is these two headers, which the
+       shared client already sets. A cloud-shaped option would have been a second way to say it. */
+    const calls = ndjson(['{"type":"done","root":"acme/site@main","config":{"name":"Site"}}']);
+    await createCloudPlatform(null).importSite!(
+      {
+        aiComponents: true,
+        apiKey: "sk-test",
+        baseUrl: "https://llm.example/v1",
+        depth: 0,
+        directory: "acme/site",
+        maxPages: 1,
+        name: "Site",
+        url: "https://clone.example/",
+      },
+      () => {},
+    );
+
+    const headers = calls[0]!.init?.headers as Record<string, string>;
+    expect(headers["X-Api-Key"]).toBe("sk-test");
+    expect(headers["X-Api-Base-URL"]).toBe("https://llm.example/v1");
+  });
+});

@@ -140,13 +140,16 @@ function joinPath(parent: string, name: string): string {
 }
 
 /**
- * The absolute directory a `"path"` destination writes to. The import pipeline takes a plain
- * absolute `directory` rather than a destination object (it is never repo-mode — cloud ships no
- * `importSite`), so the modal resolves it here.
+ * The destination as the import pipeline names it: `importSite` takes a plain `directory` string
+ * rather than a destination object, so the modal flattens one here.
+ *
+ * Both shapes, because both platforms import now. A `"path"` destination flattens to the absolute
+ * folder it writes; a `"repo"` one to `owner/repo`, which is what a backend that commits the
+ * emitted project into a git tree can act on — there is no directory for it to name.
  */
 export function destinationPath(destination: CreateProjectDestination, slug: string): string {
-  if (destination.kind !== "path") {
-    throw new Error("Only filesystem destinations have a path");
+  if (destination.kind === "repo") {
+    return `${destination.owner}/${destination.repo || slug.trim()}`;
   }
   return joinPath(destination.parent, slug.trim());
 }

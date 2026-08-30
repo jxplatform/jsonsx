@@ -576,7 +576,11 @@ export interface ImportSiteOptions {
   url: string;
   /** Display name for the new project. */
   name: string;
-  /** Destination directory (platform-interpreted: project-relative on the dev server). */
+  /**
+   * Where the project goes, interpreted by the platform that receives it: an absolute path on
+   * desktop, project-relative on the dev server, `owner/repo` on a host whose projects are
+   * repositories. Never a path the caller assumes a filesystem for.
+   */
   directory: string;
   /** Max crawl depth; 0 = single page. */
   depth: number;
