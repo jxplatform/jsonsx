@@ -12,6 +12,20 @@ import {
 } from "./harness";
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import type { DeployConfig } from "@jxsuite/schema/types";
+import type { CfConnectOutcome } from "../src/types";
+
+/**
+ * The account picker is doubled: `hostedConnect` reaches it through a lazy `import()`, so the
+ * double is both the witness that it opened and what keeps two real dynamic imports from
+ * overlapping (which is how Bun 1.4 loses a file's coverage record).
+ */
+let pickerOpens = 0;
+void mock.module("../src/ui/cf-account-picker", () => ({
+  openCfAccountPicker: async () => {
+    pickerOpens += 1;
+    return { id: "acc-picked", name: "Picked" };
+  },
+}));
 
 const { openPublishPanel, seedPublishConnected } = await import("../src/publish/publish-panel");
 const { initLayers } = await import("../src/ui/layers");
@@ -110,7 +124,10 @@ describe("openPublishPanel — platform capability states", () => {
       cfApi: cfApiMock({ "/accounts": [{ id: "a".repeat(32), name: "Acme" }] }),
       cfConnect: () => {
         connected = true;
-        return Promise.resolve({ connected: true });
+        return Promise.resolve({
+          connection: { accountId: "a".repeat(32), connected: true },
+          status: "connected" as const,
+        });
       },
       cfConnection: () =>
         Promise.resolve(connected ? { accountId: "a".repeat(32), connected: true } : null),
@@ -141,6 +158,110 @@ describe("openPublishPanel — platform capability states", () => {
     pointer(button("Verify & Connect")!, "click");
     await flush();
     expect(getCfToken()).toBe("cf_pasted");
+    expect(bodyText()).toContain("Create a Cloudflare Pages project");
+  });
+});
+
+/**
+ * A lapsed brokered connection, which the panel had no branch for at all.
+ *
+ * It arrives as `connected: true`, so `loadConnection` called straight through to `/accounts`, the
+ * proxy 401'd, the catch nulled the connection — and the reader got the FIRST-TIME "Connect your
+ * Cloudflare account to publish this site" invitation next to a raw `Cloudflare API: …` string. Two
+ * wrong sentences where one true one belonged.
+ */
+describe("openPublishPanel — an expired connection", () => {
+  function installLapsed(onConnect?: () => Promise<CfConnectOutcome>) {
+    let lapsed = true;
+    // Exactly what the proxy does through a lapsed grant, and what it does once it is renewed.
+    const cfApi = mock(async () => {
+      if (lapsed) {
+        throw new Error("Cloudflare API: 401 Unauthorized");
+      }
+      return [{ id: "a".repeat(32), name: "Acme" }];
+    });
+    installMockPlatform({
+      cfApi,
+      cfConnect: onConnect
+        ? async () => onConnect()
+        : async () => {
+            lapsed = false;
+            return {
+              connection: { accountId: "a".repeat(32), connected: true },
+              status: "connected" as const,
+            };
+          },
+      cfConnection: () =>
+        Promise.resolve(
+          lapsed
+            ? { code: "cf_reconnect_required" as const, connected: true, needsReconnect: true }
+            : { accountId: "a".repeat(32), accountName: "Acme", connected: true },
+        ),
+    });
+    return cfApi;
+  }
+
+  test("says the connection expired, and does not ask Cloudflare anything through it", async () => {
+    resetStudioState({ projectConfig: { name: "My Site" } });
+    const cfApi = installLapsed();
+    openPublishPanel();
+    await flush();
+    expect(bodyText()).toContain("connection has expired");
+    expect(bodyText()).not.toContain("Connect your Cloudflare account");
+    // The 401 that produced the raw error string is not even attempted.
+    expect(cfApi).not.toHaveBeenCalled();
+    expect(bodyText()).not.toContain("Cloudflare API:");
+    expect(button("Reconnect Cloudflare")).toBeTruthy();
+  });
+
+  test("Reconnect runs the hosted flow and the panel moves on", async () => {
+    resetStudioState({ projectConfig: { name: "My Site" } });
+    installLapsed();
+    openPublishPanel();
+    await flush();
+    pointer(button("Reconnect Cloudflare")!, "click");
+    await flush();
+    expect(bodyText()).toContain("Create a Cloudflare Pages project");
+  });
+
+  test("a deadline that passed is reported; a cancellation is not", async () => {
+    resetStudioState({ projectConfig: { name: "My Site" } });
+    let outcome: CfConnectOutcome = { status: "timeout" };
+    installLapsed(async () => outcome);
+    openPublishPanel();
+    await flush();
+    pointer(button("Reconnect Cloudflare")!, "click");
+    await flush();
+    expect(bodyText()).toContain("didn't finish");
+
+    // A closed popup says nothing — and clears the deadline message, which no longer applies.
+    outcome = { status: "canceled" };
+    pointer(button("Reconnect Cloudflare")!, "click");
+    await flush();
+    expect(bodyText()).not.toContain("didn't finish");
+    expect(panel()?.querySelector(".publish-error")).toBeNull();
+  });
+
+  test("a connect with no account chosen opens the picker before the form", async () => {
+    resetStudioState({ projectConfig: { name: "My Site" } });
+    pickerOpens = 0;
+    let chosen = false;
+    installMockPlatform({
+      cfApi: cfApiMock({ "/accounts": [{ id: "a".repeat(32), name: "Acme" }] }),
+      cfConnect: async () => {
+        chosen = true;
+        return { connection: { connected: true }, status: "connected" as const };
+      },
+      cfConnection: () =>
+        Promise.resolve(
+          chosen ? { accountId: "a".repeat(32), accountName: "Acme", connected: true } : null,
+        ),
+    });
+    openPublishPanel();
+    await flush();
+    pointer(button("Connect Cloudflare")!, "click");
+    await flush();
+    expect(pickerOpens).toBe(1);
     expect(bodyText()).toContain("Create a Cloudflare Pages project");
   });
 });

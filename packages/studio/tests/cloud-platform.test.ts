@@ -14,10 +14,32 @@ const PROJECT = { owner: "octocat", repo: "my-site", branch: "main" };
 const BASE = "/api/v1/p/octocat/my-site/main/studio";
 
 const realFetch = globalThis.fetch;
+/* Captured before any test stubs window.setTimeout — `until` must keep running on the real clock
+   even inside a test that has replaced the platform's one. */
+const realSetTimeout = globalThis.setTimeout;
 
 afterEach(() => {
   globalThis.fetch = realFetch;
 });
+
+/**
+ * Wait for something cfConnect does asynchronously.
+ *
+ * CfConnect reads a BASELINE connection before it opens the popup, so neither the popup, the
+ * message listener nor the poll timer exists synchronously any more — a test that dispatches its
+ * relay in the same turn dispatches it into nothing.
+ */
+async function until(done: () => boolean, what: string): Promise<void> {
+  for (let i = 0; i < 200; i += 1) {
+    if (done()) {
+      return;
+    }
+    await new Promise((resolve) => {
+      realSetTimeout(resolve, 0);
+    });
+  }
+  throw new Error(`timed out waiting for ${what}`);
+}
 
 interface Call {
   url: string;
@@ -603,6 +625,99 @@ describe("identity & cloudflare surface", () => {
     expect(await p.cfConnection?.()).toBeNull();
   });
 
+  test("cfConnection surfaces a lapsed grant instead of flattening it into a healthy row", async () => {
+    mockFetch({
+      "/api/v1/cf/connection": {
+        body: {
+          code: "cf_reconnect_required",
+          connected: true,
+          expiresAt: 1_700_000_000,
+          hasRefreshToken: false,
+          needsAccount: false,
+          needsReconnect: true,
+          reason: "refresh_failed",
+        },
+      },
+    });
+    const p = createCloudPlatform(null);
+    // Dropping needsReconnect here is what let cfConnect's poll close the popup over a dead row.
+    expect(await p.cfConnection?.()).toEqual({
+      code: "cf_reconnect_required",
+      connected: true,
+      expiresAt: 1_700_000_000,
+      hasRefreshToken: false,
+      needsReconnect: true,
+      reason: "refresh_failed",
+    });
+  });
+
+  test("cfConnection carries needsAccount through for a connection with no account chosen", async () => {
+    mockFetch({
+      "/api/v1/cf/connection": {
+        body: { code: "cf_account_required", connected: true, needsAccount: true },
+      },
+    });
+    const p = createCloudPlatform(null);
+    expect(await p.cfConnection?.()).toEqual({
+      code: "cf_account_required",
+      connected: true,
+      needsAccount: true,
+    });
+  });
+
+  test("cfAccounts lists the grant's accounts and surfaces the broker's unusable payload", async () => {
+    const calls = mockFetch({
+      "/api/v1/cf/accounts": { body: [{ id: "a1", name: "Acme" }] },
+    });
+    const p = createCloudPlatform(null);
+    expect(await p.cfAccounts?.()).toEqual([{ id: "a1", name: "Acme" }]);
+    expect(calls[0]?.url).toBe("/api/v1/cf/accounts");
+    expect(calls[0]?.init?.credentials).toBe("include");
+
+    mockFetch({
+      "/api/v1/cf/accounts": {
+        status: 401,
+        body: {
+          code: "cf_reconnect_required",
+          error: "Your Cloudflare connection has expired — reconnect to continue",
+        },
+      },
+    });
+    expect(p.cfAccounts?.()).rejects.toThrow(/has expired/);
+  });
+
+  test("cfSelectAccount posts the chosen account and surfaces a refusal", async () => {
+    const calls = mockFetch({ "/api/v1/cf/select-account": { body: { ok: true } } });
+    const p = createCloudPlatform(null);
+    await p.cfSelectAccount?.({ id: "a1", name: "Acme" });
+    expect(calls[0]?.url).toBe("/api/v1/cf/select-account");
+    expect(calls[0]?.init?.method).toBe("POST");
+    expect(JSON.parse(String(calls[0]?.init?.body))).toEqual({
+      accountId: "a1",
+      accountName: "Acme",
+    });
+
+    mockFetch({
+      "/api/v1/cf/select-account": {
+        status: 401,
+        body: { code: "cf_not_connected", error: "Cloudflare not connected" },
+      },
+    });
+    expect(p.cfSelectAccount?.({ id: "a1" })).rejects.toThrow(/not connected/);
+  });
+
+  test("cfDisconnect deletes the brokered connection and surfaces a failure", async () => {
+    const calls = mockFetch({ "/api/v1/cf/connection": { body: { ok: true } } });
+    const p = createCloudPlatform(null);
+    await p.cfDisconnect?.();
+    expect(calls[0]?.url).toBe("/api/v1/cf/connection");
+    expect(calls[0]?.init?.method).toBe("DELETE");
+    expect(calls[0]?.init?.credentials).toBe("include");
+
+    mockFetch({ "/api/v1/cf/connection": { status: 500, body: { error: "D1 unavailable" } } });
+    expect(p.cfDisconnect?.()).rejects.toThrow(/D1 unavailable/);
+  });
+
   test("cfApi unwraps the envelope and surfaces joined error messages", async () => {
     const calls = mockFetch({
       "/api/v1/cf/proxy/accounts": { body: { success: true, result: [{ id: "a1" }] } },
@@ -623,12 +738,20 @@ describe("identity & cloudflare surface", () => {
   test("cfConnect falls back to a full-page redirect when the popup is blocked", async () => {
     mockFetch({});
     const realOpen = window.open;
+    const realAssign = location.assign;
+    const assigned: string[] = [];
+    (location as { assign: unknown }).assign = (url: string) => {
+      assigned.push(url);
+    };
     (window as { open: unknown }).open = mock(() => null);
     try {
       const p = createCloudPlatform(null);
-      expect(await p.cfConnect?.()).toBeNull();
+      // Not null and not a failure: the page itself is navigating, so the caller renders nothing.
+      expect(await p.cfConnect?.()).toEqual({ status: "redirect" });
+      expect(assigned).toEqual(["/api/v1/cf/connect"]);
     } finally {
       (window as { open: unknown }).open = realOpen;
+      (location as { assign: unknown }).assign = realAssign;
     }
   });
 
@@ -638,10 +761,12 @@ describe("identity & cloudflare surface", () => {
     });
     const realOpen = window.open;
     const popup = { close: mock(() => {}), closed: false };
-    (window as { open: unknown }).open = mock(() => popup);
+    const open = mock(() => popup);
+    (window as { open: unknown }).open = open;
     try {
       const p = createCloudPlatform(null);
       const pending = p.cfConnect?.();
+      await until(() => open.mock.calls.length > 0, "the connect popup");
       // Foreign-source noise is ignored; the jx-cf relay settles the promise.
       window.dispatchEvent(
         new MessageEvent("message", { data: { source: "other" }, origin: location.origin }),
@@ -652,7 +777,10 @@ describe("identity & cloudflare surface", () => {
           origin: location.origin,
         }),
       );
-      expect(await pending).toEqual({ connected: true, accountId: "acct" });
+      expect(await pending).toEqual({
+        connection: { connected: true, accountId: "acct" },
+        status: "connected",
+      });
     } finally {
       (window as { open: unknown }).open = realOpen;
     }
@@ -662,10 +790,12 @@ describe("identity & cloudflare surface", () => {
     mockFetch({});
     const realOpen = window.open;
     const popup = { close: mock(() => {}), closed: false };
-    (window as { open: unknown }).open = mock(() => popup);
+    const open = mock(() => popup);
+    (window as { open: unknown }).open = open;
     try {
       const p = createCloudPlatform(null);
       const pending = p.cfConnect?.();
+      await until(() => open.mock.calls.length > 0, "the connect popup");
       window.dispatchEvent(
         new MessageEvent("message", {
           data: {

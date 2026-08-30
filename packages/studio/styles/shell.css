@@ -800,6 +800,13 @@
   max-width: 140px;
   min-width: 0;
 }
+/* The chat-only-model note, under the picker that caused it. Advisory weight on purpose: the
+   assistant still answers, it just cannot edit. */
+.ai-composer-note {
+  color: var(--fg-dim);
+  font-size: var(--spectrum-font-size-50, 11px);
+  line-height: 1.3;
+}
 /* Sessions list */
 .ai-sessions {
   flex: 1 1 0;
@@ -1374,6 +1381,35 @@
 .prefs-account-detail {
   font-size: var(--spectrum-font-size-50, 11px);
   color: var(--fg-dim);
+}
+/* The account picker borrows `.prefs-account` for its rows on purpose — it is the same object in a
+   different frame, and a second row style would drift from this one. Only its own chrome is here. */
+.cf-account-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 320px;
+}
+.cf-account-picker-lede {
+  margin: 0;
+  color: var(--fg-dim);
+  font-size: var(--spectrum-font-size-75, 12px);
+}
+.cf-account-picker-empty {
+  margin: 0;
+  color: var(--fg-dim);
+  font-size: var(--spectrum-font-size-75, 12px);
+}
+.cf-account-picker-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: var(--spectrum-font-size-75, 12px);
+}
+.prefs-account-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
 }
 .prefs-keys {
   display: flex;

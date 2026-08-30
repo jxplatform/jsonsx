@@ -13,6 +13,7 @@
  */
 import { flush, installMockPlatform, key, pointer, seedSettings } from "./harness";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
+import type { CfConnection } from "../src/types";
 
 // Keep the credentials gate deterministic: no managed proxy, no probe fetch.
 void mock.module("../src/services/ai-models", () => ({
@@ -26,6 +27,8 @@ void mock.module("../src/services/ai-models", () => ({
   resetModelCache: () => {},
   isManagedProxy: () => false,
   isProxyConfigured: () => false,
+  modelContextWindow: () => {},
+  modelToolSupport: () => {},
   // Every named export ai-managed-connect.ts imports must be here: a partial mock.module() of a
   // Module someone else imports is a SyntaxError at link time, not a missing stub at call time.
   proxyStateCode: () => {},
@@ -625,5 +628,45 @@ describe("the app.preferences record", () => {
       'command "app.preferences" argument "section": "updates" is not a Preferences section — ' +
         "declared: appearance, assistant, accounts, keyboard",
     );
+  });
+});
+
+/**
+ * The Cloudflare row, on a platform that brokers the connection.
+ *
+ * Under hosted OAuth there is no local token to enumerate, so this row said "Not connected" to
+ * every Jx Cloud user, named no account, and offered a Disconnect that cleared nothing server-side
+ * — with no reconnect entry point anywhere in Preferences.
+ */
+describe("Accounts, when the platform brokers Cloudflare", () => {
+  test("shows the hosted state, and Reconnect is a verb the sheet actually has", async () => {
+    let connection: CfConnection = {
+      code: "cf_reconnect_required",
+      connected: true,
+      needsReconnect: true,
+    };
+    const cfConnect = mock(async () => {
+      connection = { accountId: "acc-1", accountName: "Acme", connected: true };
+      return { connection, status: "connected" as const };
+    });
+    installMockPlatform({ cfConnect, cfConnection: async () => connection });
+
+    void openPreferences("accounts");
+    await flush(3);
+    const row = () => d('.prefs-account[data-account="cloudflare"]')!;
+    expect(row().textContent).toContain("expired");
+    expect(
+      dAll('.prefs-account[data-account="cloudflare"] sp-button').map((el) => el.dataset.action),
+    ).toEqual(["reconnect", "disconnect"]);
+
+    pointer(d('.prefs-account[data-account="cloudflare"] [data-action="reconnect"]')!, "click");
+    await flush(3);
+    expect(cfConnect).toHaveBeenCalledTimes(1);
+    // The row re-read itself: a Reconnect that leaves "expired" on screen is the defect this fixes.
+    expect(row().textContent).toContain("Acme");
+    expect(
+      dAll('.prefs-account[data-account="cloudflare"] sp-button').map((el) => el.dataset.action),
+    ).toEqual(["disconnect"]);
+    installMockPlatform();
   });
 });

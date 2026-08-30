@@ -18,6 +18,9 @@ import type { ProjectConfig } from "@jxsuite/schema/types";
 import { componentMetaFrom } from "@jxsuite/schema/component-meta";
 import type {
   AccountStatus,
+  CfAccountSummary,
+  CfConnection,
+  CfConnectOutcome,
   ComponentMeta,
   CreateProjectDestination,
   DirEntry,
@@ -124,12 +127,16 @@ export function projectRootKey(project: CloudProject): string {
   return `${project.owner}/${project.repo}@${project.branch}`;
 }
 
-/** Current hosted Cloudflare connection; null when none is brokered yet. */
-async function fetchCfConnection(): Promise<{
-  connected: boolean;
-  accountId?: string | undefined;
-  accountName?: string | undefined;
-} | null> {
+/**
+ * Current hosted Cloudflare connection; null when none is brokered yet.
+ *
+ * A LAPSED row is not a healthy one. This reader used to answer `{connected: true}` for any body
+ * whose `connected` flag was set and drop `needsReconnect` on the floor, so a row whose grant had
+ * expired came back indistinguishable from one that works — which is how `cfConnect`'s poll came to
+ * close the popup the moment it opened, over a row from a previous session, while the user was
+ * still on Cloudflare's login page. Every diagnostic the broker sends now passes straight through.
+ */
+async function fetchCfConnection(): Promise<CfConnection | null> {
   const res = await fetch("/api/v1/cf/connection", { credentials: "include" });
   if (!res.ok) {
     return null;
@@ -138,7 +145,15 @@ async function fetchCfConnection(): Promise<{
     connected: boolean;
     accountId?: string | null;
     accountName?: string | null;
+    needsReconnect?: boolean;
+    needsAccount?: boolean;
+    code?: CfConnection["code"];
+    reason?: string;
+    hasRefreshToken?: boolean;
+    expiresAt?: number;
   };
+  /* Cloud never emits {connected: false} to the PAL — no brokered row at all is `null`, and a row
+     that cannot be used arrives as connected + needsReconnect. See CfConnection. */
   if (!body.connected) {
     return null;
   }
@@ -146,10 +161,131 @@ async function fetchCfConnection(): Promise<{
     connected: true,
     ...(body.accountId ? { accountId: body.accountId } : {}),
     ...(body.accountName ? { accountName: body.accountName } : {}),
+    ...(body.needsReconnect ? { needsReconnect: true } : {}),
+    ...(body.needsAccount ? { needsAccount: true } : {}),
+    ...(body.code ? { code: body.code } : {}),
+    ...(body.reason ? { reason: body.reason } : {}),
+    ...(body.hasRefreshToken === undefined ? {} : { hasRefreshToken: body.hasRefreshToken }),
+    ...(body.expiresAt === undefined ? {} : { expiresAt: body.expiresAt }),
   };
 }
 
-type CfConnectionInfo = Awaited<ReturnType<typeof fetchCfConnection>>;
+interface CfConnectFlow {
+  popup: Window | null;
+  promise: Promise<CfConnectOutcome | null>;
+}
+
+/**
+ * The connect flow currently running, or null.
+ *
+ * Module-level rather than per-platform because the popup's TARGET NAME ("cf-connect") is global to
+ * the browsing context: a second `window.open` on that name re-uses the first flow's popup, and the
+ * first flow's cleanup then closes it out from under the second — the user watches their half-typed
+ * Cloudflare login vanish. Joining the in-flight promise is the only answer that leaves both
+ * callers correct.
+ */
+let cfConnectFlow: CfConnectFlow | null = null;
+
+/**
+ * Drive one hosted OAuth connect to a {@link CfConnectOutcome}. See `cfConnect` for the semantics;
+ * this lives at module scope so the single-flight handle can too.
+ */
+async function runCfConnect(handle: CfConnectFlow): Promise<CfConnectOutcome | null> {
+  /* The baseline is read BEFORE the popup opens, and it is what keeps the poll honest: a row that
+     was already healthy proves nothing about THIS flow, so the poll must not settle on one. Reading
+     it after the popup opened would race the callback and could capture the new row as "old". */
+  const baseline = await fetchCfConnection().catch(() => null);
+  const healthyBaseline = Boolean(baseline?.connected && !baseline.needsReconnect);
+  const popup = window.open("/api/v1/cf/connect", "cf-connect", "width=980,height=780");
+  if (!popup) {
+    /* Popup blocked: the whole page is now navigating to the broker. Not a failure — the caller
+       must render nothing at all rather than an error it will never get to show. */
+    location.assign("/api/v1/cf/connect");
+    return { status: "redirect" };
+  }
+  handle.popup = popup;
+  const deadline = Date.now() + 180_000;
+  return new Promise<CfConnectOutcome>((resolve, reject) => {
+    let timer = 0;
+    const cleanup = () => {
+      window.removeEventListener("message", onMessage);
+      window.clearTimeout(timer);
+      if (!popup.closed) {
+        popup.close();
+      }
+    };
+    const settle = (outcome: CfConnectOutcome) => {
+      cleanup();
+      resolve(outcome);
+    };
+    const fail = (reason: string) => {
+      cleanup();
+      reject(new Error(reason));
+    };
+    /** A usable row: brokered, and its grant has not lapsed. */
+    const usable = (connection: CfConnection | null): connection is CfConnection =>
+      Boolean(connection?.connected && !connection.needsReconnect);
+    const onMessage = (event: MessageEvent) => {
+      if (event.origin !== location.origin) {
+        return;
+      }
+      const data = event.data as { source?: string; status?: string; reason?: string | null };
+      if (!data || data.source !== "jx-cf") {
+        return;
+      }
+      if (data.status === "error") {
+        fail(data.reason ?? "Cloudflare authorization failed");
+        return;
+      }
+      /* Any other status — "connected", "pick-account", or one a shell of another vintage sends —
+         is a CLAIM that the callback ran, and the broker row is what adjudicates it. */
+      void fetchCfConnection().then(
+        (connection) => {
+          settle(usable(connection) ? { connection, status: "connected" } : { status: "timeout" });
+        },
+        /* This promise had no rejection handler, so one network blip left the listener installed,
+           the timer armed and the popup open forever. */
+        () => {
+          fail("Cloudflare connected, but the connection could not be confirmed");
+        },
+      );
+    };
+    window.addEventListener("message", onMessage);
+    const poll = async () => {
+      if (Date.now() > deadline) {
+        settle({ status: "timeout" });
+        return;
+      }
+      let connection: CfConnection | null = null;
+      let answered = true;
+      try {
+        connection = await fetchCfConnection();
+      } catch {
+        answered = false; // A blip is not an answer: re-arm and ask again.
+      }
+      /* The poll is a FALLBACK for shells whose postMessage never arrives, so it may only settle on
+         proof that THIS flow stored a fresh token: a usable row that was NOT already usable at the
+         baseline. For a reconnect, `needsReconnect` flipping false is that proof; for a connection
+         that was healthy all along nothing the poll can see is, so it must never settle — the relay
+         or the popup-closed path answers that case instead. */
+      if (answered && usable(connection) && !healthyBaseline) {
+        settle({ connection, status: "connected" });
+        return;
+      }
+      if (popup.closed) {
+        const final = await fetchCfConnection().catch(() => null);
+        settle(usable(final) ? { connection: final, status: "connected" } : { status: "canceled" });
+        return;
+      }
+      timer = window.setTimeout(() => {
+        void poll();
+      }, 1500);
+    };
+    timer = window.setTimeout(() => {
+      void poll();
+    }, 1500);
+  });
+}
 
 /** Parse an "owner/repo@branch" root key; null when malformed. */
 export function parseRootKey(root: string): CloudProject | null {
@@ -1001,71 +1137,75 @@ export function createCloudPlatform(project: CloudProject | null): StudioPlatfor
      * OAuth errors (denial, invalid_scope misregistration) REJECT with the real reason instead of
      * timing out. A 1.5s poll remains as fallback for older shells / blocked message delivery, and
      * popup-blocked browsers fall back to a full-page redirect.
+     *
+     * Promise semantics, which are narrower than they look:
+     *
+     * - **Resolves `null`** only under the SSR guard, where there is no window to open.
+     * - **Resolves an outcome** for all four real endings — `connected`, `redirect` (popup blocked,
+     *   page navigating away), `canceled` (popup closed with nothing stored), `timeout` (180s).
+     * - **Rejects** only on a relayed OAuth error, or on a relayed success this platform could not
+     *   confirm against the broker.
+     *
+     * Concurrent calls JOIN the flow already running rather than starting a second one: both would
+     * open the same "cf-connect" target, and the first one's cleanup would then close the popup the
+     * second is waiting on.
      */
-    async cfConnect() {
+    cfConnect() {
       if (typeof window === "undefined" || typeof location === "undefined") {
-        return null;
+        return Promise.resolve(null);
       }
-      const popup = window.open("/api/v1/cf/connect", "cf-connect", "width=980,height=780");
-      if (!popup) {
-        location.assign("/api/v1/cf/connect");
-        return null;
+      const running = cfConnectFlow;
+      if (running) {
+        try {
+          running.popup?.focus();
+        } catch {
+          // A cross-origin popup may refuse focus; joining the flow is what mattered.
+        }
+        return running.promise;
       }
-      const deadline = Date.now() + 180_000;
-      return new Promise<CfConnectionInfo>((resolve, reject) => {
-        let timer = 0;
-        const cleanup = () => {
-          window.removeEventListener("message", onMessage);
-          window.clearTimeout(timer);
-          if (!popup.closed) {
-            popup.close();
-          }
-        };
-        const settle = (connection: CfConnectionInfo) => {
-          cleanup();
-          resolve(connection);
-        };
-        const fail = (reason: string) => {
-          cleanup();
-          reject(new Error(reason));
-        };
-        const onMessage = (event: MessageEvent) => {
-          if (event.origin !== location.origin) {
-            return;
-          }
-          const data = event.data as { source?: string; status?: string; reason?: string | null };
-          if (!data || data.source !== "jx-cf") {
-            return;
-          }
-          if (data.status === "error") {
-            fail(data.reason ?? "Cloudflare authorization failed");
-            return;
-          }
-          void fetchCfConnection().then(settle);
-        };
-        window.addEventListener("message", onMessage);
-        const poll = async () => {
-          if (Date.now() > deadline) {
-            settle(null);
-            return;
-          }
-          const connection = await fetchCfConnection();
-          if (connection) {
-            settle(connection);
-            return;
-          }
-          if (popup.closed) {
-            settle(await fetchCfConnection());
-            return;
-          }
-          timer = window.setTimeout(() => {
-            void poll();
-          }, 1500);
-        };
-        timer = window.setTimeout(() => {
-          void poll();
-        }, 1500);
+      const handle: CfConnectFlow = { popup: null, promise: Promise.resolve(null) };
+      cfConnectFlow = handle;
+      handle.promise = runCfConnect(handle).finally(() => {
+        if (cfConnectFlow === handle) {
+          cfConnectFlow = null;
+        }
       });
+      return handle.promise;
+    },
+
+    /**
+     * Every Cloudflare account this connection can reach (the account picker's rows).
+     *
+     * A non-OK body is the broker's own unusable-connection payload — `{error, code}` naming a
+     * lapsed grant or a connection that never existed — so its sentence is the one worth showing.
+     */
+    async cfAccounts() {
+      const res = await fetch("/api/v1/cf/accounts", { credentials: "include" });
+      return okJson<CfAccountSummary[]>(res, "Failed to list Cloudflare accounts");
+    },
+
+    /** Store the chosen account on the brokered connection. */
+    async cfSelectAccount(account: { id: string; name?: string }) {
+      const res = await fetch("/api/v1/cf/select-account", {
+        body: JSON.stringify({ accountId: account.id, accountName: account.name }),
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      });
+      if (!res.ok) {
+        throw new Error(await errorMessage(res, "Failed to select a Cloudflare account"));
+      }
+    },
+
+    /** Forget the brokered connection (the broker revokes its tokens upstream). */
+    async cfDisconnect() {
+      const res = await fetch("/api/v1/cf/connection", {
+        credentials: "include",
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        throw new Error(await errorMessage(res, "Failed to disconnect Cloudflare"));
+      }
     },
 
     /** Allowlisted Cloudflare API passthrough (platform injects the OAuth token). */

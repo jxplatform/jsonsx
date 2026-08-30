@@ -42,6 +42,8 @@ A connected GitHub account also says **where** the credential is kept, because t
 
 The list never shows the credential itself, only that one is stored.
 
+On Jx Cloud the Cloudflare row is different in one way that matters: the connection is held for you by the platform rather than stored on this machine, so the row reports what the platform says about it. It names the connected account, or tells you the authorization has expired and offers **Reconnect**, or — when your Cloudflare login covers several accounts and none has been chosen yet — offers to pick one. **Disconnect** there reaches the platform and drops the authorization itself, not just a local copy of it.
+
 ## Keyboard
 
 Every keyboard shortcut Studio has, grouped by where the key is live: **Anywhere**, **Canvas selection**, **Text caret**, **Data grid**, **Code editor**, **Focused dock**, **Palette**. The sheet is **generated from the app's own command registry**, so it cannot be out of date: a shortcut cannot exist without appearing here, a command with no shortcut is not listed because there is nothing to press, and a command an extension adds shows up without anyone maintaining a list.

@@ -8,10 +8,32 @@
 import { installMockPlatform } from "./harness";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { render } from "lit-html";
-import { createManagedConnect } from "../src/ui/ai-managed-connect";
-import { fetchAvailableModels, resetModelCache } from "../src/services/ai-models";
+import type { CfAccountSummary, CfConnectOutcome } from "../src/types";
+
+/**
+ * The account picker is doubled, for both reasons the repo policy names: `connect()` reaches it
+ * through a lazy `import()`, so without a double there is no witness that it was opened — and two
+ * real dynamic imports of one module can race Bun's coverage recorder into dropping the file.
+ */
+const pickerCalls: number[] = [];
+let pickerResult: CfAccountSummary | null = { id: "acc-picked", name: "Picked" };
+void mock.module("../src/ui/cf-account-picker", () => ({
+  openCfAccountPicker: async () => {
+    pickerCalls.push(pickerCalls.length + 1);
+    return pickerResult;
+  },
+}));
+
+const { createManagedConnect } = await import("../src/ui/ai-managed-connect");
+const { fetchAvailableModels, resetModelCache } = await import("../src/services/ai-models");
 
 const { platform } = installMockPlatform();
+
+/** A connect that lands on a usable account — the ending most of these cases are not about. */
+const CONNECTED: CfConnectOutcome = {
+  connection: { accountId: "acc-1", connected: true },
+  status: "connected",
+};
 
 let fetchImpl: (url: string, init?: RequestInit) => Promise<Response> = async () =>
   Response.json({ models: [] }, { status: 200 });
@@ -57,6 +79,8 @@ beforeEach(() => {
   globalThis.localStorage.clear();
   resetModelCache();
   fetchCalls.length = 0;
+  pickerCalls.length = 0;
+  pickerResult = { id: "acc-picked", name: "Picked" };
   delete platform.cfConnect;
 });
 
@@ -70,7 +94,7 @@ describe("canOffer", () => {
     // Managed, but this platform has no hosted OAuth flow (desktop/dev server).
     expect(mc.canOffer()).toBe(false);
 
-    platform.cfConnect = async () => ({ connected: true });
+    platform.cfConnect = async () => CONNECTED;
     expect(mc.canOffer()).toBe(true);
 
     // Already connected — the gate is open, so there is nothing to offer.
@@ -81,6 +105,21 @@ describe("canOffer", () => {
     await probeManaged(false);
     expect(mc.canOffer()).toBe(false);
   });
+
+  test("a lapsed grant keeps the CTA even when the backend says configured", async () => {
+    /* The state that had no button at all. A backend can answer `configured: true` over a grant it
+       cannot use — and hiding the offer there is precisely how a user ends up with a broken
+       assistant and nothing on screen to press. */
+    platform.cfConnect = async () => CONNECTED;
+    fetchImpl = async () =>
+      Response.json(
+        { code: "cf_reconnect_required", configured: true, managed: true, models: [] },
+        { status: 200 },
+      );
+    await fetchAvailableModels({ force: true });
+    const { mc } = makeConnect();
+    expect(mc.canOffer()).toBe(true);
+  });
 });
 
 describe("render", () => {
@@ -89,7 +128,7 @@ describe("render", () => {
     expect(container.querySelector(".ai-managed-connect")).toBeNull();
 
     await probeManaged(true);
-    platform.cfConnect = async () => ({ connected: true });
+    platform.cfConnect = async () => CONNECTED;
     render(mc.render(), container);
 
     const cta = container.querySelector(".ai-managed-connect");
@@ -104,7 +143,7 @@ describe("render", () => {
 describe("connect", () => {
   test("runs the platform flow, then re-probes so the gate opens", async () => {
     await probeManaged(true);
-    const cfConnect = mock(async () => ({ accountId: "acc-1", connected: true }));
+    const cfConnect = mock(async () => CONNECTED);
     platform.cfConnect = cfConnect;
     const { container, mc } = makeConnect();
     render(mc.render(), container);
@@ -127,19 +166,98 @@ describe("connect", () => {
     expect(container.querySelector(".ai-managed-connect")).toBeNull();
   });
 
-  test("reports an abandoned flow without closing the offer", async () => {
+  /**
+   * Defect 4, and the regression guard for the whole reported symptom.
+   *
+   * `connect()` treated any truthy result as success: it force-refetched models, got the SAME
+   * `cf_reconnect_required` state back, and re-rendered a byte-identical CTA with no message. The
+   * user pressed Reconnect and observably nothing happened — twice, in the production logs.
+   */
+  test("a connect the backend does not honour says so instead of repainting itself", async () => {
     await probeManaged(true);
-    platform.cfConnect = async () => null;
+    platform.cfConnect = async () => CONNECTED;
+    const { container, mc } = makeConnect();
+    render(mc.render(), container);
+
+    // The backend has not changed its mind: still lapsed, still unusable.
+    fetchImpl = async () =>
+      Response.json(
+        { code: "cf_reconnect_required", configured: false, managed: true, models: [] },
+        { status: 200 },
+      );
+    connectButton(container)!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await flush();
+
+    expect(container.querySelector(".ai-managed-connect-error")?.textContent).toContain(
+      "still reports the connection as unusable",
+    );
+    // And the offer stays up, because reconnecting is still the only thing that could fix it.
+    expect(mc.canOffer()).toBe(true);
+  });
+
+  test("a passed deadline gets its own words; a cancellation and a redirect get none", async () => {
+    await probeManaged(true);
+    let outcome: CfConnectOutcome | null = { status: "timeout" };
+    platform.cfConnect = async () => outcome;
     const { container, mc } = makeConnect();
     render(mc.render(), container);
 
     connectButton(container)!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     await flush();
+    expect(container.querySelector(".ai-managed-connect-error")?.textContent).toContain(
+      "didn't finish",
+    );
+
+    // A closed popup is not an error — the user already knows what they did.
+    outcome = { status: "canceled" };
+    connectButton(container)!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await flush();
+    expect(container.querySelector(".ai-managed-connect-error")).toBeNull();
+
+    // And a blocked popup navigated the whole page: apologising to a document on its way out is
+    // The bug, not the fix.
+    outcome = { status: "redirect" };
+    connectButton(container)!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await flush();
+    expect(container.querySelector(".ai-managed-connect-error")).toBeNull();
+    expect(mc.canOffer()).toBe(true);
+  });
+
+  test("a connect with no account chosen opens the picker before re-probing", async () => {
+    await probeManaged(true);
+    platform.cfConnect = async () => ({
+      connection: { connected: true },
+      status: "connected" as const,
+    });
+    const { container } = makeConnect();
+
+    fetchImpl = async () =>
+      Response.json({ configured: true, managed: true, models: [] }, { status: 200 });
+    connectButton(container)!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await flush();
+
+    expect(pickerCalls).toHaveLength(1);
+    expect(container.querySelector(".ai-managed-connect-error")).toBeNull();
+  });
+
+  test("a dismissed picker leaves the connection named as unfinished, not as working", async () => {
+    await probeManaged(true);
+    pickerResult = null;
+    platform.cfConnect = async () => ({
+      connection: { connected: true },
+      status: "connected" as const,
+    });
+    const { container } = makeConnect();
+
+    fetchCalls.length = 0;
+    connectButton(container)!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await flush();
 
     expect(container.querySelector(".ai-managed-connect-error")?.textContent).toContain(
-      "not completed",
+      "no account is chosen yet",
     );
-    expect(mc.canOffer()).toBe(true);
+    // No point re-probing: the backend answers cf_account_required until one is picked.
+    expect(fetchCalls).toHaveLength(0);
   });
 
   test("surfaces a thrown error and re-enables the button", async () => {
@@ -160,10 +278,10 @@ describe("connect", () => {
 
   test("ignores a second click while a flow is in flight", async () => {
     await probeManaged(true);
-    let resolveFlow: ((v: { connected: boolean }) => void) | null = null;
+    let resolveFlow: ((v: CfConnectOutcome) => void) | null = null;
     const cfConnect = mock(
       async () =>
-        await new Promise<{ connected: boolean }>((resolve) => {
+        await new Promise<CfConnectOutcome>((resolve) => {
           resolveFlow = resolve;
         }),
     );
@@ -178,7 +296,7 @@ describe("connect", () => {
     await flush(1);
     expect(cfConnect).toHaveBeenCalledTimes(1);
 
-    resolveFlow!({ connected: true });
+    resolveFlow!(CONNECTED);
     await flush();
   });
 });
@@ -187,7 +305,7 @@ describe("ensureProbe", () => {
   test("fires the shared capability probe and repaints when it settles", async () => {
     fetchImpl = async () =>
       Response.json({ models: [], configured: false, managed: true }, { status: 200 });
-    platform.cfConnect = async () => ({ connected: true });
+    platform.cfConnect = async () => CONNECTED;
     const { container, mc } = makeConnect();
     expect(container.querySelector(".ai-managed-connect")).toBeNull();
 
@@ -218,7 +336,7 @@ describe("the recommendation, and its two moods", () => {
     /* The PAL half of canOffer(): a host that cannot run the hosted OAuth flow must not be offered
        it. Set in every case here, including the two that expect the block to stay hidden, so those
        prove the PROBE hid it rather than a missing platform method. */
-    platform.cfConnect = async () => ({ connected: true });
+    platform.cfConnect = async () => CONNECTED;
     resetModelCache();
     const { container, mc } = makeConnect();
     mc.ensureProbe();

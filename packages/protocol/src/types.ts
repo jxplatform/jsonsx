@@ -701,9 +701,61 @@ export interface AiModelsResponse {
 
 // ─── Cloudflare publish surface ──────────────────────────────────────────────
 
-/** Cloudflare connection state (see StudioPlatform.cfConnection). */
+/**
+ * Cloudflare connection state (see StudioPlatform.cfConnection).
+ *
+ * Three answers, not two, and a reader tells them apart by SHAPE:
+ *
+ * - `null` — no credential and no row exists at all; nothing was ever connected here.
+ * - `{connected: false}` — a credential exists but the provider rejected it. That is the dev server's
+ *   stored-token-invalid case, and the publish panel's "Replace token" branch keys on it.
+ * - `{connected: true, needsReconnect: true}` — a brokered row exists whose OAuth grant has lapsed.
+ *   Its access token is gone or unrenewable, so every Cloudflare call will fail until the user goes
+ *   back through the hosted flow.
+ *
+ * Each platform emits a strict subset: **cloud never emits `{connected: false}`** (a broker row it
+ * cannot use is a reconnect, not a bad token) and **the dev server never emits `needsReconnect`**
+ * (it holds a pasted token, not a grant, so there is nothing to lapse). Collapsing the lapsed case
+ * into a healthy one is precisely the defect that let the connect popup close over a dead row while
+ * the user was still typing their Cloudflare password.
+ */
 export interface CfConnection {
   connected: boolean;
   accountId?: string | undefined;
   accountName?: string | undefined;
+  /** A broker row exists but its grant has lapsed — reconnect before any Cloudflare call. */
+  needsReconnect?: boolean | undefined;
+  /** Connected and usable, but no account has been chosen yet (multi-account connect). */
+  needsAccount?: boolean | undefined;
+  code?: "cf_reconnect_required" | "cf_account_required" | undefined;
+  reason?: string | undefined;
+  /**
+   * Whether the broker holds a refresh token for this row. Diagnostic: without one the connection
+   * dies at the access token's expiry and cannot renew itself silently, which is a degraded state
+   * worth naming on screen rather than discovering an hour later.
+   */
+  hasRefreshToken?: boolean | undefined;
+  /** Unix seconds at which the current access token expires (after any silent refresh). */
+  expiresAt?: number | undefined;
 }
+
+/** One Cloudflare account the connected grant can reach (the account picker's row). */
+export interface CfAccountSummary {
+  id: string;
+  name: string;
+}
+
+/**
+ * How an interactive `cfConnect` ended.
+ *
+ * A connect flow has four endings and only one of them is a failure, so they are a union rather
+ * than a nullable connection: `redirect` means the page is already navigating away and the caller
+ * must render nothing, `timeout` means the deadline passed with no confirmation, and `canceled`
+ * means the user closed the popup. Returning `null` for all three made "the user changed their
+ * mind" indistinguishable from "this browser blocked the popup", and the UI apologised for both.
+ */
+export type CfConnectOutcome =
+  | { status: "connected"; connection: CfConnection }
+  | { status: "redirect" }
+  | { status: "timeout" }
+  | { status: "canceled" };

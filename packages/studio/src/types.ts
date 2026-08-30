@@ -14,7 +14,9 @@ import type {
 import type {
   AppInfo,
   AssetCapabilities,
+  CfAccountSummary,
   CfConnection,
+  CfConnectOutcome,
   CodeServiceResult,
   ComponentMeta,
   DataConnectionsResponse,
@@ -54,7 +56,9 @@ export type {
   AiModelInfo,
   AiModelsResponse,
   AppInfo,
+  CfAccountSummary,
   CfConnection,
+  CfConnectOutcome,
   CodeServiceResult,
   ComponentMeta,
   ComponentSlotMeta,
@@ -612,14 +616,34 @@ export interface StudioPlatform {
     head?: string;
     base?: string;
   }) => Promise<{ url: string; number: number }>;
-  /** Current Cloudflare connection state, when the platform can broker one. */
+  /**
+   * Current Cloudflare connection state, when the platform can broker one. See {@link CfConnection}
+   * for what null, `{connected: false}` and `needsReconnect` each mean — they are three different
+   * states and the UI says a different sentence for each.
+   */
   cfConnection?: () => Promise<CfConnection | null>;
   /**
    * Interactively connect a Cloudflare account (hosted OAuth on the cloud platform). Local
    * platforms omit it — the publish UI collects an API token instead and verifies via
    * cfConnection.
+   *
+   * Resolves a {@link CfConnectOutcome} rather than a connection, because "connected" is only one of
+   * four endings: a blocked popup navigates the whole page (`redirect`), a closed popup is a
+   * cancellation, and a passed deadline is a timeout. Rejects only when the flow actually failed —
+   * a relayed OAuth error, or a success the platform could not confirm. Resolves null only where
+   * there is no DOM to open a popup in.
    */
-  cfConnect?: () => Promise<CfConnection | null>;
+  cfConnect?: () => Promise<CfConnectOutcome | null>;
+  /**
+   * Every Cloudflare account the connected grant can reach. Backs the account picker a
+   * multi-account user needs before publishing: the broker stores one account id per connection,
+   * and until one is chosen every Cloudflare-backed call answers `cf_account_required`.
+   */
+  cfAccounts?: () => Promise<CfAccountSummary[]>;
+  /** Store the chosen account on the brokered connection (the picker's commit). */
+  cfSelectAccount?: (account: { id: string; name?: string }) => Promise<void>;
+  /** Forget the brokered connection and revoke its tokens upstream. */
+  cfDisconnect?: () => Promise<void>;
   /**
    * Allowlisted Cloudflare API passthrough (accounts, Pages projects and deployments). The backend
    * injects credentials — an OAuth token on the cloud platform, the user's pasted API token locally
