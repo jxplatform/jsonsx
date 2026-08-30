@@ -42,7 +42,7 @@ A connected GitHub account also says **where** the credential is kept, because t
 
 The list never shows the credential itself, only that one is stored.
 
-On Jx Cloud the Cloudflare row is different in one way that matters: the connection is held for you by the platform rather than stored on this machine, so the row reports what the platform says about it. It names the connected account, or tells you the authorization has expired and offers **Reconnect**, or — when your Cloudflare login covers several accounts and none has been chosen yet — offers to pick one. **Disconnect** there reaches the platform and drops the authorization itself, not just a local copy of it.
+On Jx Cloud the Cloudflare row is different in one way that matters: the connection is held for you by the platform rather than stored on this machine, so the row reports what the platform says about it. It names the connected account, or tells you the authorization has expired and offers **Reconnect**, or offers to pick an account when your Cloudflare login covers several and none has been chosen yet. **Disconnect** there reaches the platform and drops the authorization itself, not just a local copy of it.
 
 ## Keyboard
 

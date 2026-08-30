@@ -27,7 +27,7 @@ Once a token is stored, the panel reports that it is stored. It never renders th
 
 If the panel instead says it can't reach the Cloudflare API on this platform, you don't need it at all. Set up Pages once in Cloudflare's own dashboard and publishing still works the same way: commit and sync, your host builds.
 
-Where the platform holds the connection for you, an authorization that has expired is named as exactly that: the panel says the connection expired and offers **Reconnect Cloudflare**, rather than asking you to connect an account you already connected. Your deployments are untouched — the site keeps serving, and only the panel's ability to read and change the Pages project is waiting on the reconnection.
+Where the platform holds the connection for you, an authorization that has expired is named as exactly that: the panel says the connection expired and offers **Reconnect Cloudflare**, rather than asking you to connect an account you already connected. Your deployments are untouched. The site keeps serving, and only the panel's ability to read and change the Pages project is waiting on the reconnection.
 
 ## Create and connect a Pages project
 
