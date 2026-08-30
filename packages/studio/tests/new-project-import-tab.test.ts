@@ -417,13 +417,16 @@ describe("Import — the brief the form hands over", () => {
     expect(ctx.onHandoff).not.toHaveBeenCalled();
   });
 
-  test("a repository destination never hands off", async () => {
+  test("a repository destination hands off as owner/repo", async () => {
     setKey();
     importPlatform();
     void openNewProjectModal();
     switchTab("import");
     npType(urlField(), "https://clone.example/");
-    // The pipeline writes to a folder; a repo destination is not a place it can clone into.
+    /* This used to be "a repository destination never hands off", because the only backends that
+       imported wrote to a folder. A backend that commits the emitted project into a git tree has no
+       directory to name, so `owner/repo` IS the destination — refusing it here would take the
+       import tab away from the platform that most needs it. */
     const { counter, ctx } = directCtx(() => ({
       kind: "repo",
       owner: "acme",
@@ -431,7 +434,7 @@ describe("Import — the brief the form hands over", () => {
       repo: "site",
     }));
     handoffImport(ctx);
-    expect(ctx.onHandoff).not.toHaveBeenCalled();
+    expect(ctx.onHandoff).toHaveBeenCalled();
     expect(counter.rerenders).toBe(0);
   });
 

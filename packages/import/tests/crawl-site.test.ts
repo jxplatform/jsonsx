@@ -9,6 +9,9 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { CapturedStyle } from "../src/style-capture.ts";
+import type { ImportBrowser } from "../src/capture.ts";
+import type { ImportIo } from "../src/io.ts";
+import { createLocalIo } from "../src/io.ts";
 
 type FakeSite = Record<string, { title: string; bodyHtml: string; links: string[] }>;
 
@@ -33,9 +36,10 @@ const capturePage = mock((url: string) => {
     },
   });
 });
-const launchBrowser = mock(() => Promise.resolve({ fake: true }));
-const closeBrowser = mock(() => Promise.resolve());
-void mock.module("../src/capture.ts", () => ({ capturePage, launchBrowser, closeBrowser }));
+void mock.module("../src/capture.ts", () => ({ capturePage }));
+
+/** The crawl is handed a browser now; it never launches one. Nothing here is a puppeteer object. */
+const browser = { newPage: () => Promise.resolve({}) } as unknown as ImportBrowser;
 
 const captureStyles = mock(() =>
   Promise.resolve({
@@ -110,8 +114,9 @@ beforeEach(() => {
   }) as unknown as typeof fetch;
 });
 
-function outDir(): string {
-  return mkdtempSync(join(tmpdir(), "jx-crawl-test-"));
+function freshIo(): ImportIo {
+  const dir = mkdtempSync(join(tmpdir(), "jx-crawl-test-"));
+  return createLocalIo(dir);
 }
 
 const HOME = "https://crawl.example/";
@@ -176,7 +181,8 @@ describe("crawlSite", () => {
     const messages: string[] = [];
     const result = await crawlSite({
       url: HOME,
-      outDir: outDir(),
+      browser,
+      io: freshIo(),
       maxDepth: 1,
       maxPages: 10,
       maxNodesPerPage: 5000,
@@ -206,7 +212,8 @@ describe("crawlSite", () => {
     seedSite();
     const result = await crawlSite({
       url: HOME,
-      outDir: outDir(),
+      browser,
+      io: freshIo(),
       maxDepth: 1,
       maxPages: 10,
       maxNodesPerPage: 1,
@@ -220,7 +227,7 @@ describe("crawlSite", () => {
     expect(captureStyles).not.toHaveBeenCalled();
     expect(collectAssets).not.toHaveBeenCalled();
     // Screenshots still captured for capped pages.
-    expect(result.pages[0]?.screenshot).toBeInstanceOf(Buffer);
+    expect(result.pages[0]?.screenshot).toBeInstanceOf(Uint8Array);
     /*
      * Whole page by default, because the verifier renders the clone the same way. A viewport
      * reference diffed against a full-page render is compared by padding the shorter image, so the
@@ -233,7 +240,8 @@ describe("crawlSite", () => {
     seedSite();
     await crawlSite({
       url: HOME,
-      outDir: outDir(),
+      browser,
+      io: freshIo(),
       maxDepth: 0,
       maxPages: 10,
       maxNodesPerPage: 5000,
@@ -255,7 +263,8 @@ describe("crawlSite", () => {
     const messages: string[] = [];
     const result = await crawlSite({
       url: HOME,
-      outDir: outDir(),
+      browser,
+      io: freshIo(),
       maxDepth: 1,
       maxPages: 10,
       maxNodesPerPage: 5000,
@@ -273,7 +282,8 @@ describe("crawlSite", () => {
     seedSite();
     const result = await crawlSite({
       url: HOME,
-      outDir: outDir(),
+      browser,
+      io: freshIo(),
       maxDepth: 3,
       maxPages: 2,
       maxNodesPerPage: 5000,
@@ -296,7 +306,8 @@ describe("crawlSite", () => {
     });
     const result = await crawlSite({
       url: HOME,
-      outDir: outDir(),
+      browser,
+      io: freshIo(),
       maxDepth: 0,
       maxPages: 1,
       maxNodesPerPage: 5000,
@@ -315,7 +326,8 @@ describe("crawlSite", () => {
     extractMedia.mockResolvedValueOnce({ breakpoints: {}, deltas: {} });
     const result = await crawlSite({
       url: HOME,
-      outDir: outDir(),
+      browser,
+      io: freshIo(),
       maxDepth: 0,
       maxPages: 1,
       maxNodesPerPage: 5000,
@@ -350,7 +362,8 @@ describe("crawlSite", () => {
     const messages: string[] = [];
     const result = await crawlSite({
       url: HOME,
-      outDir: outDir(),
+      browser,
+      io: freshIo(),
       maxDepth: 1,
       maxPages: 5,
       maxNodesPerPage: 5000,
@@ -386,7 +399,8 @@ describe("crawlSite", () => {
     const messages: string[] = [];
     await crawlSite({
       url: HOME,
-      outDir: outDir(),
+      browser,
+      io: freshIo(),
       maxDepth: 0,
       maxPages: 1,
       maxNodesPerPage: 5000,
@@ -405,7 +419,8 @@ describe("crawlSite", () => {
     const messages: string[] = [];
     const result = await crawlSite({
       url: HOME,
-      outDir: outDir(),
+      browser,
+      io: freshIo(),
       maxDepth: 0,
       maxPages: 1,
       maxNodesPerPage: 5000,
@@ -440,7 +455,8 @@ describe("crawlSite", () => {
     await expect(
       crawlSite({
         url: HOME,
-        outDir: outDir(),
+        browser,
+        io: freshIo(),
         maxDepth: 2,
         maxPages: 10,
         maxNodesPerPage: 5000,

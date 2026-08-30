@@ -85,10 +85,22 @@ describe("path destinations", () => {
     expect(destinationPath({ kind: "path", parent: "/" }, "my-site")).toBe("/my-site");
   });
 
-  test("destinationPath refuses a repo destination", () => {
-    expect(() =>
+  test("destinationPath flattens a repo destination to owner/repo", () => {
+    /* It used to THROW here, on the premise that only a filesystem platform imports. A hosted
+       backend imports into a repository it creates, and `importSite` takes one `directory` string
+       for every platform — so the repo shape has to flatten to the name that backend can act on
+       rather than to an exception the Import tab would hit on its first hand-off. */
+    expect(
       destinationPath({ kind: "repo", owner: "acme", private: true, repo: "site" }, "site"),
-    ).toThrow("Only filesystem destinations have a path");
+    ).toBe("acme/site");
+  });
+
+  test("destinationPath falls back to the slug when the repo name is empty", () => {
+    /* `collectDestination` fills `repo` from the slug, so the two agree in the wizard. A caller
+       that built the destination itself must still get the name the user typed, not "acme/". */
+    expect(
+      destinationPath({ kind: "repo", owner: "acme", private: false, repo: "" }, " site "),
+    ).toBe("acme/site");
   });
 });
 

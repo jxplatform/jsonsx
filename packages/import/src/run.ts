@@ -1,35 +1,24 @@
 /**
- * Programmatic import pipeline — the orchestrator behind both the jx-import CLI and the Studio
- * import endpoint. Runs the same phase sequence as the CLI (capture → styles → assets →
- * componentize → emit → verify), reporting progress through a callback instead of the console.
+ * The local import — the orchestrator behind both the jx-import CLI and the Studio import endpoint.
+ *
+ * Everything portable moved to `pipeline.ts`. What is left is what only a machine with a disk and a
+ * Chrome can do: the empty-directory guard, the `project.json` seed, the local write sink, the
+ * browser launch, and the verify phase (which builds the project with `@jxsuite/compiler` and
+ * serves it over `Bun.serve` to screenshot it — a hosted platform never executes a project's own
+ * JavaScript, so verification does not follow the pipeline anywhere).
  */
 
 import { existsSync, readdirSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
 import { mkdir } from "node:fs/promises";
-import { capturePage, closeBrowser, launchBrowser } from "./capture.ts";
-import { convertToJx } from "./to-jx.ts";
-import { emitMultiPageProject } from "./emit.ts";
-import { captureStyles } from "./style-capture.ts";
-import { extractMedia } from "./media-extract.ts";
-import {
-  DEFAULT_BREAKPOINT_POLICY,
-  analyzeMediaQueries,
-  planBreakpoints,
-  skippedWidthQueries,
-} from "./breakpoint-plan.ts";
+import { closeBrowser, launchBrowser } from "./browser-local.ts";
+import { createLocalIo } from "./io.ts";
+import { runImportPipeline } from "./pipeline.ts";
 import type { BreakpointPolicy } from "./breakpoint-plan.ts";
-import { diffAllStyles, kebabToCamel } from "./style-diff.ts";
-import { applyStylesToTree } from "./apply-styles.ts";
-import { collectAssets } from "./asset-collect.ts";
-import { downloadAssets } from "./asset-download.ts";
-import { rewriteAssetUrls } from "./asset-rewrite.ts";
-import { applyTokens } from "./css-tokens.ts";
-import { crawlSite } from "./crawl.ts";
-import { detectLayout } from "./layout-detect.ts";
+import type { ImportPhase, ImportProgressEvent } from "./pipeline.ts";
 import type { Browser } from "puppeteer-core";
-import type { JxElement } from "@jxsuite/schema/types";
-import type { ComponentizeResult } from "./componentize.ts";
+
+export type { ImportPhase, ImportProgressEvent } from "./pipeline.ts";
 
 export interface ImportSiteOptions {
   /** The page to import; must be http(s). */
@@ -76,35 +65,6 @@ export interface ImportSiteOptions {
   signal?: AbortSignal;
 }
 
-export type ImportPhase =
-  | "seed"
-  | "launch"
-  | "capture"
-  | "crawl"
-  | "styles"
-  | "assets"
-  | "layout"
-  | "components"
-  | "ai"
-  | "emit"
-  | "verify"
-  | "done";
-
-export interface ImportProgressEvent {
-  phase: ImportPhase;
-  message: string;
-  current?: number;
-  total?: number;
-  /**
-   * The project root, on the `seed` event alone.
-   *
-   * The destination exists and holds a valid `project.json` from that moment, which is what lets a
-   * host OPEN it and watch the rest of the run land in its own file tree — rather than staring at a
-   * welcome screen for the several minutes a crawl takes.
-   */
-  root?: string;
-}
-
 export interface ImportSiteResult {
   outDir: string;
   pages: { route: string; title: string; nodeCount: number }[];
@@ -144,13 +104,13 @@ export interface ImportSiteResult {
 }
 
 /**
- * The viewport the base capture runs at, and therefore the project's base width.
+ * What the CLI and the OSS server ask for when the caller named no model.
  *
- * It is `capture.ts`'s own default; naming it here is what lets the emitted `$media` carry a `"--"`
- * base entry that agrees with the styles actually sampled. Without one, Studio's canvas falls back
- * to 320px — narrower than every breakpoint an import discovers.
+ * It lives at the call site rather than inside `ai-componentize.ts`, because a default belongs to
+ * whoever knows the provider. This path talks to an OpenAI-compatible endpoint; a backend brokering
+ * Workers AI would 404 on this id, which is exactly why the module below it demands one.
  */
-const CAPTURE_WIDTH = 1440;
+const DEFAULT_AI_MODEL = "gpt-4o-mini";
 
 /** The one file the seed writes, and the only thing the empty-directory guard tolerates. */
 const PROJECT_FILE = "project.json";
@@ -164,53 +124,6 @@ function seedName(url: string): string {
   }
 }
 
-function throwIfAborted(signal?: AbortSignal): void {
-  if (signal?.aborted) {
-    throw new Error("Import aborted");
-  }
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) {
-    return `${bytes} B`;
-  }
-  if (bytes < 1024 * 1024) {
-    return `${(bytes / 1024).toFixed(1)} KB`;
-  }
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-/**
- * Run the heuristic componentize pass and refine it with the LLM. Returns undefined when the AI
- * pass is off, componentization is disabled, or the heuristic found nothing (the emit step then
- * runs its own heuristic pass as usual).
- */
-async function maybeAiComponentize(
-  pageMap: Map<string, JxElement>,
-  componentizeOptions: false | { minInstances?: number; minDepth?: number },
-  ai: ImportSiteOptions["ai"],
-  progress: (phase: ImportPhase, message: string) => void,
-): Promise<ComponentizeResult | undefined> {
-  if (!ai || componentizeOptions === false) {
-    return undefined;
-  }
-  const { componentize } = await import("./componentize.ts");
-  const { aiComponentize } = await import("./ai-componentize.ts");
-  progress("components", "Running heuristic componentization...");
-  const heuristic = componentize(pageMap, componentizeOptions);
-  if (heuristic.components.size === 0) {
-    return undefined;
-  }
-  progress("ai", `Found ${heuristic.components.size} component(s), refining with AI...`);
-  const refined = await aiComponentize(
-    heuristic,
-    { apiKey: ai.apiKey, baseUrl: ai.baseUrl, model: ai.model },
-    (msg) => progress("ai", msg),
-  );
-  progress("ai", `AI refined ${refined.components.size} component(s)`);
-  return refined;
-}
-
 /**
  * Import a live website into a Jx project at `outDir`.
  *
@@ -221,23 +134,7 @@ export async function importSite(
   options: ImportSiteOptions,
   onProgress?: (e: ImportProgressEvent) => void,
 ): Promise<ImportSiteResult> {
-  const {
-    url,
-    outDir,
-    maxDepth = 2,
-    maxPages = 25,
-    maxNodesPerPage = 5000,
-    styles = true,
-    assets = true,
-    scroll = true,
-    respectRobots = true,
-    componentize: componentizeOptions = {},
-    ai = false,
-    verify = false,
-    chromePath,
-    signal,
-    breakpoints: breakpointPolicy = DEFAULT_BREAKPOINT_POLICY,
-  } = options;
+  const { url, outDir, maxDepth = 2, ai = false, verify = false, chromePath, signal } = options;
 
   if (!url.startsWith("http://") && !url.startsWith("https://")) {
     throw new Error("URL must start with http:// or https://");
@@ -253,12 +150,8 @@ export async function importSite(
     throw new Error(`Directory "${outDir}" is not empty`);
   }
 
-  const progress = (
-    phase: ImportPhase,
-    message: string,
-    counts?: { current?: number; total?: number },
-  ) => {
-    onProgress?.({ phase, message, ...counts });
+  const progress = (phase: ImportPhase, message: string) => {
+    onProgress?.({ phase, message });
   };
   const warnings: string[] = [];
   const warn = (phase: ImportPhase, message: string) => {
@@ -271,10 +164,57 @@ export async function importSite(
 
   try {
     await seedProject();
-    if (maxDepth === 0) {
-      return await runSinglePage();
+
+    progress("launch", "Launching browser...");
+    const browser = await launchBrowser(
+      chromePath === undefined ? {} : { executablePath: chromePath },
+    );
+
+    const result = await runImportPipeline(
+      {
+        url,
+        browser,
+        io: createLocalIo(outDir),
+        maxDepth,
+        /* The model default is applied here so the pipeline can require one. See DEFAULT_AI_MODEL. */
+        ai: ai === false ? false : { ...ai, model: ai.model ?? DEFAULT_AI_MODEL },
+        referenceScreenshots: verify === false ? false : { fullPage: verifyFullPage },
+        ...pick(options, [
+          "maxPages",
+          "maxNodesPerPage",
+          "breakpoints",
+          "styles",
+          "assets",
+          "scroll",
+          "respectRobots",
+          "componentize",
+          "signal",
+        ]),
+      },
+      onProgress,
+    );
+    warnings.push(...result.warnings);
+
+    let verifySummary: ImportSiteResult["verify"] = null;
+    if (verify !== false) {
+      if (result.references.size === 0) {
+        progress("verify", "No reference screenshots captured — skipping verify");
+      } else {
+        /* Only the single-page run hands the verifier its browser. A crawl's pages were captured
+           and closed one at a time, so by now the connection has outlived every page it opened and
+           `verifyProject` launching its own is the same cost either way. */
+        verifySummary = await runVerify(result.references, maxDepth === 0 ? browser : undefined);
+      }
     }
-    return await runCrawl();
+
+    progress("done", `Imported ${url} → ${outDir}`);
+    return {
+      outDir,
+      pages: result.pages,
+      fileCount: result.files.length,
+      verify: verifySummary,
+      warnings,
+    };
   } finally {
     await closeBrowser();
   }
@@ -298,391 +238,18 @@ export async function importSite(
     });
   }
 
-  // ─── Single-page mode: Phase 0-2 pipeline, no crawl overhead ────────────────
-  async function runSinglePage(): Promise<ImportSiteResult> {
-    progress("launch", "Launching browser...");
-    const browser = await launchBrowser(
-      chromePath === undefined ? {} : { executablePath: chromePath },
-    );
-
-    throwIfAborted(signal);
-    progress("capture", "Capturing page...");
-    const capture = await capturePage(url, browser, { scrollToBottom: scroll });
-    progress("capture", `Captured: "${capture.title}" (${capture.links.length} links found)`);
-
-    progress("capture", "Converting to Jx...");
-    const jx = convertToJx(capture.bodyHtml);
-    progress(
-      "capture",
-      `Converted: ${jx.nodeCount} nodes, ${jx.collectedStyles.length} inline stylesheets collected`,
-    );
-    if (jx.nodeCount > maxNodesPerPage) {
-      warn("capture", `Large page (${jx.nodeCount} nodes). Studio may be slow.`);
-    }
-
-    let breakpoints: Record<string, string> | undefined;
-    let styleTokens: Record<string, string> | undefined;
-
-    if (styles) {
-      throwIfAborted(signal);
-      progress("styles", "Capturing computed styles...");
-      const styleResult = await captureStyles(capture.page);
-      progress(
-        "styles",
-        `Captured styles for ${styleResult.elements.length} elements, ${Object.keys(styleResult.uaDefaults).length} tag baselines`,
-      );
-
-      progress("styles", "Diffing against UA defaults...");
-      const diffed = diffAllStyles(styleResult.elements, styleResult.uaDefaults);
-      progress("styles", `${diffed.length} elements with non-default styles`);
-
-      // Replace resolved values with var(--name) references
-      const propCount = Object.keys(styleResult.customProperties).length;
-      if (propCount > 0) {
-        const tokenResult = applyTokens(diffed, styleResult.customProperties);
-        if (tokenResult.replacements > 0) {
-          styleTokens = tokenResult.tokens;
-          progress(
-            "styles",
-            `Extracted ${Object.keys(tokenResult.tokens).length} design tokens (${tokenResult.replacements} replacements)`,
-          );
-        } else {
-          progress(
-            "styles",
-            `${propCount} custom properties found, but none matched computed values`,
-          );
-        }
-      }
-
-      if (styleResult.mediaQueries.length > 0) {
-        progress(
-          "styles",
-          `Extracting @media breakpoints (${styleResult.mediaQueries.length} queries found)...`,
-        );
-        reportBreakpointPlan(styleResult.mediaQueries);
-        const media = await extractMedia(
-          capture.page,
-          styleResult.elements,
-          styleResult.uaDefaults,
-          styleResult.mediaQueries,
-          { policy: breakpointPolicy },
-        );
-        const bpCount = Object.keys(media.breakpoints).length;
-        if (bpCount > 0) {
-          progress("styles", `${bpCount} breakpoints with style changes`);
-          ({ breakpoints } = media);
-          applyStylesToTree(jx.document, diffed, media.deltas);
-        } else {
-          progress("styles", "No responsive breakpoints with style changes");
-          applyStylesToTree(jx.document, diffed);
-        }
-      } else {
-        progress("styles", "No @media queries found");
-        applyStylesToTree(jx.document, diffed);
-      }
-
-      // Apply <html>/<body> computed styles to the root wrapper
-      if (Object.keys(styleResult.documentStyles).length > 0) {
-        if (!jx.document.style) {
-          jx.document.style = {};
-        }
-        for (const [prop, val] of Object.entries(styleResult.documentStyles)) {
-          const camel = kebabToCamel(prop);
-          jx.document.style[camel] = val;
-        }
-        progress(
-          "styles",
-          `Applied ${Object.keys(styleResult.documentStyles).length} document-level styles to root`,
-        );
-      }
-    }
-
-    let fontFaceRules: string[] | undefined;
-    let fontRewriteMap: Map<string, string> | undefined;
-
-    if (assets) {
-      throwIfAborted(signal);
-      progress("assets", "Collecting asset URLs...");
-      const collected = await collectAssets(capture.page);
-      progress(
-        "assets",
-        `Found ${collected.assets.length} assets (${collected.inlineSvgCount} inline SVGs kept, ${collected.stylesheets.length} stylesheets retained)`,
-      );
-
-      const allFontRules = collected.stylesheets.flatMap((s) => s.fontFaceRules);
-      if (allFontRules.length > 0) {
-        fontFaceRules = allFontRules;
-        progress("assets", `Found ${allFontRules.length} @font-face rules`);
-      }
-
-      if (collected.assets.length > 0) {
-        progress("assets", "Downloading assets...");
-        const downloaded = await downloadAssets(collected.assets, outDir, url);
-        progress(
-          "assets",
-          `Downloaded ${downloaded.rewriteMap.size} assets (${formatBytes(downloaded.totalBytes)})`,
-        );
-        if (downloaded.failed.length > 0) {
-          warn("assets", `${downloaded.failed.length} assets failed to download`);
-        }
-        if (downloaded.skipped.length > 0) {
-          progress("assets", `Skipped ${downloaded.skipped.length} tracking/analytics URLs`);
-        }
-
-        if (fontFaceRules) {
-          fontRewriteMap = new Map<string, string>();
-          for (const [originalUrl, localPath] of downloaded.rewriteMap) {
-            if (localPath.includes("/fonts/") || /\.(woff2?|ttf|otf|eot)$/i.test(localPath)) {
-              fontRewriteMap.set(originalUrl, localPath);
-            }
-          }
-        }
-
-        progress("assets", "Rewriting asset URLs...");
-        const rewrites = rewriteAssetUrls(jx.document, downloaded.rewriteMap, url);
-        progress("assets", `Rewrote ${rewrites} URL references`);
-      }
-    }
-
-    // Capture the reference screenshot before closing the page (for verify)
-    let referenceScreenshot: Buffer | undefined;
-    if (verify !== false) {
-      progress("verify", "Capturing reference screenshot...");
-      const { captureReferenceScreenshot } = await import("./verify.ts");
-      referenceScreenshot = await captureReferenceScreenshot(
-        capture.page,
-        undefined,
-        undefined,
-        verifyFullPage,
-      );
-    }
-
-    await capture.page.close();
-
-    throwIfAborted(signal);
-    const pageMap = new Map([["pages/index.json", jx.document]]);
-    const precomputedComponents = await maybeAiComponentize(
-      pageMap,
-      componentizeOptions,
-      ai,
-      progress,
-    );
-
-    throwIfAborted(signal);
-    progress("emit", "Writing project...");
-    const { files, classesStripped } = await emitMultiPageProject({
-      outDir,
-      title: capture.title,
-      pages: pageMap,
-      sourceUrl: url,
-      breakpoints,
-      baseWidth: CAPTURE_WIDTH,
-      componentizeOptions: precomputedComponents ? false : componentizeOptions,
-      precomputedComponents,
-      fontFaceRules,
-      fontRewriteMap,
-      styleTokens,
-    });
-    reportEmit(files.length, classesStripped);
-
-    let verifySummary: ImportSiteResult["verify"] = null;
-    if (verify !== false && referenceScreenshot) {
-      verifySummary = await runVerify(
-        new Map([["pages/index.json", { sourceUrl: url, screenshot: referenceScreenshot }]]),
-        browser,
-      );
-    }
-
-    progress("done", `Imported ${url} → ${outDir}`);
-    return {
-      outDir,
-      pages: [{ route: "pages/index.json", title: capture.title, nodeCount: jx.nodeCount }],
-      fileCount: files.length,
-      verify: verifySummary,
-      warnings,
-    };
-  }
-
-  // ─── Multi-page crawl mode (Phase 3) ────────────────────────────────────────
-  async function runCrawl(): Promise<ImportSiteResult> {
-    progress("launch", "Launching browser...");
-    await launchBrowser(chromePath === undefined ? {} : { executablePath: chromePath });
-
-    throwIfAborted(signal);
-    const result = await crawlSite({
-      url,
-      outDir,
-      maxDepth,
-      maxPages,
-      maxNodesPerPage,
-      skipStyles: !styles,
-      skipAssets: !assets,
-      respectRobots,
-      noScroll: !scroll,
-      captureScreenshots: verify !== false,
-      // The reference and the render must be framed the same way, or the diff pads one of them.
-      fullPageScreenshots: verifyFullPage,
-      breakpoints: breakpointPolicy,
-      onProgress: (msg) => progress("crawl", msg.trim()),
-      ...(signal === undefined ? {} : { signal }),
-    });
-
-    progress(
-      "crawl",
-      `Crawled ${result.pages.length} page${result.pages.length === 1 ? "" : "s"}`,
-      { current: result.pages.length, total: maxPages },
-    );
-    if (result.skippedByRobots.length > 0) {
-      progress("crawl", `Skipped ${result.skippedByRobots.length} URLs (robots.txt)`);
-    }
-    if (result.skippedByNodeCap.length > 0) {
-      warn(
-        "crawl",
-        `${result.skippedByNodeCap.length} pages exceeded node cap (styles/assets skipped)`,
-      );
-    }
-
-    const pageMap = new Map<string, JxElement>();
-    for (const page of result.pages) {
-      pageMap.set(page.route, page.jx.document);
-    }
-
-    // Layout detection
-    let layout: JxElement | undefined;
-    if (result.pages.length >= 2) {
-      throwIfAborted(signal);
-      progress("layout", "Detecting shared layout (header/footer)...");
-      const layoutResult = detectLayout(pageMap);
-      if (layoutResult) {
-        ({ layout } = layoutResult);
-        const sharedCount = (Array.isArray(layout.children) ? layout.children.length : 0) - 1; // Minus the slot
-        progress("layout", `Found shared layout with ${sharedCount} shared elements`);
-        for (const [route, stripped] of layoutResult.strippedPages) {
-          pageMap.set(route, stripped);
-        }
-      } else {
-        progress("layout", "No shared layout detected");
-      }
-    }
-
-    throwIfAborted(signal);
-    const precomputedComponents = await maybeAiComponentize(
-      pageMap,
-      componentizeOptions,
-      ai,
-      progress,
-    );
-
-    throwIfAborted(signal);
-    progress("emit", "Writing project...");
-    const title = result.pages[0]?.title || new URL(url).hostname;
-    const { files, classesStripped } = await emitMultiPageProject({
-      outDir,
-      title,
-      sourceUrl: url,
-      pages: pageMap,
-      layout,
-      breakpoints: result.breakpoints,
-      baseWidth: CAPTURE_WIDTH,
-      componentizeOptions: precomputedComponents ? false : componentizeOptions,
-      precomputedComponents,
-      fontFaceRules: result.fontFaceRules.length > 0 ? result.fontFaceRules : undefined,
-      fontRewriteMap: result.fontRewriteMap.size > 0 ? result.fontRewriteMap : undefined,
-      styleTokens: result.styleTokens,
-    });
-    reportEmit(files.length, classesStripped);
-
-    let verifySummary: ImportSiteResult["verify"] = null;
-    if (verify !== false) {
-      const verifyPages = new Map<string, { sourceUrl: string; screenshot: Buffer | string }>();
-      for (const page of result.pages) {
-        if (page.screenshot) {
-          verifyPages.set(page.route, { sourceUrl: page.url, screenshot: page.screenshot });
-        }
-      }
-      if (verifyPages.size === 0) {
-        progress("verify", "No reference screenshots captured — skipping verify");
-      } else {
-        verifySummary = await runVerify(verifyPages);
-      }
-    }
-
-    progress("done", `Imported ${url} → ${outDir}`);
-    return {
-      outDir,
-      pages: result.pages.map((p) => ({
-        route: p.route,
-        title: p.title,
-        nodeCount: p.jx.nodeCount,
-      })),
-      fileCount: files.length,
-      verify: verifySummary,
-      warnings,
-    };
-  }
-
-  /** One emit line, naming what the strip pass removed — silence would read as "nothing to do". */
-  function reportEmit(fileCount: number, classesStripped: number): void {
-    const classes =
-      classesStripped > 0
-        ? `, stripped ${classesStripped} source class name${classesStripped === 1 ? "" : "s"}`
-        : "";
-    progress("emit", `Wrote ${fileCount} files${classes}`);
-  }
-
-  /**
-   * Say which breakpoints the project is getting, and where the others went.
-   *
-   * The plan is a decision made ON THE AUTHOR'S BEHALF — nine declared widths become three — so it
-   * has to be visible. "9 breakpoints found, keeping 3" with the fold spelled out is the difference
-   * between a project that mysteriously has different breakpoints from its source and one whose
-   * import said so at the time.
-   */
-  function reportBreakpointPlan(mediaQueries: readonly string[]): void {
-    const skipped = skippedWidthQueries(mediaQueries);
-    if (skipped.length > 0) {
-      warn(
-        "styles",
-        `${skipped.length} width media ${skipped.length === 1 ? "query" : "queries"} could not be ` +
-          `read (only single-clause px min-width/max-width is supported): ${skipped.join(", ")}`,
-      );
-    }
-    const discovered = analyzeMediaQueries(mediaQueries);
-    if (discovered.length === 0) {
-      return;
-    }
-    const { keep, fold } = planBreakpoints(discovered, breakpointPolicy);
-    if (keep.length === discovered.length) {
-      progress("styles", `Keeping all ${keep.length} declared breakpoints`);
-      return;
-    }
-    const folded = new Map<string, string[]>();
-    for (const [from, to] of fold) {
-      if (from === to) {
-        continue;
-      }
-      folded.set(to, [...(folded.get(to) ?? []), from.replace(/^--/, "")]);
-    }
-    const detail = keep
-      .map((bp) => {
-        const into = folded.get(bp.name) ?? [];
-        return into.length > 0 ? `${bp.name} (+${into.join(", ")})` : bp.name;
-      })
-      .join(", ");
-    progress(
-      "styles",
-      `${discovered.length} breakpoints declared, keeping ${keep.length}: ${detail}`,
-    );
-  }
-
   // ─── Phase 5: build + screenshot-diff against the original ─────────────────
   async function runVerify(
-    verifyPages: Map<string, { sourceUrl: string; screenshot: Buffer | string }>,
+    references: Map<string, { sourceUrl: string; screenshot: Uint8Array }>,
     browser?: Browser,
   ): Promise<ImportSiteResult["verify"]> {
     throwIfAborted(signal);
     progress("verify", "Verifying against the original...");
     const { verifyProject } = await import("./verify.ts");
+    const verifyPages = new Map<string, { sourceUrl: string; screenshot: Buffer | string }>();
+    for (const [route, ref] of references) {
+      verifyPages.set(route, { sourceUrl: ref.sourceUrl, screenshot: Buffer.from(ref.screenshot) });
+    }
     const verifyResult = await verifyProject({
       projectDir: outDir,
       pages: verifyPages,
@@ -740,4 +307,27 @@ export async function importSite(
       }),
     };
   }
+}
+
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) {
+    throw new Error("Import aborted");
+  }
+}
+
+/**
+ * Forward the options this wrapper shares with the pipeline, and only the ones actually given.
+ *
+ * `exactOptionalPropertyTypes` is on, so `{ signal: undefined }` is a different thing from an
+ * absent `signal` and the pipeline would reject it. Copying present keys is also what keeps every
+ * default in ONE place — restating `maxPages = 25` here is how the CLI and the cloud drift apart.
+ */
+function pick<T extends object, K extends keyof T>(source: T, keys: readonly K[]): Pick<T, K> {
+  const out = {} as Pick<T, K>;
+  for (const key of keys) {
+    if (source[key] !== undefined) {
+      out[key] = source[key];
+    }
+  }
+  return out;
 }

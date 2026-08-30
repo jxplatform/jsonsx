@@ -30,7 +30,7 @@ Type in the message box at the bottom and press :kbd[Enter] to send. :kbd[Shift+
 The row under the message box holds the composer's controls:
 
 - **Attach context** (paperclip) pins the current page or the selected element to your message (below).
-- The **model picker** switches models mid-conversation. The list comes from the provider you have configured, and only from that one: change the key or the endpoint and the picker re-asks rather than showing you the previous provider's catalogue.
+- The **model picker** switches models mid-conversation. The list comes from the provider you have configured, and only from that one: change the key or the endpoint and the picker re-asks rather than showing you the previous provider's catalogue. Where the provider says which of its models can call tools, one that cannot is labelled, and picking it puts a line under the picker: that model will answer your questions but will not edit anything. It is a fine choice when you want to think out loud, just not the one to blame when nothing changes on the canvas.
 - **API key & endpoint** (gear) reopens the **Assistant settings** dialog.
 - **Send** becomes **Stop** while the assistant is replying; click it to halt the reply and any further actions.
 

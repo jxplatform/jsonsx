@@ -87,7 +87,10 @@ describe("Agent flow", () => {
        renders only the BYOK form leaves them with no key and no way to get one. */
     proxyState = { configured: false, managed: true };
     const { platform } = installMockPlatform();
-    platform.cfConnect = async () => ({ connected: true });
+    platform.cfConnect = async () => ({
+      status: "connected" as const,
+      connection: { connected: true },
+    });
     void openNewProjectModal();
     switchTab("agent");
     await flush();

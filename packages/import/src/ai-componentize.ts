@@ -15,7 +15,17 @@ import type { ExtractedComponent, ComponentizeResult } from "./componentize.ts";
 export interface AiComponentizeOptions {
   apiKey: string;
   baseUrl?: string | undefined;
-  model?: string | undefined;
+  /**
+   * The model id, and it has no default on purpose.
+   *
+   * `"gpt-4o-mini"` used to be one, which was harmless while the only caller was the OSS CLI
+   * pointing at OpenAI and wrong the moment a backend brokered anything else: Workers AI answers a
+   * model it does not know with a 404, `callLlm` reads that as "the LLM failed", and every
+   * component silently keeps its heuristic `component-div-0` name. A required id makes the caller
+   * that knows which provider it is talking to say so. The CLI and the OSS server still default to
+   * `gpt-4o-mini` — at their own call site, in `run.ts`.
+   */
+  model: string;
 }
 
 interface RenameResult {
@@ -58,7 +68,7 @@ Respond with ONLY the JSON object, no markdown fences or explanation.`;
 
 async function callLlm(prompt: string, opts: AiComponentizeOptions): Promise<RenameResult | null> {
   const baseUrl = opts.baseUrl || "https://api.openai.com/v1";
-  const model = opts.model || "gpt-4o-mini";
+  const { model } = opts;
 
   const response = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",

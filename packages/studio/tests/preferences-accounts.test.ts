@@ -7,15 +7,35 @@
  * secret it describes.
  */
 import "./with-dom.js";
-import { clearSeededSettings, seedSettings } from "./harness";
+import { clearSeededSettings, flush, installMockPlatform, seedSettings } from "./harness";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
-import {
+import type { CfConnection, StudioPlatform } from "../src/types";
+
+/**
+ * The picker is doubled: the Choose account action reaches it through a lazy `import()` (the static
+ * one would close a cycle — the picker imports this module for `notifyCredentialsChanged`), so a
+ * double is both the witness that it opened and the way two real imports never overlap.
+ */
+let pickerOpens = 0;
+let pickerResult: { id: string; name: string } | null = { id: "acc-2", name: "Acme" };
+void mock.module("../src/ui/cf-account-picker", () => ({
+  openCfAccountPicker: async () => {
+    pickerOpens += 1;
+    return pickerResult;
+  },
+}));
+
+const {
+  ensureCfConnection,
   listAccounts,
   notifyCredentialsChanged,
   onCredentialsChanged,
+  platformBrokersCf,
+  refreshCfConnection,
+  resetCfConnectionCache,
   resetCredentialListeners,
   revokeAccount,
-} from "../src/settings/preferences-accounts";
+} = await import("../src/settings/preferences-accounts");
 
 const GITHUB_TOKEN = "gho_secretsecretsecret";
 const AI_KEY = "sk-secretsecretsecret";
@@ -113,6 +133,197 @@ describe("revokeAccount", () => {
 
   test("an unknown id reports false rather than silently doing nothing", () => {
     expect(revokeAccount("bitbucket")).toBe(false);
+  });
+});
+
+/**
+ * The Cloudflare row has two spellings, and this file used to know only one.
+ *
+ * Under hosted OAuth there is no local token to enumerate — `getCfToken()` is empty by design — so
+ * the row said "Not connected" to every Jx Cloud user, named no account, and offered a Disconnect
+ * that cleared nothing server-side. There was no reconnect entry point anywhere in Preferences.
+ */
+describe("the brokered Cloudflare row", () => {
+  function install(connection: CfConnection | null, extra: Partial<StudioPlatform> = {}) {
+    return installMockPlatform({
+      cfConnect: async () => ({
+        connection: connection ?? { connected: true },
+        status: "connected",
+      }),
+      cfConnection: async () => connection,
+      ...extra,
+    });
+  }
+
+  function cloudflare() {
+    return listAccounts().find((account) => account.id === "cloudflare")!;
+  }
+
+  /** Run one of the row's own actions and let its async work settle. */
+  async function act(id: string): Promise<void> {
+    const action = cloudflare().actions?.find((candidate) => candidate.id === id);
+    expect(action).toBeTruthy();
+    await action!.run();
+    await flush();
+  }
+
+  beforeEach(() => {
+    pickerOpens = 0;
+    pickerResult = { id: "acc-2", name: "Acme" };
+    resetCfConnectionCache();
+  });
+
+  test("says it is checking before the broker has answered, and offers nothing yet", () => {
+    install({ accountId: "acc-1", accountName: "Acme", connected: true });
+    expect(platformBrokersCf()).toBe(true);
+    expect(cloudflare().detail).toContain("Checking");
+    expect(cloudflare().actions).toEqual([]);
+  });
+
+  test("names the connected account once the broker answers", async () => {
+    install({ accountId: "acc-1", accountName: "Acme", connected: true });
+    const announced = mock(() => {});
+    onCredentialsChanged(announced);
+    ensureCfConnection();
+    await flush();
+    expect(cloudflare().connected).toBe(true);
+    expect(cloudflare().detail).toContain("Acme");
+    // A repaint of every surface that shows the connection, not just this list.
+    expect(announced).toHaveBeenCalled();
+    expect(cloudflare().actions?.map((action) => action.id)).toEqual(["disconnect"]);
+  });
+
+  test("Disconnect goes through the broker, and the row re-reads what it said", async () => {
+    let connection: CfConnection | null = {
+      accountId: "acc-1",
+      accountName: "Acme",
+      connected: true,
+    };
+    const cfDisconnect = mock(async () => {
+      connection = null;
+    });
+    installMockPlatform({
+      cfConnect: async () => ({ connection: { connected: true }, status: "connected" }),
+      cfConnection: async () => connection,
+      cfDisconnect,
+    });
+    await refreshCfConnection();
+    await act("disconnect");
+    expect(cfDisconnect).toHaveBeenCalledTimes(1);
+    expect(cloudflare().connected).toBe(false);
+    expect(cloudflare().detail).toContain("Not connected");
+  });
+
+  test("a lapsed grant offers Reconnect, and says what expiring costs", async () => {
+    let connection: CfConnection = {
+      accountId: "acc-1",
+      code: "cf_reconnect_required",
+      connected: true,
+      needsReconnect: true,
+    };
+    const cfConnect = mock(async () => {
+      connection = { accountId: "acc-1", accountName: "Acme", connected: true };
+      return { connection, status: "connected" as const };
+    });
+    installMockPlatform({ cfConnect, cfConnection: async () => connection });
+    await refreshCfConnection();
+    expect(cloudflare().detail).toContain("expired");
+    expect(cloudflare().actions?.map((action) => action.id)).toEqual(["reconnect", "disconnect"]);
+
+    await act("reconnect");
+    expect(cfConnect).toHaveBeenCalledTimes(1);
+    expect(cloudflare().detail).toContain("Acme");
+  });
+
+  test("connected with no account chosen offers the picker, and commits what it returns", async () => {
+    let connection: CfConnection = { connected: true, needsAccount: true };
+    installMockPlatform({
+      cfConnect: async () => ({ connection, status: "connected" }),
+      cfConnection: async () => connection,
+    });
+    await refreshCfConnection();
+    expect(cloudflare().connected).toBe(true);
+    expect(cloudflare().detail).toContain("no account is chosen");
+    expect(cloudflare().actions?.map((action) => action.id)).toEqual([
+      "choose-account",
+      "disconnect",
+    ]);
+
+    connection = { accountId: "acc-2", accountName: "Acme", connected: true };
+    await act("choose-account");
+    expect(pickerOpens).toBe(1);
+    expect(cloudflare().detail).toContain("Acme");
+  });
+
+  test("a connect that lands account-less opens the picker before the row settles", async () => {
+    let connection: CfConnection | null = null;
+    installMockPlatform({
+      cfConnect: async () => {
+        connection = { accountId: "acc-2", accountName: "Acme", connected: true };
+        return { connection: { connected: true }, status: "connected" as const };
+      },
+      cfConnection: async () => connection,
+    });
+    await refreshCfConnection();
+    await act("connect");
+    expect(pickerOpens).toBe(1);
+    expect(cloudflare().detail).toContain("Acme");
+  });
+
+  test("revokeAccount reaches the broker too — one verb, whoever holds the credential", async () => {
+    let connection: CfConnection | null = { accountId: "acc-1", connected: true };
+    const cfDisconnect = mock(async () => {
+      connection = null;
+    });
+    installMockPlatform({
+      cfConnect: async () => ({ connection: { connected: true }, status: "connected" }),
+      cfConnection: async () => connection,
+      cfDisconnect,
+    });
+    await refreshCfConnection();
+    expect(revokeAccount("cloudflare")).toBe(true);
+    await flush();
+    expect(cfDisconnect).toHaveBeenCalledTimes(1);
+  });
+
+  test("revoking a connection the broker never confirmed is inert, not an error", async () => {
+    const cfDisconnect = mock(async () => {});
+    installMockPlatform({
+      cfConnect: async () => ({ connection: { connected: true }, status: "connected" }),
+      cfConnection: async () => null,
+      cfDisconnect,
+    });
+    // Still "checking": nothing has been read, so there is nothing to forget.
+    expect(revokeAccount("cloudflare")).toBe(true);
+    await refreshCfConnection();
+    expect(revokeAccount("cloudflare")).toBe(true);
+    await flush();
+    expect(cfDisconnect).not.toHaveBeenCalled();
+  });
+
+  test("an unreachable broker reads as not connected rather than throwing at the sheet", async () => {
+    installMockPlatform({
+      cfConnect: async () => ({ connection: { connected: true }, status: "connected" }),
+      cfConnection: async () => {
+        throw new Error("network down");
+      },
+    });
+    await refreshCfConnection();
+    expect(cloudflare().connected).toBe(false);
+    expect(cloudflare().detail).toContain("Not connected");
+  });
+
+  test("a platform with no broker keeps the locally stored token row, unchanged", async () => {
+    installMockPlatform();
+    resetCfConnectionCache();
+    expect(platformBrokersCf()).toBe(false);
+    seedSettings({ "jx.cf.token": CF_TOKEN, "jx.cf.accountId": "acc-1" });
+    expect(cloudflare().connected).toBe(true);
+    expect(cloudflare().detail).toBe("Connected — account acc-1.");
+    expect(cloudflare().actions).toBeUndefined();
+    // And refreshing is inert rather than an error: there is no broker to ask.
+    await refreshCfConnection();
+    expect(cloudflare().detail).toBe("Connected — account acc-1.");
   });
 });
 

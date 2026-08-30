@@ -268,7 +268,10 @@ describe("ai-panel", () => {
     (globalThis as Record<string, unknown>).fetch = async () =>
       Response.json({ models: [], configured: false, managed: true }, { status: 200 });
     await fetchAvailableModels({ force: true });
-    const cfConnect = mock(async () => ({ connected: true, accountId: "acc-1" }));
+    const cfConnect = mock(async () => ({
+      status: "connected" as const,
+      connection: { connected: true, accountId: "acc-1" },
+    }));
     mockPlatform.cfConnect = cfConnect;
     pushMessage("user", "nudge render");
     await flush(3);

@@ -1,7 +1,24 @@
-import { describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { createChatState } from "@jxsuite/ai";
 import type { Message } from "@jxsuite/ai/chat-state";
-import { pruneOrphanToolMessages, trimContext } from "../src/services/context-manager";
+
+/**
+ * The catalogue's reported windows, doubled.
+ *
+ * `ai-models` reaches the platform layer and the settings kernel, and none of that is what these
+ * tests are about — what matters here is only WHICH of the three sources the budget comes from.
+ * Doubled rather than seeded through a real fetch so this file stays DOM-free.
+ */
+let reportedWindows: Record<string, number> = {};
+void mock.module("../src/services/ai-models", () => ({
+  modelContextWindow: (id: string) => reportedWindows[id],
+}));
+
+const { pruneOrphanToolMessages, trimContext } = await import("../src/services/context-manager");
+
+beforeEach(() => {
+  reportedWindows = {};
+});
 
 function longContent(tokens: number) {
   return "x".repeat(tokens * 4);
@@ -177,6 +194,59 @@ describe("context-manager — trimContext", () => {
     expect(result!.droppedCount).toBe(0);
     expect(cs.contextWarning).toBe(true);
     expect(cs.messages.length).toBe(2); // Nothing dropped
+  });
+});
+
+describe("context-manager — the model's context window", () => {
+  /** Fill a state with `count` messages of `tokens` each, so a budget can be crossed on purpose. */
+  function stateWith(model: string, count: number, tokens: number) {
+    const cs = createChatState({ model });
+    const msgs: Omit<Message, "id" | "timestamp">[] = [];
+    for (let i = 0; i < count; i++) {
+      msgs.push({ role: i % 2 === 0 ? "user" : "assistant", content: longContent(tokens) });
+    }
+    pushMessages(cs, msgs);
+    return cs;
+  }
+
+  test("a server-reported window beats the prefix table", () => {
+    /* The table can only know the names it was written with, and it is also free to be WRONG about
+       one it does know — the backend serving the model is the better authority either way. */
+    const unreported = stateWith("gpt-4", 30, 300); // Table says 8192 → budget 6553.
+    expect(trimContext(unreported, longContent(500))!.droppedCount).toBeGreaterThan(0);
+
+    reportedWindows["gpt-4"] = 1_000_000;
+    const reported = stateWith("gpt-4", 30, 300);
+    expect(trimContext(reported, longContent(500))!.droppedCount).toBe(0);
+  });
+
+  test("an unreported model falls back to the prefix table", () => {
+    // The backend answered about a different model entirely, and about this one said nothing.
+    reportedWindows["@cf/meta/llama-4"] = 128_000;
+
+    const small = stateWith("gpt-4", 30, 300);
+    expect(trimContext(small, longContent(500))!.droppedCount).toBeGreaterThan(0);
+
+    const large = stateWith("gpt-4o", 30, 300); // Table says 128k.
+    expect(trimContext(large, longContent(500))!.droppedCount).toBe(0);
+  });
+
+  test("a model in neither the report nor the table gets the conservative default", () => {
+    /* This is the case that was silently costing the most: every `@cf/*` id missed the table, so a
+       128k managed model was budgeted at 32k and started dropping turns at about 25.6k. */
+    const defaulted = stateWith("@cf/meta/llama-4", 30, 1000); // ~30k tokens vs a 25.6k budget.
+    expect(trimContext(defaulted, longContent(500))!.droppedCount).toBeGreaterThan(0);
+
+    reportedWindows["@cf/meta/llama-4"] = 128_000;
+    const declared = stateWith("@cf/meta/llama-4", 30, 1000);
+    expect(trimContext(declared, longContent(500))!.droppedCount).toBe(0);
+  });
+
+  test("a nonsensical reported window is ignored rather than obeyed", () => {
+    // A zero would make every budget zero and trim the whole conversation on the first send.
+    reportedWindows["gpt-4o"] = 0;
+    const cs = stateWith("gpt-4o", 30, 300);
+    expect(trimContext(cs, longContent(500))!.droppedCount).toBe(0);
   });
 });
 

@@ -1,7 +1,7 @@
 /**
- * VerifyProject tests — mock the compiler's buildSite and puppeteer (via capture.ts) so the full
- * pipeline (build → serve → screenshot → diff → report) runs without a real browser. Fake pages
- * fetch from the real serveDirectory server and return in-memory PNGs built with pngjs.
+ * VerifyProject tests — mock the compiler's buildSite and puppeteer (via browser-local.ts) so the
+ * full pipeline (build → serve → screenshot → diff → report) runs without a real browser. Fake
+ * pages fetch from the real serveDirectory server and return in-memory PNGs built with pngjs.
  */
 
 import { describe, expect, it, mock } from "bun:test";
@@ -36,13 +36,13 @@ void mock.module("@jxsuite/compiler/site", () => ({
   buildSite: (dir: string) => buildSiteImpl(dir),
 }));
 
-// -- Mock capture.ts (launchBrowser / closeBrowser) ---------------------------------------------
+// -- Mock browser-local.ts (launchBrowser / closeBrowser) ---------------------------------------------
 
 let launchedBrowser: Browser | null = null;
 let launchCount = 0;
 let closeCount = 0;
 
-void mock.module("../src/capture.ts", () => ({
+void mock.module("../src/browser-local.ts", () => ({
   launchBrowser: () => {
     launchCount += 1;
     if (!launchedBrowser) {

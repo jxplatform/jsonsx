@@ -5,7 +5,7 @@
  * SVGs are kept as-is (no download needed). Returns absolute URLs for downloading.
  */
 
-import type { Page } from "puppeteer-core";
+import type { ImportPage } from "./capture.ts";
 import { SRCSET_SEPARATOR } from "./srcset.ts";
 
 export interface DiscoveredAsset {
@@ -46,7 +46,7 @@ export interface AssetCollectionResult {
  * Collect all asset URLs from the live page DOM and stylesheets. Runs entirely in-browser via
  * page.evaluate() — no per-element round-trips.
  */
-export async function collectAssets(page: Page): Promise<AssetCollectionResult> {
+export async function collectAssets(page: ImportPage): Promise<AssetCollectionResult> {
   /*
    * The separator crosses into the page as a SOURCE STRING: an evaluated body is serialised and
    * re-parsed in the browser, so it cannot close over a value declared out here.

@@ -2,9 +2,9 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.10.2-draft
+**Version:** 0.10.3-draft
 **Status:** Partial
-**Updated:** 2026-08-29
+**Updated:** 2026-08-30
 **License:** MIT
 
 ---
@@ -2337,6 +2337,15 @@ Two rules the sections must keep:
 Saving or revoking a credential announces itself, so surfaces that gate on one (the Assistant tab's
 setup notice) repaint without Preferences having to know they exist.
 
+**A brokered credential is read from the broker, never from the local slot it does not occupy.**
+Where the platform holds an account on the user's behalf, the row describing it asks the platform for
+its state; a row derived from local storage on such a platform reads "Not connected" forever, names
+no account, and offers a Disconnect that clears nothing anywhere. A brokered row therefore states
+what the broker reports — connected and to which account, connected but not yet pointed at one, or a
+grant that has lapsed — and carries the verb that state actually needs: Reconnect for a lapsed grant,
+a choice of account for an unpointed one, and a Disconnect that reaches the broker. Rule 1 still
+holds: none of these print the credential.
+
 Three rules govern the values themselves, and each of them is a defect that shipped:
 
 3.  **A blank field never deletes.** Storing an empty value and forgetting a value are different
@@ -2845,6 +2854,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.10.3-draft** (2026-08-30) — 15: a brokered credential row reads from the broker, and carries reconnect, account choice and a disconnect that reaches it.
 - **0.10.2-draft** (2026-08-29) — A format declaring rewrite rather than serialize has its references repaired by the rename refactor, so it is no longer a reported remainder.
 - **0.10.1-draft** (2026-08-28) — studioShellHtml() now links a favicon for hosts whose window chrome has no native icon of its own.
 - **0.10.0-draft** (2026-08-27) — New File chooses a format rather than an extension (Other... preserves arbitrary names); a document converts between formats in place; creating in a collection source routes to New Entry.
@@ -2956,4 +2966,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/studio` Specification v0.10.2-draft_
+_`@jxsuite/studio` Specification v0.10.3-draft_

@@ -6,6 +6,7 @@ import { existsSync } from "node:fs";
 import type { JxElement } from "@jxsuite/schema/types";
 import type { ComponentizeResult } from "../src/componentize.ts";
 import { emitMultiPageProject } from "../src/emit.ts";
+import { createLocalIo } from "../src/io.ts";
 
 function makePrecomputed(): ComponentizeResult {
   const template: JxElement = {
@@ -69,7 +70,7 @@ describe("emitMultiPageProject", () => {
       ]);
 
       const { files } = await emitMultiPageProject({
-        outDir: dir,
+        io: createLocalIo(dir),
         title: "Multi Page Test",
         sourceUrl: "https://example.com",
         pages,
@@ -108,7 +109,7 @@ describe("emitMultiPageProject", () => {
       };
 
       await emitMultiPageProject({
-        outDir: dir,
+        io: createLocalIo(dir),
         title: "Layout Test",
         sourceUrl: "https://example.com",
         pages: new Map([["pages/index.json", { tagName: "div" as const }]]),
@@ -130,7 +131,7 @@ describe("emitMultiPageProject", () => {
 
     try {
       await emitMultiPageProject({
-        outDir: dir,
+        io: createLocalIo(dir),
         title: "BP Test",
         sourceUrl: "https://example.com",
         pages: new Map([["pages/index.json", { tagName: "div" as const }]]),
@@ -152,7 +153,7 @@ describe("emitMultiPageProject", () => {
 
     try {
       await emitMultiPageProject({
-        outDir: dir,
+        io: createLocalIo(dir),
         title: "Nested",
         sourceUrl: "https://example.com",
         pages: new Map([["pages/docs/api/reference.json", { tagName: "div" as const }]]),
@@ -169,7 +170,7 @@ describe("emitMultiPageProject", () => {
 
     try {
       await emitMultiPageProject({
-        outDir: dir,
+        io: createLocalIo(dir),
         title: "Token Test",
         sourceUrl: "https://example.com",
         pages: new Map([["pages/index.json", { tagName: "div" as const }]]),
@@ -189,7 +190,7 @@ describe("emitMultiPageProject", () => {
 
     try {
       const { files } = await emitMultiPageProject({
-        outDir: dir,
+        io: createLocalIo(dir),
         title: "Font Test",
         sourceUrl: "https://example.com",
         pages: new Map([["pages/index.json", { tagName: "div" as const }]]),
@@ -199,9 +200,9 @@ describe("emitMultiPageProject", () => {
         ],
       });
 
-      const fontsCssPath = join(dir, "public", "assets", "fonts.css");
-      expect(files).toContain(fontsCssPath);
-      const css = await Bun.file(fontsCssPath).text();
+      // The emitter reports PROJECT-RELATIVE paths — a sink with no filesystem has nothing else.
+      expect(files).toContain("public/assets/fonts.css");
+      const css = await Bun.file(join(dir, "public", "assets", "fonts.css")).text();
       expect(css).toContain('font-family: "A"');
       expect(css).toContain('font-family: "B"');
 
@@ -220,7 +221,7 @@ describe("emitMultiPageProject", () => {
 
     try {
       await emitMultiPageProject({
-        outDir: dir,
+        io: createLocalIo(dir),
         title: "Font Rewrite Test",
         sourceUrl: "https://example.com",
         pages: new Map([["pages/index.json", { tagName: "div" as const }]]),
@@ -256,7 +257,7 @@ describe("emitMultiPageProject", () => {
       });
 
       await emitMultiPageProject({
-        outDir: dir,
+        io: createLocalIo(dir),
         title: "No Comp",
         sourceUrl: "https://example.com",
         pages: new Map<string, JxElement>([
@@ -278,18 +279,18 @@ describe("emitMultiPageProject", () => {
 
     try {
       const { files } = await emitMultiPageProject({
-        outDir: dir,
+        io: createLocalIo(dir),
         title: "Precomputed",
         sourceUrl: "https://example.com",
         pages: new Map<string, JxElement>([["pages/index.json", { tagName: "div" }]]),
         precomputedComponents: makePrecomputed(),
       });
 
+      expect(files).toContain("components/hero-card.json");
+      expect(files).toContain("components/site-footer.json");
+
       const heroPath = join(dir, "components", "hero-card.json");
       const footerPath = join(dir, "components", "site-footer.json");
-      expect(files).toContain(heroPath);
-      expect(files).toContain(footerPath);
-
       const hero = await Bun.file(heroPath).json();
       expect(hero.$id).toBe("HeroCard");
       expect(hero.tagName).toBe("hero-card");
@@ -307,7 +308,7 @@ describe("emitMultiPageProject", () => {
 
     try {
       await emitMultiPageProject({
-        outDir: dir,
+        io: createLocalIo(dir),
         title: "Refs",
         sourceUrl: "https://example.com",
         pages: new Map<string, JxElement>([["pages/index.json", { tagName: "div" }]]),

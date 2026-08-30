@@ -20,6 +20,8 @@
     "./capture": "./src/capture.ts",
     "./to-jx": "./src/to-jx.ts",
     "./emit": "./src/emit.ts",
+    "./io": "./src/io.ts",
+    "./pipeline": "./src/pipeline.ts",
     "./run": "./src/run.ts",
     "./verify": "./src/verify.ts",
     "./breakpoint-plan": "./src/breakpoint-plan.ts"

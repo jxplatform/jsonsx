@@ -594,6 +594,34 @@ describe("createProxyStreamingClient", () => {
     expect(events).toEqual([{ type: "error", message: "bad request detail", code: "400" }]);
   });
 
+  it("prefers a non-ok body's machine code over the HTTP status", async () => {
+    /* `code` was `String(response.status)` unconditionally, so a proxy answering 401
+       `{ code: "cf_reconnect_required" }` reached the client as `"401"` — indistinguishable from a
+       bad BYOK key, and the one reading that would have put a Reconnect button on screen was
+       thrown away at the only place it ever arrived. */
+    mockFetch(() =>
+      streamingResponse(
+        JSON.stringify({ error: "Reconnect Cloudflare.", code: "cf_reconnect_required" }),
+        { status: 401 },
+      ),
+    );
+    const client = createProxyStreamingClient({ chatUrl: "https://proxy/chat" });
+    const events = await collect(client.streamChat([], [], "", new AbortController().signal));
+    expect(events).toEqual([
+      { type: "error", message: "Reconnect Cloudflare.", code: "cf_reconnect_required" },
+    ]);
+  });
+
+  it("falls back to the status when the body's code is absent or empty", async () => {
+    // An empty string is not a code — it must not shadow the status a reader can still act on.
+    mockFetch(() =>
+      streamingResponse(JSON.stringify({ error: "no reason given", code: "" }), { status: 403 }),
+    );
+    const client = createProxyStreamingClient({ chatUrl: "https://proxy/chat" });
+    const events = await collect(client.streamChat([], [], "", new AbortController().signal));
+    expect(events).toEqual([{ type: "error", message: "no reason given", code: "403" }]);
+  });
+
   it("uses the raw body when a non-ok body is not JSON", async () => {
     mockFetch(() => streamingResponse("plain text failure", { status: 500 }));
     const client = createProxyStreamingClient({ chatUrl: "https://proxy/chat" });

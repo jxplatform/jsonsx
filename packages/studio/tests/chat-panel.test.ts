@@ -55,6 +55,8 @@ void mock.module("../src/services/ai-models", () => ({
   resetModelCache: () => {},
   isManagedProxy: () => false,
   isProxyConfigured: () => false,
+  modelContextWindow: () => {},
+  modelToolSupport: () => {},
   // Every named export ai-managed-connect.ts imports must be here: a partial mock.module() of a
   // Module someone else imports is a SyntaxError at link time, not a missing stub at call time.
   proxyStateCode: () => {},

@@ -23,7 +23,7 @@ The assistant is the **fourth tab of the Inspector**, beside Content, Style and 
 
 ## What it can do
 
-**With nothing open**, the assistant bootstraps. Describe a site and it creates a project for you: name, folders, starter pages, and a design quickstart (colors and fonts) derived from your description, then keeps building inside it. It will ask you where to put the project before creating anything. Tell it a folder (or, on the cloud, a GitHub account or organization). It can also clone a live site. Point it at a URL and it crawls the pages, extracts the styles and assets, finds the shared layout and the repeating components, and opens the project straight away, so the Files panel fills up in front of you while the crawl runs. It reports each phase as it goes, and stops to ask you about the judgement calls that are yours to make. The **[New Project](/docs/studio/projects/create)** dialog's **Agent** and **Import** tabs are these same two jobs as a form you fill in.
+**With nothing open**, the assistant bootstraps. Describe a site and it creates a project for you: name, folders, starter pages, and a design quickstart (colors and fonts) derived from your description, then keeps building inside it. It will ask you where to put the project before creating anything. Tell it a folder (or, on the cloud, a GitHub account or organization). It can also clone a live site. Point it at a URL and it crawls the pages, extracts the styles and assets, finds the shared layout and the repeating components, and opens the project. Where Studio runs against your own machine it opens straight away, so the Files panel fills up in front of you while the crawl runs; where the project is a repository being built for you, it opens once the import is committed, because there is nothing to look at until then. It reports each phase as it goes, and stops to ask you about the judgement calls that are yours to make. The **[New Project](/docs/studio/projects/create)** dialog's **Agent** and **Import** tabs are these same two jobs as a form you fill in.
 
 **With a project open**, the assistant works across files. It can list and read any project file, find files by name, create new pages and components, and rewrite files whole. Anything it writes as a Jx document is validated before it touches disk. It can also open a page on the canvas to continue there.
 
@@ -41,11 +41,13 @@ Until AI is connected, the tab shows the chat as usual with one line beneath it 
 
 On Jx Cloud that section leads with **Connect Cloudflare**: Studio brokers **Workers AI** on your own Cloudflare account, so you need no API key and no third-party provider account. Click **Connect Cloudflare**, approve the authorization in the Cloudflare window that opens, and you land back in Studio with the assistant connected. Inference runs on your own Cloudflare account and bills to it; Jx only brokers the request.
 
+If your Cloudflare login covers more than one account, Studio cannot guess which one to bill, so it asks: a short list appears, you pick the account, and the assistant unlocks. You can change that choice later in **[Preferences](/docs/studio/interface/preferences)** › **Accounts**.
+
 This option appears only where a platform can run that hosted flow. The desktop app and the dev server show the key form alone.
 
 #### When the connection expires
 
-A Cloudflare authorization does not last forever. When yours lapses, the same place in Preferences says so and the button reads **Reconnect Cloudflare**. One click through the same approval screen and the assistant works again. Nothing else about the project changes, and your model choice is remembered.
+A Cloudflare authorization does not last forever. When yours lapses, the same place in Preferences says so and the button reads **Reconnect Cloudflare**. One click through the same approval screen and the assistant works again. Nothing else about the project changes, and your model choice is remembered. If a session goes stale while you are working, the first request that hits the lapsed grant flips the panel back to **Reconnect Cloudflare** rather than leaving you with an assistant that quietly stops answering.
 
 :::doc-note
 If Cloudflare itself is briefly unreachable, Studio does **not** ask you to reconnect, because reconnecting would not help. The assistant reports the provider as unavailable and keeps the connection you already have.

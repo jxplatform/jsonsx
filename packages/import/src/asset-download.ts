@@ -5,9 +5,9 @@
  * subdirectories by type: images/, fonts/, icons/.
  */
 
-import { join, extname } from "node:path";
-import { mkdir } from "node:fs/promises";
+import { extname } from "node:path";
 import type { DiscoveredAsset } from "./asset-collect.ts";
+import type { ImportIo } from "./io.ts";
 
 export interface DownloadResult {
   /**
@@ -127,7 +127,7 @@ function isBlocked(url: string): boolean {
 
 export async function downloadAssets(
   assets: DiscoveredAsset[],
-  outDir: string,
+  io: ImportIo,
   sourceUrl?: string,
 ): Promise<DownloadResult> {
   const rewriteMap = new Map<string, string>();
@@ -143,12 +143,11 @@ export async function downloadAssets(
     }
   }
 
-  // Create subdirectories
-  const assetsDir = join(outDir, "public", "assets");
-  await mkdir(join(assetsDir, "images"), { recursive: true });
-  await mkdir(join(assetsDir, "fonts"), { recursive: true });
-  await mkdir(join(assetsDir, "icons"), { recursive: true });
-  await mkdir(join(assetsDir, "other"), { recursive: true });
+  // Create subdirectories (a sink with no directories declines — see ImportIo.mkdir)
+  const assetsDir = "public/assets";
+  for (const subdir of ["images", "fonts", "icons", "other"]) {
+    await io.mkdir?.(`${assetsDir}/${subdir}`);
+  }
 
   // Track filenames to avoid collisions
   const usedNames = new Map<string, number>();
@@ -172,7 +171,7 @@ export async function downloadAssets(
     }
     usedNames.set(nameKey, count + 1);
 
-    const destPath = join(assetsDir, subdir, filename);
+    const destPath = `${assetsDir}/${subdir}/${filename}`;
     // The site-absolute path the built asset is served from. `public/` is the compiler's static
     // ROOT — its contents land at dist/<path>, so the "public/" segment must not survive into a
     // Reference, and the leading slash must be there or a reference from /components/x.js or a
@@ -195,7 +194,7 @@ export async function downloadAssets(
 
       const buffer = await response.arrayBuffer();
       totalBytes += buffer.byteLength;
-      await Bun.write(destPath, buffer);
+      await io.write(destPath, new Uint8Array(buffer));
       rewriteMap.set(url, relativePath);
     } catch {
       failed.push(url);

@@ -113,6 +113,14 @@ interface OpenAIStreamChunk {
 /** Error response body — the proxy's flat `{ error: "..." }` or OpenAI's `{ error: { message } }`. */
 interface ErrorResponseBody {
   error?: string | { message?: string; code?: string; type?: string };
+  /**
+   * The proxy's machine code, alongside its human `error` — `cf_reconnect_required` and friends.
+   *
+   * A backend that knows WHY it refused says so here, and a client can only act on the reason it is
+   * given: the whole point of the code is that the Reconnect affordance appears without the user
+   * reading a sentence and deciding what it meant.
+   */
+  code?: string;
 }
 
 // ─── Type definitions ────────────────────────────────────────────────────────
@@ -508,6 +516,11 @@ export function createProxyStreamingClient({
       // Try to extract a clean message from JSON error bodies (e.g. the proxy's
       // { error: "..." } shape or OpenAI's { error: { message: "..." } }).
       let cleanMessage = errorBody || response.statusText;
+      /* The body's machine code beats the status. `code` was `String(response.status)`
+         unconditionally, so a proxy answering 401 `{ code: "cf_reconnect_required" }` reached the
+         client as `"401"` — indistinguishable from a bad BYOK key, and the one reading that would
+         have put a Reconnect button on screen was thrown away at the only place it arrived. */
+      let machineCode = "";
       try {
         const parsed = JSON.parse(errorBody) as ErrorResponseBody;
         if (typeof parsed.error === "string") {
@@ -515,13 +528,16 @@ export function createProxyStreamingClient({
         } else if (parsed.error?.message) {
           cleanMessage = parsed.error.message;
         }
+        if (typeof parsed.code === "string" && parsed.code) {
+          machineCode = parsed.code;
+        }
       } catch {
         /* Not JSON — use the raw body. */
       }
       yield {
         type: "error",
         message: cleanMessage,
-        code: String(response.status),
+        code: machineCode || String(response.status),
       };
       return;
     }

@@ -1,5 +1,44 @@
-import { launch } from "puppeteer-core";
-import type { Browser, Page } from "puppeteer-core";
+/**
+ * Page capture, and the browser surface the whole import is written against.
+ *
+ * That surface is declared STRUCTURALLY here rather than imported from `puppeteer-core`, and the
+ * reason is bundling, not taste: `puppeteer-core` is unloadable in workerd, and a Worker bundler
+ * follows value imports transitively, so a single one anywhere in `pipeline.ts`'s graph would fail
+ * the deploy. Naming only `newPage` — and, on a page, the five calls the phases actually make —
+ * lets the same code drive a local Chrome (`browser-local.ts`) or a `@cloudflare/puppeteer`
+ * session, both of which provide exactly this and more.
+ */
+
+/**
+ * What `evaluate` hands the in-page function.
+ *
+ * A homomorphic mapped type rather than plain `Params`, because puppeteer's own `evaluate` declares
+ * its parameters through one (it unwraps `JSHandle`s there). Two generic signatures only relate
+ * when they are shaped alike, and with a bare tuple puppeteer's `Page` stops being assignable to
+ * `ImportPage` — which is the one thing this interface has to be true of.
+ */
+export type PageArgs<Params extends unknown[]> = { [K in keyof Params]: Params[K] };
+
+export interface ImportPage {
+  goto: (
+    url: string,
+    options?: {
+      waitUntil?: "load" | "domcontentloaded" | "networkidle0" | "networkidle2";
+      timeout?: number;
+    },
+  ) => Promise<unknown>;
+  setViewport: (viewport: { width: number; height: number }) => Promise<unknown>;
+  evaluate: <Params extends unknown[], R>(
+    fn: (...params: PageArgs<Params>) => R,
+    ...args: Params
+  ) => Promise<Awaited<R>>;
+  screenshot: (options?: { fullPage?: boolean; type?: "png" }) => Promise<Uint8Array>;
+  close: () => Promise<unknown>;
+}
+
+export interface ImportBrowser {
+  newPage: () => Promise<ImportPage>;
+}
 
 export interface CaptureResult {
   url: string;
@@ -7,61 +46,8 @@ export interface CaptureResult {
   bodyHtml: string;
   /** Discovered same-origin links for the crawler (Phase 3). */
   links: string[];
-  /** The puppeteer Page, kept open for style capture (Phase 1). Caller must close. */
-  page: Page;
-}
-
-const DEFAULT_CHROME_PATHS = [
-  "google-chrome-stable",
-  "google-chrome",
-  "chromium-browser",
-  "chromium",
-];
-
-function findChrome(executablePath?: string): string {
-  if (executablePath) {
-    return executablePath;
-  }
-  const env = process.env.CHROME_PATH;
-  if (env) {
-    return env;
-  }
-
-  for (const name of DEFAULT_CHROME_PATHS) {
-    const path = Bun.which(name);
-    if (path) {
-      return path;
-    }
-  }
-  throw new Error(
-    "Could not find Chrome/Chromium. Set CHROME_PATH or install google-chrome-stable.",
-  );
-}
-
-let _browser: Browser | null = null;
-
-export interface LaunchOptions {
-  /** Explicit browser binary. Wins over CHROME_PATH and PATH discovery. */
-  executablePath?: string;
-}
-
-export async function launchBrowser(options?: LaunchOptions): Promise<Browser> {
-  if (_browser?.connected) {
-    return _browser;
-  }
-  _browser = await launch({
-    executablePath: findChrome(options?.executablePath),
-    headless: true,
-    args: ["--no-sandbox", "--disable-gpu"],
-  });
-  return _browser;
-}
-
-export async function closeBrowser(): Promise<void> {
-  if (_browser?.connected) {
-    await _browser.close();
-    _browser = null;
-  }
+  /** The page, kept open for style capture (Phase 1). Caller must close. */
+  page: ImportPage;
 }
 
 export interface CaptureOptions {
@@ -73,7 +59,7 @@ export interface CaptureOptions {
  * Scroll the page to the bottom in steps to trigger lazy-loaded images and intersection-observer
  * content, then scroll back to top. Settles between steps to let content render.
  */
-async function scrollToRevealAll(page: Page): Promise<void> {
+async function scrollToRevealAll(page: ImportPage): Promise<void> {
   await page.evaluate(async () => {
     const delay = (ms: number) =>
       new Promise<void>((r) => {
@@ -111,15 +97,18 @@ async function scrollToRevealAll(page: Page): Promise<void> {
 /**
  * Capture a page's DOM. Returns the page object still open — the caller is responsible for closing
  * it (after style capture in Phase 1, or immediately).
+ *
+ * The browser is a parameter and has no default. It used to fall back to launching a local Chrome,
+ * and that fallback was the value import of `puppeteer-core` that kept this module — and everything
+ * that reaches it — out of a Worker.
  */
 export async function capturePage(
   url: string,
-  browser?: Browser,
+  browser: ImportBrowser,
   options?: CaptureOptions,
 ): Promise<CaptureResult> {
   const { scrollToBottom = true } = options ?? {};
-  const br = browser ?? (await launchBrowser());
-  const page: Page = await br.newPage();
+  const page = await browser.newPage();
   await page.setViewport({ width: 1440, height: 900 });
 
   await page.goto(url, { waitUntil: "networkidle0", timeout: 30_000 });

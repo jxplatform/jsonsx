@@ -20,6 +20,16 @@ import { onSettingsChanged } from "./settings/kernel";
 export interface AiModel {
   id: string;
   name: string;
+  /**
+   * Whether the backend says the model can call tools.
+   *
+   * Absent when it did not say, which is the ordinary case for a BYOK provider — only a managed
+   * catalogue knows. `false` is therefore a statement and `undefined` is silence, and no gate may
+   * collapse the two: a Workers AI chat-only model must be labelled, an OpenAI model must not.
+   */
+  toolSupport?: boolean;
+  /** The backend's declared context window in tokens, when it declares one. */
+  contextWindow?: number;
 }
 
 /**
@@ -75,6 +85,23 @@ let proxyProbe: Promise<void> | null = null;
 const probeListeners = new Set<() => void>();
 
 /**
+ * How long a settled probe is trusted before a window refocus re-runs it.
+ *
+ * The probe is one-shot by construction (`proxyProbe ??=`) and the only thing that re-arms it is
+ * the settings subscription below — which never fires for a HOSTED grant, because nothing about it
+ * is stored in this browser. So a Cloudflare grant that lapsed mid-session left every gate showing
+ * the reading it took at boot: the assistant reported itself configured, and every send failed. Ten
+ * minutes is well inside the hour a Cloudflare access token lives.
+ */
+export const PROBE_STALE_MS = 600_000;
+
+/** When the probe last settled (0 = never). The age {@link PROBE_STALE_MS} is measured against. */
+let probeSettledAt = 0;
+
+/** Whether {@link installProbeRefresh} has already registered its listener. */
+let probeRefreshInstalled = false;
+
+/**
  * Drop the cached list and the capability reading.
  *
  * No surface calls this: it runs off the settings subscription below, because "the credentials
@@ -93,6 +120,7 @@ export function resetModelCache() {
      would strand every gate on a permanent "unconfigured, unmanaged" reading — ensureProxyProbe
      would no-op forever and the managed option would vanish until a full reload. */
   proxyProbe = null;
+  probeSettledAt = 0;
 }
 
 /** The keys whose value changes what a provider would answer with. */
@@ -118,6 +146,33 @@ export function cachedModels(credentials: AiCredentials): AiModel[] | null {
 }
 
 /**
+ * A model's entry in whatever list is cached, by id.
+ *
+ * Deliberately NOT keyed by credentials, unlike {@link cachedModels}. That key exists because
+ * SHOWING one provider's catalogue under another's credentials is a lie about what is available;
+ * asking "what did the backend say about this id" is not — the answer is either recorded or it is
+ * not, and a mismatched key just yields `undefined`, which every caller already has to handle.
+ */
+function cachedModel(id: string): AiModel | undefined {
+  return cache?.find((model) => model.id === id);
+}
+
+/**
+ * Whether the backend said this model can call tools — `undefined` when it said nothing.
+ *
+ * The distinction is the whole point: a chat-only model is a legitimate choice, so this labels and
+ * warns rather than gating, and silence must read as "no opinion" rather than as "no tools".
+ */
+export function modelToolSupport(id: string): boolean | undefined {
+  return cachedModel(id)?.toolSupport;
+}
+
+/** The backend's declared context window for a model, in tokens — `undefined` when it declared none. */
+export function modelContextWindow(id: string): number | undefined {
+  return cachedModel(id)?.contextWindow;
+}
+
+/**
  * Run the capability probe once, repainting `onSettled` when it lands. Idempotent: concurrent and
  * repeated callers share the single in-flight fetch, and every registered host is notified. Probe
  * failure is not surfaced — an unreachable proxy simply leaves the gate showing the key form.
@@ -133,11 +188,49 @@ export function ensureProxyProbe(onSettled?: () => void) {
       // Unreachable proxy — the key gate stays up.
     })
     .then(() => {
+      probeSettledAt = Date.now();
       for (const notify of probeListeners) {
         notify();
       }
     });
 }
+
+/**
+ * Re-run the capability probe when it is older than {@link PROBE_STALE_MS} and the backend holds
+ * the credentials. Returns whether it re-armed, so a caller (and a test) can see that it did.
+ *
+ * Managed-only on purpose. A BYOK reading changes only when the stored key does, and the settings
+ * subscription already covers that; a hosted grant expires on a clock this browser cannot see.
+ */
+export function refreshStaleProbe(): boolean {
+  if (!proxyManaged || probeSettledAt === 0 || Date.now() - probeSettledAt < PROBE_STALE_MS) {
+    return false;
+  }
+  proxyProbe = null;
+  probeSettledAt = 0;
+  ensureProxyProbe();
+  return true;
+}
+
+/**
+ * Re-check the probe whenever the window regains focus, which is where a lapsed grant is noticed.
+ *
+ * `focus` rather than a timer: the reading only matters when somebody is looking at Studio, and the
+ * OAuth reconnect the stale reading would have hidden happens in another tab — so coming back IS
+ * the event. Idempotent, and a no-op outside a browser so the module stays importable under a
+ * bare-`bun` runner.
+ */
+export function installProbeRefresh(): void {
+  if (typeof window === "undefined" || probeRefreshInstalled) {
+    return;
+  }
+  probeRefreshInstalled = true;
+  window.addEventListener("focus", () => {
+    refreshStaleProbe();
+  });
+}
+
+installProbeRefresh();
 
 /**
  * Whether the assistant can run at all: a key stored in this browser, or a backend that holds
@@ -263,7 +356,21 @@ export async function fetchAvailableModels(
   proxyManaged = data.managed === true;
   proxyDefaultModel = data.defaultModel ?? "";
   proxyCode = data.code;
-  cache = (data.models || []).map((m) => ({ id: m.id, name: m.name || m.id }));
+  /* Capabilities are kept, not dropped. The backend has reported `toolSupport` all along and the
+     ingest mapped `{id, name}` only, so a Workers AI model that cannot call tools looked exactly
+     like one that can — the agent loop ran, called nothing, and answered as if that were normal.
+     The keys are OMITTED rather than set to undefined: absent means "the backend said nothing",
+     which is a third state both consumers depend on. */
+  cache = (data.models || []).map((m) => {
+    const model: AiModel = { id: m.id, name: m.name || m.id };
+    if (typeof m.contextWindow === "number") {
+      model.contextWindow = m.contextWindow;
+    }
+    if (typeof m.toolSupport === "boolean") {
+      model.toolSupport = m.toolSupport;
+    }
+    return model;
+  });
   cacheKey = key;
   return cache;
 }

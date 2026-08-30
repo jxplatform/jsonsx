@@ -25,7 +25,9 @@ import {
   isManagedProxy,
   isProxyConfigured,
   proxyStateCode,
+  resetModelCache,
 } from "../services/ai-models";
+import type { CfConnectOutcome } from "../types";
 
 export interface ManagedConnectOptions {
   /** Host re-render scheduler — called on connect start/finish and when the probe settles. */
@@ -52,18 +54,71 @@ export function createManagedConnect(opts: ManagedConnectOptions): ManagedConnec
   let connectError = "";
 
   /*
-   * Offer the keyless path when the proxy says managed-but-unconfigured and the platform can run
-   * the hosted OAuth flow (the PAL seam — desktop shells can implement cfConnect later). Guarded on
-   * hasPlatform() because gates can render from modules that load before registration.
+   * Offer the keyless path when the proxy is managed and the platform can run the hosted OAuth flow
+   * (the PAL seam — desktop shells can implement cfConnect later). Guarded on hasPlatform() because
+   * gates can render from modules that load before registration.
+   *
+   * `configured` alone does NOT withdraw the offer any more. A backend can answer `configured: true`
+   * over a grant it cannot actually use, and hiding the CTA there left the user with a broken
+   * assistant and no button at all — the one state in which reconnecting is the whole fix. So the
+   * lapsed code overrides `configured`, while `cf_upstream_error` (also `configured: true`, and
+   * carrying no reconnect code) still hides it: an unreachable Cloudflare is not fixed by an OAuth
+   * round trip.
    */
   function canOffer(): boolean {
-    return (
-      isManagedProxy() && !isProxyConfigured() && hasPlatform() && Boolean(getPlatform().cfConnect)
-    );
+    if (!isManagedProxy() || !hasPlatform() || !getPlatform().cfConnect) {
+      return false;
+    }
+    return !isProxyConfigured() || proxyStateCode() === "cf_reconnect_required";
   }
 
   function ensureProbe() {
     ensureProxyProbe(opts.requestRender);
+  }
+
+  /**
+   * Act on how the flow ended.
+   *
+   * Every branch here exists because the old code had ONE: any truthy result was success, so a
+   * connect that landed on the same lapsed row re-probed, got the same `cf_reconnect_required`
+   * back, and re-rendered a byte-identical CTA. The user clicked Reconnect and observably nothing
+   * happened — which is the half of the outage that made the other half impossible to diagnose.
+   *
+   * @param {CfConnectOutcome | null} outcome - Null where the platform had no DOM to open a popup
+   *   in.
+   */
+  async function settle(outcome: CfConnectOutcome | null): Promise<void> {
+    /* A blocked popup turns into a full-page redirect, and null is a host with nowhere to open one:
+       in both the document is on its way out, so an apology would be the last thing painted before
+       it goes. Cancellation is silent for the opposite reason — the user already knows. */
+    if (!outcome || outcome.status === "redirect" || outcome.status === "canceled") {
+      return;
+    }
+    if (outcome.status === "timeout") {
+      connectError =
+        "The Cloudflare window didn't finish. Sign in there, then reconnect — nothing was changed.";
+      return;
+    }
+    if (!outcome.connection.accountId) {
+      /* Lazily, because the picker pulls the dialog layer in and this module is imported by every
+         credentials gate — including ones that render before layers are bound. */
+      const { openCfAccountPicker } = await import("./cf-account-picker");
+      if (!(await openCfAccountPicker())) {
+        connectError =
+          "Cloudflare is connected, but no account is chosen yet — pick one to finish setting up the assistant.";
+        return;
+      }
+    }
+    // Re-probe: /models flips to configured once the connection lands, opening the gate.
+    resetModelCache();
+    await fetchAvailableModels({ force: true });
+    /* And then CHECK, because a connect the backend does not honour must not look like one that
+       worked. This is the only place that can tell the difference. */
+    if (!isProxyConfigured() || proxyStateCode() === "cf_reconnect_required") {
+      connectError =
+        "Cloudflare connected, but the assistant backend still reports the connection as unusable. " +
+        "Try reconnecting, or use your own API key below.";
+    }
   }
 
   async function connect() {
@@ -74,13 +129,7 @@ export function createManagedConnect(opts: ManagedConnectOptions): ManagedConnec
     connectError = "";
     opts.requestRender();
     try {
-      const connection = await getPlatform().cfConnect?.();
-      if (connection) {
-        // Re-probe: /models flips to configured once the connection lands, opening the gate.
-        await fetchAvailableModels({ force: true });
-      } else {
-        connectError = "Cloudflare connection was not completed.";
-      }
+      await settle((await getPlatform().cfConnect?.()) ?? null);
     } catch (error) {
       connectError = error instanceof Error ? error.message : String(error);
     }

@@ -38,7 +38,15 @@ import { createManagedConnect } from "../ui/ai-managed-connect";
 import { activeRegistry } from "../commands/active-registry";
 import { shortcutReference, SCOPE_LABELS } from "../commands/reference";
 import { chordFromEvent } from "../commands/keymap";
-import { listAccounts, notifyCredentialsChanged, revokeAccount } from "./preferences-accounts";
+import {
+  ensureCfConnection,
+  listAccounts,
+  notifyCredentialsChanged,
+  platformBrokersCf,
+  refreshCfConnection,
+  resetCfConnectionCache,
+  revokeAccount,
+} from "./preferences-accounts";
 import { applyKeybindingOverrides, rebindCommand, resetKeybinding } from "./preferences-keymap";
 import { overlayRegion } from "../ui/regions";
 
@@ -97,6 +105,19 @@ function credentialsChanged(): void {
   repaint();
 }
 
+/**
+ * Showing a section is a chance to find out it is stale.
+ *
+ * Only Accounts has anything to re-read: the brokered Cloudflare connection lives on the server, so
+ * a grant that lapsed while Preferences was closed — or while the author was in Keyboard — would
+ * otherwise be reported from a cache taken before it did.
+ */
+function sectionShown(): void {
+  if (_section === "accounts" && platformBrokersCf()) {
+    void refreshCfConnection().then(repaint);
+  }
+}
+
 /** The shared credentials form — draft state lives inside the form's closure. */
 const credsForm = createAiCredentialsForm({
   intro: html`
@@ -144,7 +165,52 @@ function assistantTpl(): TemplateResult {
   return html`<div class="prefs-assistant">${managedConnect.render()} ${credsForm.render()}</div>`;
 }
 
+/**
+ * The buttons on one row.
+ *
+ * A record that declares `actions` decides its own verbs; everything else keeps the original rule —
+ * a connected credential offers Disconnect and a disconnected one offers nothing. The async ones
+ * repaint when they settle, because a hosted Reconnect is a round trip through a Cloudflare popup
+ * and the row must not still be reading "expired" when it comes back.
+ */
+function accountActionsTpl(account: ReturnType<typeof listAccounts>[number]) {
+  if (account.actions) {
+    return account.actions.map(
+      (action) => html`
+        <sp-button
+          size="s"
+          data-action=${action.id}
+          variant=${action.variant ?? nothing}
+          treatment=${action.variant === "negative" ? "outline" : nothing}
+          @click=${() => {
+            void Promise.resolve(action.run()).finally(repaint);
+          }}
+        >
+          ${action.label}
+        </sp-button>
+      `,
+    );
+  }
+  return account.connected
+    ? html`
+        <sp-button
+          size="s"
+          variant="negative"
+          treatment="outline"
+          @click=${() => {
+            revokeAccount(account.id);
+            repaint();
+          }}
+        >
+          Disconnect
+        </sp-button>
+      `
+    : nothing;
+}
+
 function accountsTpl(): TemplateResult {
+  // First paint asks the broker what it holds; the answer arrives as a credentials-changed repaint.
+  ensureCfConnection();
   return html`
     <div class="prefs-accounts">
       ${listAccounts().map(
@@ -154,23 +220,7 @@ function accountsTpl(): TemplateResult {
               <span class="prefs-account-label">${account.label}</span>
               <span class="prefs-account-detail">${account.detail}</span>
             </div>
-            ${
-              account.connected
-                ? html`
-                    <sp-button
-                      size="s"
-                      variant="negative"
-                      treatment="outline"
-                      @click=${() => {
-                        revokeAccount(account.id);
-                        repaint();
-                      }}
-                    >
-                      Disconnect
-                    </sp-button>
-                  `
-                : nothing
-            }
+            <div class="prefs-account-actions">${accountActionsTpl(account)}</div>
           </div>
         `,
       )}
@@ -449,15 +499,21 @@ function sectionBodyTpl(): TemplateResult {
  * @param section One of {@link PREFERENCES_SECTIONS}' ids. An unknown id falls back to Appearance.
  */
 export function openPreferences(section?: string): Promise<null> {
+  /* Opening is a fresh look, so nothing may be reported from the last one: a brokered Cloudflare
+     grant can lapse between visits, and a row that repaints the previous answer first is stating
+     something it has no reason to believe. */
+  resetCfConnectionCache();
   _section = section !== undefined && isPreferencesSection(section) ? section : _section;
   if (_close) {
     repaint();
+    sectionShown();
     return Promise.resolve(null);
   }
   _section =
     section !== undefined && isPreferencesSection(section) ? section : DEFAULT_PREFERENCES_SECTION;
   credsForm.startEdit();
   resetKeyboardState();
+  sectionShown();
   return showDialog<null>(
     (done) => {
       let wrapperEl: HTMLElement | null = null;
@@ -500,6 +556,7 @@ export function openPreferences(section?: string): Promise<null> {
                         // First chord pressed on the author's NEXT visit.
                         resetKeyboardState();
                         repaint();
+                        sectionShown();
                       }}
                     >
                       ${candidate.title}

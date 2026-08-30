@@ -58,8 +58,8 @@ export interface ImportTabCtx {
   form: { name: string; directory: string };
   /**
    * Validate the shared Parameters fields and return where to write, or null when something is
-   * missing (the modal has already rendered the reason inline). Import is always a `"path"`
-   * destination — cloud ships no `importSite`, so the Import tab never renders there.
+   * missing (the modal has already rendered the reason inline). Either destination shape: a hosted
+   * backend imports into a repository it creates, so `"repo"` reaches here too.
    */
   resolveDestination: () => CreateProjectDestination | null;
   rerender: () => void;
@@ -201,6 +201,22 @@ export function breakpointPolicyFromForm(): ImportBreakpointPolicy {
   return { count: _breakpointCount, mode: "limit", rounding: _breakpointRounding };
 }
 
+/**
+ * Whether this backend can answer the fidelity question at all.
+ *
+ * `verify` builds the emitted project with the compiler and serves it to screenshot every page
+ * against the original — it executes the project's own JavaScript, so `@jxsuite/import` keeps that
+ * phase out of the portable pipeline entirely and a hosted backend deliberately never runs it.
+ *
+ * There is no PAL member for "this backend compiles", so the nearest DECLARED fact stands in:
+ * `createDestination`. A `"repo"` platform commits the emitted project into a git tree it never
+ * checks out, which is the same set of hosts and one the tab can read without naming a platform by
+ * id. Offering the switch there would collect an answer nothing acts on.
+ */
+function canVerify(): boolean {
+  return getPlatform().createDestination !== "repo";
+}
+
 function slugOf(name: string): string {
   return name
     .toLowerCase()
@@ -252,7 +268,7 @@ export function importBriefFor(ctx: ImportTabCtx): ImportBrief | null {
     return null;
   }
   const destination = ctx.resolveDestination();
-  if (!destination || destination.kind !== "path") {
+  if (!destination) {
     return null;
   }
   return {
@@ -266,7 +282,9 @@ export function importBriefFor(ctx: ImportTabCtx): ImportBrief | null {
     prompt: _prompt.trim(),
     minFidelity: _minFidelity,
     url: parsed.href,
-    verify: _verify,
+    /* Never asked for where it cannot run: the switch is not rendered there, and a value left over
+       from a session on another platform must not travel as a request the backend would ignore. */
+    verify: canVerify() && _verify,
   };
 }
 
@@ -472,18 +490,22 @@ export function renderImportSource(ctx: ImportTabCtx): TemplateResult {
     >
       AI component naming
     </sp-switch>
-    <sp-switch
-      .checked=${live(_verify)}
-      @change=${(e: Event) => {
-        _verify = (e.target as HTMLInputElement).checked;
-        // The bar below it only means anything while the check runs, so it appears with it.
-        ctx.rerender();
-      }}
-    >
-      Check fidelity against the original (slower)
-    </sp-switch>
     ${
-      _verify
+      canVerify()
+        ? html`<sp-switch
+            .checked=${live(_verify)}
+            @change=${(e: Event) => {
+              _verify = (e.target as HTMLInputElement).checked;
+              // The bar below it only means anything while the check runs, so it appears with it.
+              ctx.rerender();
+            }}
+          >
+            Check fidelity against the original (slower)
+          </sp-switch>`
+        : nothing
+    }
+    ${
+      canVerify() && _verify
         ? html`
             <label class="new-project-field">
               <span class="new-project-label">Minimum fidelity</span>

@@ -10,7 +10,7 @@
 import { extname, join } from "node:path";
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import type { Browser, Page } from "puppeteer-core";
-import { launchBrowser, closeBrowser } from "./capture.ts";
+import { launchBrowser, closeBrowser } from "./browser-local.ts";
 import { diffScreenshots } from "./screenshot-diff.ts";
 
 export interface PageRef {

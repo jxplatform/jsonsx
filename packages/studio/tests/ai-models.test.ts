@@ -4,7 +4,7 @@
  * error surfacing.
  */
 import { clearSeededSettings, installMockPlatform, seedSettings } from "./harness";
-import { beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, setSystemTime, test } from "bun:test";
 import {
   ensureProxyProbe,
   fetchAvailableModels,
@@ -12,6 +12,11 @@ import {
   hasAiCredentials,
   aiConnection,
   cachedModels,
+  installProbeRefresh,
+  modelContextWindow,
+  modelToolSupport,
+  PROBE_STALE_MS,
+  refreshStaleProbe,
   resetModelCache,
   isManagedProxy,
   isProxyConfigured,
@@ -43,6 +48,10 @@ beforeEach(() => {
   fetchCalls.length = 0;
   fetchImpl = async () =>
     Response.json({ models: [{ id: "gpt-4o" }, { id: "x", name: "Model X" }] }, { status: 200 });
+});
+
+afterEach(() => {
+  setSystemTime();
 });
 
 describe("fetchAvailableModels", () => {
@@ -235,5 +244,159 @@ describe("ensureProxyProbe", () => {
     await flush();
     expect(fetchCalls).toHaveLength(2);
     expect(isManagedProxy()).toBe(true);
+  });
+});
+
+describe("model capabilities", () => {
+  /* The backend has reported toolSupport all along and the ingest mapped {id, name} only, so a
+     Workers AI model that cannot call tools was indistinguishable from one that can. */
+  test("ingest keeps toolSupport and contextWindow, omitting what the backend did not send", async () => {
+    fetchImpl = async () =>
+      Response.json(
+        {
+          models: [
+            { id: "@cf/meta/llama-4", contextWindow: 128_000, toolSupport: true },
+            { id: "@cf/tiny/chat", contextWindow: 4096, toolSupport: false },
+            { id: "gpt-4o", name: "GPT-4o" },
+          ],
+        },
+        { status: 200 },
+      );
+    const models = await fetchAvailableModels();
+
+    expect(models[0]).toEqual({
+      contextWindow: 128_000,
+      id: "@cf/meta/llama-4",
+      name: "@cf/meta/llama-4",
+      toolSupport: true,
+    });
+    expect(models[1]!.toolSupport).toBe(false);
+    // Silence stays silence: a BYOK provider reports neither, and neither key is invented.
+    expect(models[2]).toEqual({ id: "gpt-4o", name: "GPT-4o" });
+    expect("toolSupport" in models[2]!).toBe(false);
+    expect("contextWindow" in models[2]!).toBe(false);
+  });
+
+  test("modelToolSupport and modelContextWindow read the cache, and undefined is not false", async () => {
+    fetchImpl = async () =>
+      Response.json(
+        {
+          models: [
+            { id: "@cf/tiny/chat", contextWindow: 4096, toolSupport: false },
+            { id: "gpt-4o" },
+          ],
+        },
+        { status: 200 },
+      );
+    await fetchAvailableModels();
+
+    expect(modelToolSupport("@cf/tiny/chat")).toBe(false);
+    expect(modelContextWindow("@cf/tiny/chat")).toBe(4096);
+    // The backend said nothing about gpt-4o, and nothing is not "no tools".
+    expect(modelToolSupport("gpt-4o")).toBeUndefined();
+    expect(modelContextWindow("gpt-4o")).toBeUndefined();
+    // A model the catalogue never listed at all.
+    expect(modelToolSupport("my-custom-model")).toBeUndefined();
+
+    resetModelCache();
+    expect(modelToolSupport("@cf/tiny/chat")).toBeUndefined();
+  });
+
+  test("a capability is readable whichever credentials keyed the list", async () => {
+    /* The keyed reader exists because SHOWING one provider's catalogue under another's key is a lie
+       about what is available. "What did the backend say about this id" is not that question. */
+    const draft = { apiKey: "sk-draft", baseUrl: "http://draft/v1" };
+    fetchImpl = async () =>
+      Response.json({ models: [{ id: "@cf/tiny/chat", toolSupport: false }] }, { status: 200 });
+    await fetchAvailableModels({ credentials: draft });
+
+    expect(cachedModels(aiConnection())).toBeNull();
+    expect(modelToolSupport("@cf/tiny/chat")).toBe(false);
+  });
+});
+
+describe("probe staleness", () => {
+  /** Settle a managed probe and report how many fetches that took. */
+  async function settleManagedProbe() {
+    fetchImpl = async () =>
+      Response.json({ models: [], configured: true, managed: true }, { status: 200 });
+    ensureProxyProbe();
+    await flush();
+    return fetchCalls.length;
+  }
+
+  /** Move the clock past the staleness window without waiting ten real minutes. */
+  function age(ms: number) {
+    setSystemTime(new Date(Date.now() + ms));
+  }
+
+  test("a stale probe re-runs on window focus", async () => {
+    /* The probe is one-shot and only the settings subscription re-arms it — which never fires for a
+       HOSTED grant, because nothing about it is stored in this browser. A grant that lapsed
+       mid-session therefore left every gate showing the reading it took at boot. */
+    setSystemTime(new Date("2026-08-29T12:00:00Z"));
+    expect(await settleManagedProbe()).toBe(1);
+
+    age(PROBE_STALE_MS + 1);
+    window.dispatchEvent(new Event("focus"));
+    await flush();
+
+    expect(fetchCalls).toHaveLength(2);
+    expect(isManagedProxy()).toBe(true);
+  });
+
+  test("a fresh probe is left alone on focus", async () => {
+    setSystemTime(new Date("2026-08-29T12:00:00Z"));
+    expect(await settleManagedProbe()).toBe(1);
+
+    age(PROBE_STALE_MS - 1000);
+    window.dispatchEvent(new Event("focus"));
+    await flush();
+
+    expect(fetchCalls).toHaveLength(1);
+    expect(refreshStaleProbe()).toBe(false);
+  });
+
+  test("an unmanaged backend is never re-probed on focus, however old the reading", async () => {
+    // A BYOK reading changes only when the stored key does, and the settings subscription owns that.
+    setSystemTime(new Date("2026-08-29T12:00:00Z"));
+    fetchImpl = async () => Response.json({ models: [], configured: true }, { status: 200 });
+    ensureProxyProbe();
+    await flush();
+    expect(fetchCalls).toHaveLength(1);
+
+    age(PROBE_STALE_MS * 10);
+    expect(refreshStaleProbe()).toBe(false);
+    window.dispatchEvent(new Event("focus"));
+    await flush();
+    expect(fetchCalls).toHaveLength(1);
+  });
+
+  test("a probe that never settled is not treated as stale", async () => {
+    setSystemTime(new Date("2026-08-29T12:00:00Z"));
+    resetModelCache();
+    age(PROBE_STALE_MS * 10);
+    expect(refreshStaleProbe()).toBe(false);
+    expect(fetchCalls).toHaveLength(0);
+  });
+
+  test("installProbeRefresh is idempotent and a no-op with no window", async () => {
+    /* The module installs its own listener at evaluation; a second call must not double-register,
+       and a bare-`bun` runner with no DOM must still be able to import this module. */
+    setSystemTime(new Date("2026-08-29T12:00:00Z"));
+    installProbeRefresh();
+    expect(await settleManagedProbe()).toBe(1);
+    age(PROBE_STALE_MS + 1);
+    window.dispatchEvent(new Event("focus"));
+    await flush();
+    expect(fetchCalls).toHaveLength(2); // One re-probe, not two.
+
+    const realWindow = globalThis.window;
+    try {
+      (globalThis as Record<string, unknown>).window = undefined;
+      expect(() => installProbeRefresh()).not.toThrow();
+    } finally {
+      (globalThis as Record<string, unknown>).window = realWindow;
+    }
   });
 });

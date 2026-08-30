@@ -26,6 +26,7 @@ import { activeRegistry } from "../commands/active-registry";
 import { currentDeploy, noteDeployment } from "./deploy-checklist";
 import { getPlatform } from "../platform";
 import { getCfToken, setCfToken } from "../services/cf-settings";
+import { resetModelCache } from "../services/ai-models";
 import { projectState } from "../store";
 import type { CfConnection } from "../types";
 import { openModal } from "../ui/layers";
@@ -76,7 +77,13 @@ async function loadConnection(): Promise<void> {
   render();
   try {
     _connection = (await getPlatform().cfConnection?.()) ?? null;
-    if (_connection?.connected) {
+    /*
+     * A lapsed brokered connection is `connected: true`, and asking Cloudflare anything through one
+     * is a guaranteed 401. Every such call landed in the catch below, which nulled the connection —
+     * so the panel showed the FIRST-TIME "Connect Cloudflare" invitation next to a raw
+     * "Cloudflare API: …" string, and never the one sentence that was true: it expired.
+     */
+    if (_connection?.connected && !_connection.needsReconnect) {
       _accounts = await listAccounts();
       _form.accountId = _connection.accountId ?? _accounts[0]?.id ?? "";
       const deploy = currentDeploy();
@@ -122,15 +129,37 @@ function openAccounts(): void {
   void activeRegistry()?.run("app.preferences", { section: "accounts" });
 }
 
+/**
+ * Run the hosted OAuth flow and act on how it ended.
+ *
+ * The four endings are not interchangeable, and collapsing them is what left a user staring at an
+ * unchanged panel: a deadline that passed and a popup the browser turned into a full-page redirect
+ * both resolved null, and both were reported as "not completed" — one of them while the document
+ * was already navigating away.
+ */
 async function hostedConnect(): Promise<void> {
   _busy = true;
+  _error = "";
   render();
   try {
-    await getPlatform().cfConnect?.();
+    const outcome = (await getPlatform().cfConnect?.()) ?? null;
+    if (outcome?.status === "timeout") {
+      _error =
+        "The Cloudflare window didn't finish. Sign in there, then reconnect — nothing was changed.";
+    } else if (outcome?.status === "connected" && !outcome.connection.accountId) {
+      /* Lazily: this module is the publish modal, and the picker drags the dialog layer with it. */
+      const { openCfAccountPicker } = await import("../ui/cf-account-picker");
+      await openCfAccountPicker();
+    }
+    /* `canceled` and `redirect` say nothing. The user closed the popup, or the page is on its way
+       to Cloudflare — an apology painted over either one is noise. */
   } catch (error) {
     _error = error instanceof Error ? error.message : String(error);
   }
   _busy = false;
+  // The assistant's gate reads the same grant through /models, so a reconnect it does not hear
+  // About leaves it insisting the connection is dead.
+  resetModelCache();
   await loadConnection();
 }
 
@@ -191,6 +220,32 @@ function fieldRow(label: string, input: unknown) {
       <span>${label}</span>
       ${input}
     </label>
+  `;
+}
+
+/**
+ * The connection exists and has lapsed.
+ *
+ * Its own template rather than a line inside {@link credentialTpl}, because the honest words are the
+ * opposite of that one's: nothing needs to be set up, nothing was lost, and the only action is to
+ * sign in again. The panel used to say "Connect your Cloudflare account to publish this site" to a
+ * user who had already done exactly that.
+ */
+function lapsedTpl() {
+  return html`
+    <p>
+      Your Cloudflare connection has expired, so publishing cannot reach your account. Reconnect to
+      restore it — this site's Pages project and its settings are untouched.
+    </p>
+    <sp-button
+      variant="accent"
+      ?disabled=${_busy}
+      @click=${() => {
+        void hostedConnect();
+      }}
+    >
+      ${_busy ? "Reconnecting…" : "Reconnect Cloudflare"}
+    </sp-button>
   `;
 }
 
@@ -392,6 +447,11 @@ function bodyTpl() {
   }
   if (_connection === "loading") {
     return html`<p>Checking Cloudflare connection…</p>`;
+  }
+  // Before the credential template, and that order is the fix: a lapsed row is `connected: true`,
+  // So neither branch below could ever have claimed it.
+  if (_connection?.connected && _connection.needsReconnect) {
+    return lapsedTpl();
   }
   if (!_connection?.connected) {
     return credentialTpl();

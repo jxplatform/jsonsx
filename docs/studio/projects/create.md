@@ -23,7 +23,7 @@ The first screen (**Choose a starting point**) opens on the starter gallery, bec
 
 - **Starters**: complete, themed websites (restaurant, shop, portfolio, blog, and more) that Studio copies in as plain files you own. The first one is selected for you. Browse the full gallery in **[Starter templates](/docs/studio/projects/starters)**.
 - **Start from scratch**: the last card in the gallery, an empty site with one page, for when you already know what you want to build.
-- **Import**: recreate an existing website as a Jx project. Give Studio the site's URL, how many pages to crawl, which model to use, and, optionally, a sentence about what you want done with the site once it's cloned. The import is AI-assisted, so this tab asks you to connect AI before it unlocks. Not every Studio platform offers this tab.
+- **Import**: recreate an existing website as a Jx project. Give Studio the site's URL, how many pages to crawl, which model to use, and, optionally, a sentence about what you want done with the site once it's cloned. The import is AI-assisted, so this tab asks you to connect AI before it unlocks. Not every Studio platform offers this tab. Where it appears, the project lands wherever that platform makes projects, so the Location step asks for whichever of the two it needs: a folder you pick on the desktop app, or a repository it creates for you on a hosted one.
 - **Agent**: describe the site you want in a sentence or two and the AI assistant builds it in the editor while you watch. Like Import, it needs AI connected first.
 
 Both AI tabs unlock the moment AI is available, by whichever route your Studio offers. They are the same options the [AI assistant](/docs/studio/ai) sidebar gives you:
@@ -82,7 +82,7 @@ Beyond the site's URL, the Import tab has five options, and a sixth that appears
 2. **Max Pages**: the ceiling on how many pages to capture.
 3. **Breakpoints**: how many of the site's own breakpoints your project ends up with. See below.
 4. **AI component naming**: let the model name the repeated pieces it finds (a `Card`, a `PricingRow`) instead of numbering them. It costs one model call per component found, so it's worth turning off on a wide crawl.
-5. **Check fidelity against the original**: after the import, build the new project, screenshot every page, and compare it against the site it came from. It roughly doubles the run, and it's the only thing that tells you how well the clone actually came out instead of what got skipped. Off by default.
+5. **Check fidelity against the original**: after the import, build the new project, screenshot every page, and compare it against the site it came from. It roughly doubles the run, and it's the only thing that tells you how well the clone actually came out instead of what got skipped. Off by default, and absent entirely where projects are repositories rather than folders, because checking fidelity means building and running the project, which a hosted backend deliberately never does.
 
    The assistant reports the percentage per page, and alongside it the two things a percentage can't tell you: requests the rendered page made and didn't get, and any errors from building the project. A page that scores badly because fifteen images 404 is a different problem from one whose layout came out wrong, and only the first of those is quick to fix.
 
