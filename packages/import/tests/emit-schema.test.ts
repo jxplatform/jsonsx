@@ -22,6 +22,7 @@ import { join } from "node:path";
 import { emitProjectSchema } from "@jxsuite/schema/project-schemas";
 import { validateProjectFile } from "@jxsuite/schema/validate-project";
 import { emitMultiPageProject } from "../src/emit.ts";
+import { createLocalIo } from "../src/io.ts";
 import type { MultiEmitOptions } from "../src/emit.ts";
 import type { JxElement } from "@jxsuite/schema/types";
 
@@ -33,10 +34,10 @@ const CORE_REF = "./node_modules/@jxsuite/schema/schemas/project.core.schema.jso
  * and hand back what the project validator says about the pair.
  */
 async function emitAndValidate(
-  options: Omit<MultiEmitOptions, "outDir">,
+  options: Omit<MultiEmitOptions, "io">,
 ): Promise<{ dir: string; project: Record<string, unknown>; errors: string[] }> {
   const dir = await mkdtemp(join(tmpdir(), "jx-import-schema-"));
-  await emitMultiPageProject({ ...options, outDir: dir });
+  await emitMultiPageProject({ ...options, io: createLocalIo(dir) });
   await Bun.write(
     join(dir, "project.schema.json"),
     `${JSON.stringify(emitProjectSchema({ corePath: CORE_REF, fragments: [] }), null, 2)}\n`,
@@ -132,7 +133,7 @@ describe("the emitted project.json", () => {
     const dir = await mkdtemp(join(tmpdir(), "jx-import-media-"));
     try {
       await emitMultiPageProject({
-        outDir: dir,
+        io: createLocalIo(dir),
         title: "Ordered",
         sourceUrl: "https://example.com",
         pages: new Map([["pages/index.json", { tagName: "div" } as JxElement]]),
@@ -156,7 +157,7 @@ describe("the emitted project.json", () => {
     const dir = await mkdtemp(join(tmpdir(), "jx-import-media-"));
     try {
       await emitMultiPageProject({
-        outDir: dir,
+        io: createLocalIo(dir),
         title: "Plain",
         sourceUrl: "https://example.com",
         pages: new Map([["pages/index.json", { tagName: "div" } as JxElement]]),
@@ -188,7 +189,7 @@ describe("the emitted documents", () => {
       };
 
       const { files, classesStripped } = await emitMultiPageProject({
-        outDir: dir,
+        io: createLocalIo(dir),
         title: "Classy",
         sourceUrl: "https://example.com",
         pages: new Map([["pages/index.json", page]]),
@@ -204,7 +205,7 @@ describe("the emitted documents", () => {
         if (!file.endsWith(".json")) {
           continue;
         }
-        expect(await Bun.file(file).text()).not.toContain('"class"');
+        expect(await Bun.file(join(dir, file)).text()).not.toContain('"class"');
       }
     } finally {
       await rm(dir, { recursive: true });
@@ -223,7 +224,7 @@ describe("the emitted documents", () => {
         ],
       });
       await emitMultiPageProject({
-        outDir: dir,
+        io: createLocalIo(dir),
         title: "Props",
         sourceUrl: "https://example.com",
         pages: new Map([

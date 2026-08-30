@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { mkdtemp, rm } from "node:fs/promises";
 import { emitProject } from "../src/emit.ts";
+import { createLocalIo } from "../src/io.ts";
 
 describe("emitProject", () => {
   test("writes project.json and pages/index.json", async () => {
@@ -18,7 +19,7 @@ describe("emitProject", () => {
       };
 
       const { files } = await emitProject({
-        outDir: dir,
+        io: createLocalIo(dir),
         title: "Test Site",
         document,
         sourceUrl: "https://example.com",
@@ -43,7 +44,7 @@ describe("emitProject", () => {
 
     try {
       await emitProject({
-        outDir: dir,
+        io: createLocalIo(dir),
         title: "Dir Test",
         document: { tagName: "div" as const },
         sourceUrl: "https://example.com",

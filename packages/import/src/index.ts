@@ -1,4 +1,7 @@
-export { capturePage, launchBrowser, closeBrowser } from "./capture.ts";
+export { capturePage } from "./capture.ts";
+export { launchBrowser, closeBrowser } from "./browser-local.ts";
+export { createLocalIo } from "./io.ts";
+export { runImportPipeline } from "./pipeline.ts";
 export { importSite } from "./run.ts";
 export { convertToJx } from "./to-jx.ts";
 export { emitProject, emitMultiPageProject } from "./emit.ts";
@@ -33,13 +36,16 @@ export {
   serveDirectory,
   routeToUrlPath,
 } from "./verify.ts";
-export type { CaptureResult, LaunchOptions } from "./capture.ts";
+export type { CaptureResult, ImportBrowser, ImportPage } from "./capture.ts";
+export type { LaunchOptions } from "./browser-local.ts";
+export type { ImportIo } from "./io.ts";
 export type {
-  ImportSiteOptions,
+  ImportPipelineOptions,
+  ImportPipelineResult,
   ImportProgressEvent,
   ImportPhase,
-  ImportSiteResult,
-} from "./run.ts";
+} from "./pipeline.ts";
+export type { ImportSiteOptions, ImportSiteResult } from "./run.ts";
 export type { ToJxResult } from "./to-jx.ts";
 export type { EmitOptions, EmitResult, MultiEmitOptions } from "./emit.ts";
 export type { CapturedStyle, StyleCaptureResult } from "./style-capture.ts";

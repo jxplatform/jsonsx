@@ -10,6 +10,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { existsSync } from "node:fs";
 import { emitMultiPageProject } from "../src/emit.ts";
+import { createLocalIo } from "../src/io.ts";
 import { downloadAssets } from "../src/asset-download.ts";
 import { rewriteAssetUrls } from "../src/asset-rewrite.ts";
 import type { DiscoveredAsset } from "../src/asset-collect.ts";
@@ -32,7 +33,7 @@ describe("an emitted project is one the compiler accepts", () => {
     const dir = await mkdtemp(join(tmpdir(), "jx-import-projectkeys-"));
     try {
       await emitMultiPageProject({
-        outDir: dir,
+        io: createLocalIo(dir),
         title: "Key Test",
         sourceUrl: "https://example.com",
         pages: new Map([["pages/index.json", { tagName: "div" as const }]]),
@@ -53,7 +54,7 @@ describe("an emitted project is one the compiler accepts", () => {
     const dir = await mkdtemp(join(tmpdir(), "jx-import-tokens-"));
     try {
       await emitMultiPageProject({
-        outDir: dir,
+        io: createLocalIo(dir),
         title: "Token Test",
         sourceUrl: "https://example.com",
         pages: new Map([["pages/index.json", { tagName: "div" as const }]]),
@@ -84,7 +85,7 @@ describe("an asset reference names the path the built site serves", () => {
         { url: "https://example.com/logo.png", source: "img-src" },
       ];
 
-      const { rewriteMap } = await downloadAssets(assets, dir);
+      const { rewriteMap } = await downloadAssets(assets, createLocalIo(dir));
       const mapped = rewriteMap.get("https://example.com/logo.png");
 
       expect(mapped).toBe("/assets/images/logo.png");
@@ -102,7 +103,7 @@ describe("a downloaded font is the one the page asks for", () => {
     const dir = await mkdtemp(join(tmpdir(), "jx-import-fontform-"));
     try {
       await emitMultiPageProject({
-        outDir: dir,
+        io: createLocalIo(dir),
         title: "Font Form Test",
         sourceUrl: "https://example.com",
         pages: new Map([["pages/index.json", { tagName: "div" as const }]]),
@@ -127,7 +128,7 @@ describe("a downloaded font is the one the page asks for", () => {
     const dir = await mkdtemp(join(tmpdir(), "jx-import-fontonce-"));
     try {
       await emitMultiPageProject({
-        outDir: dir,
+        io: createLocalIo(dir),
         title: "Font Once Test",
         sourceUrl: "https://example.com",
         pages: new Map([["pages/index.json", { tagName: "div" as const }]]),

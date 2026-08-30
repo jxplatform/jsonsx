@@ -12,7 +12,7 @@
  * so the import can SAY where a width went, not so its styles can be recovered.
  */
 
-import type { Page } from "puppeteer-core";
+import type { ImportPage } from "./capture.ts";
 import type { CapturedStyle } from "./style-capture.ts";
 import { captureStylesAtWidth } from "./style-capture.ts";
 import { computeMediaDelta } from "./style-diff.ts";
@@ -56,7 +56,7 @@ export interface ExtractMediaOptions {
 /**
  * Extract `$media` style deltas by re-capturing at each KEPT breakpoint width.
  *
- * @param {Page} page - Puppeteer page (must still have the target page loaded)
+ * @param {ImportPage} page - Browser page (must still have the target page loaded)
  * @param {CapturedStyle[]} baseElements - Style capture from the base viewport
  * @param {Record<string, Record<string, string>>} uaDefaults - UA-default baselines per tagName
  * @param {readonly string[]} mediaQueries - `@media` queries discovered in the page's stylesheets
@@ -64,7 +64,7 @@ export interface ExtractMediaOptions {
  * @returns {Promise<MediaExtractionResult>}
  */
 export async function extractMedia(
-  page: Page,
+  page: ImportPage,
   baseElements: CapturedStyle[],
   uaDefaults: Record<string, Record<string, string>>,
   mediaQueries: readonly string[],

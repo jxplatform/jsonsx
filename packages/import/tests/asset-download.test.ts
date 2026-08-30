@@ -1,5 +1,6 @@
 import { describe, test, expect } from "bun:test";
 import { downloadAssets } from "../src/asset-download.ts";
+import { createLocalIo } from "../src/io.ts";
 import { join } from "node:path";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -16,7 +17,7 @@ describe("downloadAssets", () => {
         { url: "https://connect.facebook.net/en_US/fbevents.js", source: "img-src" },
       ];
 
-      const result = await downloadAssets(assets, tmpDir);
+      const result = await downloadAssets(assets, createLocalIo(tmpDir));
 
       expect(result.skipped.length).toBe(3);
       expect(result.rewriteMap.size).toBe(0);
@@ -34,7 +35,7 @@ describe("downloadAssets", () => {
         { url: "https://www.google-analytics.com/analytics.js", source: "css-background" },
       ];
 
-      const result = await downloadAssets(assets, tmpDir);
+      const result = await downloadAssets(assets, createLocalIo(tmpDir));
 
       // Should only process once even though same URL appears twice
       expect(result.skipped.length).toBe(1);
@@ -46,7 +47,7 @@ describe("downloadAssets", () => {
   test("creates subdirectory structure", async () => {
     const tmpDir = await mkdtemp(join(tmpdir(), "jx-import-test-"));
     try {
-      await downloadAssets([], tmpDir);
+      await downloadAssets([], createLocalIo(tmpDir));
 
       expect(existsSync(join(tmpDir, "public", "assets", "images"))).toBe(true);
       expect(existsSync(join(tmpDir, "public", "assets", "fonts"))).toBe(true);
@@ -65,7 +66,7 @@ describe("downloadAssets", () => {
         { url: "http://127.0.0.1:1/image.jpg", source: "img-src" },
       ];
 
-      const result = await downloadAssets(assets, tmpDir);
+      const result = await downloadAssets(assets, createLocalIo(tmpDir));
 
       expect(result.failed.length).toBe(1);
       expect(result.rewriteMap.size).toBe(0);
@@ -79,7 +80,7 @@ describe("downloadAssets", () => {
     try {
       const assets: DiscoveredAsset[] = [{ url: "not a url", source: "img-src" }];
 
-      const result = await downloadAssets(assets, tmpDir);
+      const result = await downloadAssets(assets, createLocalIo(tmpDir));
 
       expect(result.skipped).toEqual(["not a url"]);
       expect(result.failed.length).toBe(0);
@@ -95,7 +96,7 @@ describe("downloadAssets", () => {
     globalThis.fetch = (async () => new Response("hello")) as unknown as typeof fetch;
     try {
       const url = "https://example.com/images/pic.jpg";
-      const result = await downloadAssets([{ url, source: "img-src" }], tmpDir);
+      const result = await downloadAssets([{ url, source: "img-src" }], createLocalIo(tmpDir));
 
       expect(result.rewriteMap.get(url)).toBe("/assets/images/pic.jpg");
       expect(result.totalBytes).toBe(5);
@@ -119,7 +120,7 @@ describe("downloadAssets", () => {
         { url: "https://example.com/whitepaper.pdf", source: "img-src" },
       ];
 
-      const result = await downloadAssets(assets, tmpDir);
+      const result = await downloadAssets(assets, createLocalIo(tmpDir));
 
       expect(result.rewriteMap.get("https://fonts.example.com/custom.ttf")).toBe(
         "/assets/fonts/custom.ttf",
@@ -150,7 +151,7 @@ describe("downloadAssets", () => {
         { url: `https://example.com/${longName}.png`, source: "img-src" },
       ];
 
-      const result = await downloadAssets(assets, tmpDir);
+      const result = await downloadAssets(assets, createLocalIo(tmpDir));
 
       // No extension → ".bin" appended (and classified as "other")
       expect(result.rewriteMap.get("https://example.com/assets/logo")).toBe(
@@ -176,7 +177,7 @@ describe("downloadAssets", () => {
         { url: "https://b.example.com/logo.png", source: "img-src" },
       ];
 
-      const result = await downloadAssets(assets, tmpDir);
+      const result = await downloadAssets(assets, createLocalIo(tmpDir));
 
       expect(result.rewriteMap.get("https://a.example.com/logo.png")).toBe(
         "/assets/images/logo.png",
@@ -204,7 +205,7 @@ describe("downloadAssets", () => {
         { url: "https://example.com/hero.jpg", source: "img-src" },
       ];
 
-      await downloadAssets(assets, tmpDir, "https://example.com/page");
+      await downloadAssets(assets, createLocalIo(tmpDir), "https://example.com/page");
 
       expect(seenHeaders).toHaveLength(1);
       expect(seenHeaders[0]!["Referer"]).toBe("https://example.com/page");
@@ -222,7 +223,7 @@ describe("downloadAssets", () => {
       new Response("nope", { status: 404 })) as unknown as typeof fetch;
     try {
       const url = "https://example.com/gone.jpg";
-      const result = await downloadAssets([{ url, source: "img-src" }], tmpDir);
+      const result = await downloadAssets([{ url, source: "img-src" }], createLocalIo(tmpDir));
 
       expect(result.failed).toEqual([url]);
       expect(result.rewriteMap.size).toBe(0);

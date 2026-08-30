@@ -11,20 +11,26 @@ import type { JxElement } from "@jxsuite/schema/types";
 import type { CapturedStyle } from "../src/style-capture.ts";
 
 const pageClose = mock(() => Promise.resolve());
+const pageSetViewport = mock((_v: { width: number; height: number }) => Promise.resolve());
+const pageScreenshot = mock((_o?: { fullPage?: boolean; type?: string }) =>
+  Promise.resolve(new Uint8Array([1, 2, 3])),
+);
 const fakeBrowser = { fake: true };
 
 const launchBrowser = mock((_opts?: Record<string, unknown>) => Promise.resolve(fakeBrowser));
 const closeBrowser = mock(() => Promise.resolve());
+void mock.module("../src/browser-local.ts", () => ({ launchBrowser, closeBrowser }));
+
 const capturePage = mock((_url: string, _browser?: unknown, _opts?: Record<string, unknown>) =>
   Promise.resolve({
     url: "https://site.example/",
     title: "Example Site",
     bodyHtml: "<div><h1>Hello</h1><p>World</p></div>",
     links: ["https://site.example/about"],
-    page: { close: pageClose },
+    page: { close: pageClose, setViewport: pageSetViewport, screenshot: pageScreenshot },
   }),
 );
-void mock.module("../src/capture.ts", () => ({ launchBrowser, closeBrowser, capturePage }));
+void mock.module("../src/capture.ts", () => ({ capturePage }));
 
 const captureStyles = mock(() =>
   Promise.resolve({
@@ -75,7 +81,11 @@ const downloadAssets = mock(() =>
 void mock.module("../src/asset-download.ts", () => ({ downloadAssets }));
 
 const emitMultiPageProject = mock((_opts: Record<string, unknown>) =>
-  Promise.resolve({ classesStripped: 0, files: ["project.json", "a", "b"] }),
+  Promise.resolve({
+    classesStripped: 0,
+    files: ["project.json", "a", "b"],
+    projectJson: '{ "name": "Example Site" }\n',
+  }),
 );
 void mock.module("../src/emit.ts", () => ({ emitMultiPageProject }));
 
@@ -95,8 +105,6 @@ const aiComponentize = mock(
   },
 );
 void mock.module("../src/ai-componentize.ts", () => ({ aiComponentize }));
-
-const captureReferenceScreenshot = mock(() => Promise.resolve(Buffer.from("png")));
 
 /**
  * The shape `verifyProject` answers with, spelled out so a per-test override can populate the
@@ -146,7 +154,7 @@ const verifyProject = mock((_opts: Record<string, unknown>): Promise<FakeVerifyR
     passed: true,
   });
 });
-void mock.module("../src/verify.ts", () => ({ captureReferenceScreenshot, verifyProject }));
+void mock.module("../src/verify.ts", () => ({ verifyProject }));
 
 const page = (title: string, extra?: JxElement[]): JxElement => ({
   tagName: "div",
@@ -176,7 +184,7 @@ const crawlSite = mock((_opts: Record<string, unknown>) => {
         jx: { document: page("About"), nodeCount: 4, collectedStyles: [] },
         depth: 1,
         links: [],
-        screenshot: Buffer.from("png"),
+        screenshot: new Uint8Array([1, 2, 3]),
       },
     ],
     breakpoints: { "--sm": "(max-width: 640px)" } as Record<string, string> | undefined,
@@ -215,10 +223,11 @@ beforeEach(() => {
     emitMultiPageProject,
     componentize,
     aiComponentize,
-    captureReferenceScreenshot,
     verifyProject,
     crawlSite,
     pageClose,
+    pageSetViewport,
+    pageScreenshot,
   ]) {
     m.mockClear();
   }
@@ -284,7 +293,7 @@ describe("importSite — the seed", () => {
       title: "Example Site",
       bodyHtml: "<div></div>",
       links: [],
-      page: { close: pageClose },
+      page: { close: pageClose, setViewport: pageSetViewport, screenshot: pageScreenshot },
     });
     // `importSite` has already accepted the scheme; this is the belt-and-braces branch for a URL
     // That parses at the guard and not at `new URL` — an empty authority.
@@ -444,6 +453,7 @@ describe("importSite — single-page mode", () => {
     emitMultiPageProject.mockResolvedValueOnce({
       classesStripped: 42,
       files: ["project.json"],
+      projectJson: "{}\n",
     });
     const events: ProgressEvent[] = [];
     await importSite({ url: "https://site.example/", outDir: freshOutDir(), maxDepth: 0 }, (e) => {
@@ -599,7 +609,9 @@ describe("importSite — single-page mode", () => {
       maxDepth: 0,
       verify: { threshold: 0.2 },
     });
-    expect(captureReferenceScreenshot).toHaveBeenCalled();
+    /* The reference is shot through the page itself now — reaching into verify.ts for it would
+       have put a compiler and Bun.serve in the portable pipeline's import graph. */
+    expect(pageScreenshot).toHaveBeenCalledWith({ fullPage: true, type: "png" });
     const verifyOpts = verifyProject.mock.calls[0]?.[0] as {
       threshold: number;
       minFidelity: number;

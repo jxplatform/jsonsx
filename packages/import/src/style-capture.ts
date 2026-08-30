@@ -6,7 +6,7 @@
  * UA-default baselines per unique tagName by rendering throwaway elements.
  */
 
-import type { Page } from "puppeteer-core";
+import type { ImportPage } from "./capture.ts";
 
 export interface CapturedStyle {
   /** Depth-first element-index path from <body>, e.g. [0, 2, 1]. */
@@ -163,7 +163,7 @@ const STYLE_ALLOWLIST: string[] = [
  * Run the style capture in a puppeteer page. Executes entirely in-browser via page.evaluate() — no
  * round-trips per element.
  */
-export async function captureStyles(page: Page): Promise<StyleCaptureResult> {
+export async function captureStyles(page: ImportPage): Promise<StyleCaptureResult> {
   return page.evaluate((allowlist: string[]) => {
     const elements: { path: number[]; tagName: string; styles: Record<string, string> }[] = [];
     const tagsSeen = new Set<string>();
@@ -337,7 +337,10 @@ export async function captureStyles(page: Page): Promise<StyleCaptureResult> {
  * Re-capture computed styles at a different viewport width (for $media extraction). Returns only
  * the per-element styles — no UA defaults or media queries (reuse from base).
  */
-export async function captureStylesAtWidth(page: Page, width: number): Promise<CapturedStyle[]> {
+export async function captureStylesAtWidth(
+  page: ImportPage,
+  width: number,
+): Promise<CapturedStyle[]> {
   await page.setViewport({ width, height: 900 });
   // Let layout reflow settle
   await page.evaluate(

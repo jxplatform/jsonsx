@@ -4,6 +4,9 @@ import { aiComponentize } from "../src/ai-componentize.ts";
 import type { JxElement } from "@jxsuite/schema/types";
 import type { ComponentizeResult, ExtractedComponent } from "../src/componentize.ts";
 
+/** Deliberately not "gpt-4o-mini": the module has no default, and this proves it forwards ours. */
+const TEST_MODEL = "test-model-v1";
+
 function firstEntry(map: Map<string, ExtractedComponent>): [string, ExtractedComponent] {
   const [k, v] = [...map][0]!;
   return [k, v];
@@ -141,6 +144,7 @@ describe("ai-componentize", () => {
     const result = await aiComponentize(heuristic, {
       apiKey: "test-key",
       baseUrl: mockBaseUrl,
+      model: TEST_MODEL,
     });
 
     expect(result.components.size).toBeGreaterThan(0);
@@ -159,6 +163,7 @@ describe("ai-componentize", () => {
     const result = await aiComponentize(heuristic, {
       apiKey: "test-key",
       baseUrl: mockBaseUrl,
+      model: TEST_MODEL,
     });
 
     const [, comp] = firstEntry(result.components);
@@ -181,6 +186,7 @@ describe("ai-componentize", () => {
     const result = await aiComponentize(heuristic, {
       apiKey: "test-key",
       baseUrl: mockBaseUrl,
+      model: TEST_MODEL,
     });
 
     const page = result.rewrittenPages.get("pages/index.json")!;
@@ -231,6 +237,7 @@ describe("ai-componentize", () => {
     const result = await aiComponentize(heuristic, {
       apiKey: "test-key",
       baseUrl: mockBaseUrl,
+      model: TEST_MODEL,
     });
 
     const names = [...result.components.values()].map((c) => c.tagName);
@@ -241,7 +248,7 @@ describe("ai-componentize", () => {
   it("handles empty components gracefully", async () => {
     const result = await aiComponentize(
       { components: new Map(), rewrittenPages: new Map() },
-      { apiKey: "test-key", baseUrl: mockBaseUrl },
+      { apiKey: "test-key", baseUrl: mockBaseUrl, model: TEST_MODEL },
     );
 
     expect(result.components.size).toBe(0);
@@ -262,10 +269,14 @@ describe("ai-componentize", () => {
     await aiComponentize(heuristic, {
       apiKey: "sk-test-12345",
       baseUrl: mockBaseUrl,
+      model: TEST_MODEL,
     });
 
     expect(lastRequestBody).toBeTruthy();
-    expect((lastRequestBody as Record<string, unknown>).model).toBe("gpt-4o-mini");
+    /* The model is the caller's to name and has no default here. A hardcoded "gpt-4o-mini" was one,
+       and it 404s on a backend brokering Workers AI — which callLlm reads as "the LLM failed", so
+       every component silently keeps its heuristic name. run.ts holds the CLI's default. */
+    expect((lastRequestBody as Record<string, unknown>).model).toBe(TEST_MODEL);
   });
 
   it("uses custom model when specified", async () => {
@@ -309,6 +320,7 @@ describe("ai-componentize", () => {
     const result = await aiComponentize(heuristic, {
       apiKey: "test-key",
       baseUrl: mockBaseUrl,
+      model: TEST_MODEL,
     });
 
     const [, comp] = firstEntry(result.components);
@@ -329,6 +341,7 @@ describe("ai-componentize", () => {
     const result = await aiComponentize(craftedResult(), {
       apiKey: "test-key",
       baseUrl: mockBaseUrl,
+      model: TEST_MODEL,
     });
 
     const [fileName, comp] = firstEntry(result.components);
@@ -342,6 +355,7 @@ describe("ai-componentize", () => {
     const result = await aiComponentize(craftedResult(), {
       apiKey: "test-key",
       baseUrl: mockBaseUrl,
+      model: TEST_MODEL,
     });
 
     const [, comp] = firstEntry(result.components);
@@ -354,6 +368,7 @@ describe("ai-componentize", () => {
     const result = await aiComponentize(craftedResult(), {
       apiKey: "test-key",
       baseUrl: mockBaseUrl,
+      model: TEST_MODEL,
     });
 
     const [, comp] = firstEntry(result.components);
@@ -370,6 +385,7 @@ describe("ai-componentize", () => {
     const result = await aiComponentize(craftedResult(), {
       apiKey: "test-key",
       baseUrl: mockBaseUrl,
+      model: TEST_MODEL,
     });
 
     const [fileName, comp] = firstEntry(result.components);
@@ -383,6 +399,7 @@ describe("ai-componentize", () => {
     const result = await aiComponentize(craftedResult(3, false), {
       apiKey: "test-key",
       baseUrl: mockBaseUrl,
+      model: TEST_MODEL,
     });
 
     const names = [...result.components.values()].map((c) => c.tagName);
@@ -399,6 +416,7 @@ describe("ai-componentize", () => {
     const result = await aiComponentize(craftedResult(), {
       apiKey: "test-key",
       baseUrl: mockBaseUrl,
+      model: TEST_MODEL,
     });
 
     const [, comp] = firstEntry(result.components);
@@ -415,6 +433,7 @@ describe("ai-componentize", () => {
     const result = await aiComponentize(craftedResult(), {
       apiKey: "test-key",
       baseUrl: mockBaseUrl,
+      model: TEST_MODEL,
     });
 
     const [, comp] = firstEntry(result.components);
@@ -440,10 +459,39 @@ describe("ai-componentize", () => {
     };
 
     const messages: string[] = [];
-    await aiComponentize(craftedResult(), { apiKey: "test-key", baseUrl: mockBaseUrl }, (msg) =>
-      messages.push(msg),
+    await aiComponentize(
+      craftedResult(),
+      { apiKey: "test-key", baseUrl: mockBaseUrl, model: TEST_MODEL },
+      (msg) => messages.push(msg),
     );
 
     expect(messages.some((m) => m.includes("Props: text→title"))).toBe(true);
+  });
+});
+
+/**
+ * The model is a required option, and the guard is textual because a type cannot fail a test run.
+ *
+ * `"gpt-4o-mini"` was a default inside `callLlm`. That is harmless while the only caller is the CLI
+ * pointing at OpenAI, and wrong the moment a backend brokers anything else: Workers AI answers an
+ * unknown model with a 404, `callLlm` reads any non-ok response as "the LLM failed", and every
+ * component silently keeps its heuristic `component-div-0` name. The default now lives at the call
+ * site that knows the provider — `run.ts` — and these two assertions are what keep it from drifting
+ * back down.
+ */
+describe("ai-componentize requires an explicit model", () => {
+  it("declares `model` without a `?`, so no caller can omit it", async () => {
+    const source = await Bun.file(new URL("../src/ai-componentize.ts", import.meta.url)).text();
+    const options = source.slice(source.indexOf("interface AiComponentizeOptions"));
+    expect(options.slice(0, options.indexOf("}"))).toContain("\n  model: string;");
+  });
+
+  it("hardcodes no model id at all, and run.ts holds the OSS default instead", async () => {
+    const source = await Bun.file(new URL("../src/ai-componentize.ts", import.meta.url)).text();
+    // Comments may name it — the prose above explains the defect. Executable code may not.
+    const code = source.replaceAll(/\/\*[\s\S]*?\*\//g, "");
+    expect(code).not.toContain("gpt-4o-mini");
+    const run = await Bun.file(new URL("../src/run.ts", import.meta.url)).text();
+    expect(run).toContain('const DEFAULT_AI_MODEL = "gpt-4o-mini";');
   });
 });

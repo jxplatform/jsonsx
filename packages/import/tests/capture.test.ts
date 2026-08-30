@@ -1,19 +1,12 @@
 /**
- * Browser plumbing in capture.ts: Chrome discovery precedence, the browser singleton, and
- * capturePage. puppeteer-core is mocked; the in-page callbacks passed to page.evaluate execute
- * in-process against a happy-dom document so their DOM logic is really exercised.
+ * CapturePage against a fake browser — no puppeteer at all, which is the property the module was
+ * split for. The in-page callbacks passed to page.evaluate execute in-process against a happy-dom
+ * document, so their DOM logic is really exercised.
  */
-import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
+import { describe, expect, mock, test } from "bun:test";
 import { Window } from "happy-dom";
-
-interface FakeBrowser {
-  connected: boolean;
-  close: ReturnType<typeof mock>;
-  newPage: ReturnType<typeof mock>;
-}
-
-let launchedWith: { executablePath: string } | null = null;
-let currentBrowser: FakeBrowser;
+import { capturePage } from "../src/capture.ts";
+import type { ImportBrowser } from "../src/capture.ts";
 
 function makeDom(html: string): Window {
   const win = new Window({ url: "https://site.example/page" });
@@ -26,100 +19,21 @@ function makeDom(html: string): Window {
   return win;
 }
 
-function makeFakePage() {
+/** A browser that is only the surface `ImportPage` declares — the point of the structural type. */
+function fakeBrowser(): ImportBrowser {
   return {
-    setViewport: mock(() => Promise.resolve()),
-    goto: mock(() => Promise.resolve()),
-    evaluate: mock((fn: (...a: unknown[]) => unknown, ...args: unknown[]) =>
-      Promise.resolve(fn(...args)),
-    ),
-    close: mock(() => Promise.resolve()),
-  };
+    newPage: () =>
+      Promise.resolve({
+        setViewport: mock(() => Promise.resolve()),
+        goto: mock(() => Promise.resolve()),
+        evaluate: mock((fn: (...a: never[]) => unknown, ...args: never[]) =>
+          Promise.resolve(fn(...args)),
+        ),
+        screenshot: mock(() => Promise.resolve(new Uint8Array([1]))),
+        close: mock(() => Promise.resolve()),
+      }),
+  } as unknown as ImportBrowser;
 }
-
-const launch = mock((opts: { executablePath: string }) => {
-  launchedWith = opts;
-  currentBrowser = {
-    connected: true,
-    close: mock(() => {
-      currentBrowser.connected = false;
-      return Promise.resolve();
-    }),
-    newPage: mock(() => Promise.resolve(makeFakePage())),
-  };
-  return Promise.resolve(currentBrowser);
-});
-void mock.module("puppeteer-core", () => ({ launch }));
-
-const { launchBrowser, closeBrowser, capturePage } = await import("../src/capture.ts");
-
-const originalChromePath = process.env.CHROME_PATH;
-
-beforeEach(() => {
-  launch.mockClear();
-  launchedWith = null;
-  delete process.env.CHROME_PATH;
-});
-
-afterEach(async () => {
-  await closeBrowser();
-  if (originalChromePath === undefined) {
-    delete process.env.CHROME_PATH;
-  } else {
-    process.env.CHROME_PATH = originalChromePath;
-  }
-});
-
-describe("launchBrowser — Chrome discovery", () => {
-  test("an explicit executablePath wins over everything", async () => {
-    process.env.CHROME_PATH = "/env/chrome";
-    await launchBrowser({ executablePath: "/explicit/chromium" });
-    expect(launchedWith?.executablePath).toBe("/explicit/chromium");
-  });
-
-  test("CHROME_PATH wins over PATH discovery", async () => {
-    process.env.CHROME_PATH = "/env/chrome";
-    await launchBrowser();
-    expect(launchedWith?.executablePath).toBe("/env/chrome");
-  });
-
-  test("falls back to which-discovery of chrome/chromium binaries", async () => {
-    const which = spyOn(Bun, "which").mockImplementation((name: string) =>
-      name === "chromium" ? "/usr/bin/chromium" : null,
-    );
-    try {
-      await launchBrowser();
-      expect(launchedWith?.executablePath).toBe("/usr/bin/chromium");
-    } finally {
-      which.mockRestore();
-    }
-  });
-
-  test("throws when no browser can be found", async () => {
-    const which = spyOn(Bun, "which").mockImplementation(() => null);
-    try {
-      // oxlint-disable-next-line typescript/await-thenable -- rejects.toThrow resolves a Promise at runtime.
-      await expect(launchBrowser()).rejects.toThrow("Could not find Chrome/Chromium");
-    } finally {
-      which.mockRestore();
-    }
-  });
-
-  test("reuses the connected browser singleton", async () => {
-    const first = await launchBrowser({ executablePath: "/a" });
-    const second = await launchBrowser({ executablePath: "/b" });
-    expect(second).toBe(first);
-    expect(launch).toHaveBeenCalledTimes(1);
-  });
-
-  test("closeBrowser disconnects and allows a fresh launch", async () => {
-    const first = await launchBrowser({ executablePath: "/a" });
-    await closeBrowser();
-    expect((first as unknown as FakeBrowser).close).toHaveBeenCalled();
-    await launchBrowser({ executablePath: "/b" });
-    expect(launch).toHaveBeenCalledTimes(2);
-  });
-});
 
 describe("capturePage", () => {
   test("strips scripts and collects same-origin links from the live DOM", async () => {
@@ -135,7 +49,7 @@ describe("capturePage", () => {
     `);
     globalThis.document.title = "Captured Page";
 
-    const browser = await launchBrowser({ executablePath: "/a" });
+    const browser = fakeBrowser();
     const result = await capturePage("https://site.example/page", browser, {
       scrollToBottom: false,
     });
@@ -153,7 +67,7 @@ describe("capturePage", () => {
     const scrollTo = mock(() => {});
     (win as unknown as { scrollTo: unknown }).scrollTo = scrollTo;
 
-    const browser = await launchBrowser({ executablePath: "/a" });
+    const browser = fakeBrowser();
     const page = await capturePage("https://site.example/page", browser);
     // The scroll pass ends by returning to the top.
     expect(scrollTo).toHaveBeenCalledWith(0, 0);
@@ -176,8 +90,7 @@ describe("capturePage", () => {
     globalThis.setTimeout = ((cb: () => void) =>
       realSetTimeout(cb, 0)) as unknown as typeof setTimeout;
     try {
-      const browser = await launchBrowser({ executablePath: "/a" });
-      await capturePage("https://site.example/page", browser);
+      await capturePage("https://site.example/page", fakeBrowser());
     } finally {
       globalThis.setTimeout = realSetTimeout;
     }
@@ -185,15 +98,5 @@ describe("capturePage", () => {
     // 21 downward steps (the 21st crosses the cap and breaks) plus the return to top.
     expect(scrollTo).toHaveBeenCalledTimes(22);
     expect(scrollTo).toHaveBeenLastCalledWith(0, 0);
-  });
-
-  test("launches its own browser when none is passed", async () => {
-    makeDom("<p>standalone</p>");
-    process.env.CHROME_PATH = "/env/chrome";
-    const result = await capturePage("https://site.example/page", undefined, {
-      scrollToBottom: false,
-    });
-    expect(launch).toHaveBeenCalledTimes(1);
-    expect(result.bodyHtml).toContain("standalone");
   });
 });
