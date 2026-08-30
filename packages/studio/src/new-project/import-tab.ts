@@ -493,7 +493,6 @@ export function renderImportSource(ctx: ImportTabCtx): TemplateResult {
     ${
       canVerify()
         ? html`<sp-switch
-            class="new-project-verify"
             .checked=${live(_verify)}
             @change=${(e: Event) => {
               _verify = (e.target as HTMLInputElement).checked;
