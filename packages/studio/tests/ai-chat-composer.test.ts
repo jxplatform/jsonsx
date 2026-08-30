@@ -10,6 +10,7 @@ import {
   key,
   pointer,
   resetWorkspaceWithTab,
+  seedSettings,
   setValue,
 } from "./harness";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
@@ -222,5 +223,42 @@ describe("model picker", () => {
     // The fetch settles through requestRender, so the list appears without an explicit rerender.
     await flush();
     expect(c.container.textContent).toContain("o3 mini");
+  });
+
+  test("warns under the picker when the chosen model can't call tools", async () => {
+    /* The agent loop a chat-only model silently disables is the whole reason the panel exists, and
+       nothing else on screen would have mentioned it. */
+    fetchImpl = async () =>
+      Response.json({ models: [{ id: "@cf/tiny/chat", toolSupport: false }] }, { status: 200 });
+    seedSettings({ "jx.ai.model": "@cf/tiny/chat" });
+    const c = makeComposer();
+    expect(c.container.querySelector(".ai-composer-note")).toBeNull(); // Nothing known yet.
+
+    await flush();
+    const note = c.container.querySelector(".ai-composer-note");
+    expect(note).not.toBeNull();
+    expect(note!.textContent).toContain("can't use editing tools");
+    // Advisory, not a gate: the composer still sends.
+    setValue(c.textarea(), "explain this page");
+    key(c.textarea(), "Enter");
+    expect(c.onSend).toHaveBeenCalledWith("explain this page");
+  });
+
+  test("no warning for a model that supports tools, nor for one the backend said nothing about", async () => {
+    fetchImpl = async () =>
+      Response.json(
+        { models: [{ id: "@cf/meta/llama-4", toolSupport: true }, { id: "gpt-4o" }] },
+        { status: 200 },
+      );
+    seedSettings({ "jx.ai.model": "@cf/meta/llama-4" });
+    const withTools = makeComposer();
+    await flush();
+    expect(withTools.container.querySelector(".ai-composer-note")).toBeNull();
+
+    clearSeededSettings();
+    seedSettings({ "jx.ai.model": "gpt-4o" });
+    const silent = makeComposer();
+    await flush();
+    expect(silent.container.querySelector(".ai-composer-note")).toBeNull();
   });
 });

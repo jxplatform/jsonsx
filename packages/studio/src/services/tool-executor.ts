@@ -27,6 +27,7 @@ import type { ToolRegistry } from "@jxsuite/ai/tools";
 
 import type { Tab } from "../tabs/tab";
 import { batchTab, beginBatch, endBatch } from "../tabs/transact";
+import { ensureProxyProbe, resetModelCache } from "./ai-models";
 import { beginTurn, endTurn } from "./ai-writes";
 import { beginToolCall, beginTurnSignal, endTurnSignal } from "./ai-turn-signal";
 
@@ -112,6 +113,7 @@ export async function runAgentLoop({
       const toolCalls = new Map<string, { name: string; arguments: string }>();
       let stopReason = "stop";
       let streamError = null;
+      let streamErrorCode: string | undefined;
 
       for await (const event of streamingClient.streamChat(
         messages,
@@ -147,6 +149,7 @@ export async function runAgentLoop({
           }
           case "error": {
             streamError = event.message;
+            streamErrorCode = event.code;
             break;
           }
           default: {
@@ -158,6 +161,14 @@ export async function runAgentLoop({
       chatState.finishStream(stopReason);
 
       if (streamError) {
+        /* A lapsed hosted grant is the one stream error that makes the app's OWN reading wrong.
+           The probe settles once at boot, so without this every gate keeps offering an assistant
+           that cannot answer, and the send that just failed is the only evidence anyone has. Drop
+           the reading and re-probe, so the next paint carries the Reconnect CTA instead. */
+        if (streamErrorCode === "cf_reconnect_required") {
+          resetModelCache();
+          ensureProxyProbe();
+        }
         chatState.setError(streamError);
         return;
       }

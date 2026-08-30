@@ -12,6 +12,7 @@
  */
 
 import type { createChatState } from "@jxsuite/ai/chat-state";
+import { modelContextWindow } from "./ai-models";
 
 /** Shape of a single entry returned by `chatState.toMessagesArray()`. */
 interface MessageArrayEntry {
@@ -52,7 +53,13 @@ const BUDGET_FRACTION = 0.8;
 const WARN_FRACTION = 0.5;
 
 /**
- * Resolve the context window (tokens) for a model id via longest-prefix match.
+ * Resolve the context window (tokens) for a model id: what the backend reported, else a
+ * longest-prefix match on the table above, else the conservative default.
+ *
+ * The backend's number goes first because the table can only ever know the names it was written
+ * with. Every `@cf/*` model missed it and was budgeted at {@link DEFAULT_CONTEXT_WINDOW}, so a
+ * managed 128k model started dropping the oldest turns at about 25.6k — a fifth of what it could
+ * hold, on the one backend that actually publishes the figure.
  *
  * @param {string | undefined} model
  * @returns {number}
@@ -60,6 +67,10 @@ const WARN_FRACTION = 0.5;
 function contextWindowFor(model: string | undefined): number {
   if (!model) {
     return DEFAULT_CONTEXT_WINDOW;
+  }
+  const reported = modelContextWindow(model);
+  if (reported !== undefined && reported > 0) {
+    return reported;
   }
   const id = model.toLowerCase();
   let best = 0;

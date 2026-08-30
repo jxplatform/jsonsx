@@ -2,9 +2,9 @@
 
 ## AI Assistant for Jx Studio
 
-**Version:** 0.1.10-draft
+**Version:** 0.1.11-draft
 **Status:** Partial
-**Updated:** 2026-08-26
+**Updated:** 2026-08-30
 **License:** MIT
 
 ---
@@ -62,6 +62,35 @@ offer from its answer, so:
 Brokered credentials are the platform's to hold and refresh; the client never sees them. A backend
 that cannot refresh a lapsed grant **MUST** report `cf_reconnect_required` rather than continuing to
 present the expired credential to the provider.
+
+**A row that exists is not a connection that works.** Two of the three managed states are a stored
+grant, and a client **MUST** distinguish them before calling a connect flow finished. A flow that
+settles on "is there a connection" is answered yes from the moment it starts, so it closes the
+provider's authorization window before the user has reached the login screen — the authorization can
+then never complete, and the lapsed state that needs re-authorization is precisely the state that
+prevents it. The proof a flow succeeded is the lapsed marker CLEARING, never the row's presence.
+
+**`cf_account_required` is not `cf_not_connected`.** It reports a live grant with no account chosen,
+because the callback found more than one and could not choose for the user. Re-authorizing cannot fix
+it — the flow lands back in the same state — so the client owes the user a choice over the accounts
+endpoint instead of an invitation to connect something that already is.
+
+**A capability probe expires with the grant it described.** A client **MUST** drop a settled probe
+when a send fails with `cf_reconnect_required`. A probe taken once at start-up otherwise keeps
+reporting a grant that lapsed mid-session, and every gate reading it keeps offering an assistant that
+cannot answer.
+
+**Per-model capability facts travel with the listing.** `toolSupport` reports whether a model can
+make tool calls; `contextWindow` reports its usable budget in tokens. Both are optional — a
+bring-your-own-key provider need not report either — but a client that drops them on ingest cannot
+recover them later:
+
+- A client that will send tools **SHOULD** warn when the chosen model reports `toolSupport: false`.
+  Such a model answers and never edits, which reads as an assistant that has silently stopped working
+  rather than one that was never able to act.
+- A client **SHOULD** prefer a reported `contextWindow` over any local heuristic. A model-id prefix
+  table only recognizes the families its author knew, so a brokered catalogue of unfamiliar ids is
+  budgeted at the default — an amply-sized model trimmed to a fraction of its real window.
 
 > **Status: Partial.** The **Anthropic provider is not yet implemented** (planned). Its client
 > **yields** a single `error` event carrying `code: "NOT_IMPLEMENTED"` and a "use OpenAI" message —
@@ -222,6 +251,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.1.11-draft** (2026-08-30) — 2.1: a lapsed grant is not a completed connect; cf_account_required; probe invalidation; per-model toolSupport and contextWindow.
 - **0.1.10-draft** (2026-08-26) — import_site adopts the project when it exists, not when the run ends; the run's log outlives it (§3.5).
 - **0.1.9-draft** (2026-08-26) — ask_user suspends a turn on the author (§3.4); import_site bootstraps a project from a live site (§3.5).
 - **0.1.8-draft** (2026-08-23) — 2.1 Managed providers: a platform may broker credentials, Studio offers that path before the key form, and the models endpoint is specified as a capability probe that must answer 200 for every credential state — with cf_not_connected, cf_reconnect_required and cf_upstream_error distinguished.
@@ -236,4 +266,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_Jx `@jxsuite/ai` Specification v0.1.10-draft — a stub, subject to expansion._
+_Jx `@jxsuite/ai` Specification v0.1.11-draft — a stub, subject to expansion._

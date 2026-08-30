@@ -280,6 +280,16 @@ export function createComposer(opts: ComposerOptions): Composer {
                 `
           }
         </div>
+        ${
+          /* Said once, quietly, under the picker that caused it. A chat-only model still answers,
+             so this is not a gate — but the agent loop it silently disables is the whole reason
+             the panel exists, and nothing else on screen would have mentioned it. */
+          modelPicker.selectedLacksTools()
+            ? html`<div class="ai-composer-note">
+                This model can't use editing tools — the assistant will answer but not edit.
+              </div>`
+            : nothing
+        }
       </div>
     `;
   }

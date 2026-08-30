@@ -41,11 +41,13 @@ Until AI is connected, the tab shows the chat as usual with one line beneath it 
 
 On Jx Cloud that section leads with **Connect Cloudflare**: Studio brokers **Workers AI** on your own Cloudflare account, so you need no API key and no third-party provider account. Click **Connect Cloudflare**, approve the authorization in the Cloudflare window that opens, and you land back in Studio with the assistant connected. Inference runs on your own Cloudflare account and bills to it; Jx only brokers the request.
 
+If your Cloudflare login covers more than one account, Studio cannot guess which one to bill, so it asks: a short list appears, you pick the account, and the assistant unlocks. You can change that choice later in **[Preferences](/docs/studio/interface/preferences)** › **Accounts**.
+
 This option appears only where a platform can run that hosted flow. The desktop app and the dev server show the key form alone.
 
 #### When the connection expires
 
-A Cloudflare authorization does not last forever. When yours lapses, the same place in Preferences says so and the button reads **Reconnect Cloudflare**. One click through the same approval screen and the assistant works again. Nothing else about the project changes, and your model choice is remembered.
+A Cloudflare authorization does not last forever. When yours lapses, the same place in Preferences says so and the button reads **Reconnect Cloudflare**. One click through the same approval screen and the assistant works again. Nothing else about the project changes, and your model choice is remembered. If a session goes stale while you are working, the first request that hits the lapsed grant flips the panel back to **Reconnect Cloudflare** rather than leaving you with an assistant that quietly stops answering.
 
 :::doc-note
 If Cloudflare itself is briefly unreachable, Studio does **not** ask you to reconnect, because reconnecting would not help. The assistant reports the provider as unavailable and keeps the connection you already have.

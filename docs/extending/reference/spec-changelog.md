@@ -14,6 +14,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `ai.md`
 
+- **0.1.11-draft** (2026-08-30) — 2.1: a lapsed grant is not a completed connect; cf_account_required; probe invalidation; per-model toolSupport and contextWindow.
 - **0.1.10-draft** (2026-08-26) — import_site adopts the project when it exists, not when the run ends; the run's log outlives it (§3.5).
 - **0.1.9-draft** (2026-08-26) — ask_user suspends a turn on the author (§3.4); import_site bootstraps a project from a live site (§3.5).
 - **0.1.8-draft** (2026-08-23) — 2.1 Managed providers: a platform may broker credentials, Studio offers that path before the key form, and the models endpoint is specified as a capability probe that must answer 200 for every credential state — with cf_not_connected, cf_reconnect_required and cf_upstream_error distinguished.
@@ -480,6 +481,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `studio.md`
 
+- **0.10.3-draft** (2026-08-30) — 15: a brokered credential row reads from the broker, and carries reconnect, account choice and a disconnect that reaches it.
 - **0.10.2-draft** (2026-08-29) — A format declaring rewrite rather than serialize has its references repaired by the rename refactor, so it is no longer a reported remainder.
 - **0.10.1-draft** (2026-08-28) — studioShellHtml() now links a favicon for hosts whose window chrome has no native icon of its own.
 - **0.10.0-draft** (2026-08-27) — New File chooses a format rather than an extension (Other... preserves arbitrary names); a document converts between formats in place; creating in a collection source routes to New Entry.

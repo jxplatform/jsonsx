@@ -107,6 +107,48 @@ describe("ai-model-picker — listing", () => {
   });
 });
 
+describe("ai-model-picker — tool support", () => {
+  test("labels a model the backend says cannot call tools, and lists it anyway", async () => {
+    /* Labelled, never filtered or disabled: a chat-only model is a legitimate choice, and hiding
+       half a managed catalogue would report a capability gap as an outage. */
+    fetchImpl = async () =>
+      Response.json(
+        {
+          models: [
+            { id: "@cf/meta/llama-4", toolSupport: true },
+            { id: "@cf/tiny/chat", name: "Tiny Chat", toolSupport: false },
+            { id: "gpt-4o" },
+          ],
+        },
+        { status: 200 },
+      );
+    seedSettings({ "jx.ai.model": "@cf/meta/llama-4" });
+    const c = mount();
+    await flush();
+    c.rerender();
+
+    const byValue = new Map(
+      items(c.container).map((i) => [i.getAttribute("value"), i.textContent]),
+    );
+    expect(byValue.get("@cf/tiny/chat")).toContain("Tiny Chat — no tools");
+    // A model that CAN, and one the backend said nothing about, are both left unadorned.
+    expect(byValue.get("@cf/meta/llama-4")).not.toContain("no tools");
+    expect(byValue.get("gpt-4o")).not.toContain("no tools");
+    expect(byValue.size).toBe(3);
+  });
+
+  test("selectedLacksTools reads the stored choice", async () => {
+    fetchImpl = async () =>
+      Response.json({ models: [{ id: "@cf/tiny/chat", toolSupport: false }] }, { status: 200 });
+    seedSettings({ "jx.ai.model": "@cf/tiny/chat" });
+    const c = mount();
+    // Before the catalogue lands nothing is known, so nothing is claimed.
+    expect(c.picker.selectedLacksTools()).toBe(false);
+    await flush();
+    expect(c.picker.selectedLacksTools()).toBe(true);
+  });
+});
+
 describe("ai-model-picker — failure", () => {
   test("fetch failure offers Retry, which refetches", async () => {
     fetchImpl = async () => new Response("boom", { status: 500 });
@@ -187,6 +229,28 @@ describe("ai-model-picker — the second host's seams", () => {
     const el = pickerEl(c.container, ".np-model");
     expect(el).not.toBeNull();
     expect(el.getAttribute("size")).toBe("m");
+  });
+
+  test("selectedLacksTools tracks the host's own current choice", async () => {
+    fetchImpl = async () =>
+      Response.json(
+        { models: [{ id: "gpt-4o" }, { id: "@cf/tiny/chat", toolSupport: false }] },
+        { status: 200 },
+      );
+    let draft = "gpt-4o";
+    const c = mount({
+      getModel: () => draft,
+      onChange: (id: string) => {
+        draft = id;
+      },
+    });
+    await flush();
+    c.rerender();
+    // The backend said nothing about gpt-4o, and silence is not "no tools".
+    expect(c.picker.selectedLacksTools()).toBe(false);
+
+    choose(pickerEl(c.container), "@cf/tiny/chat");
+    expect(c.picker.selectedLacksTools()).toBe(true);
   });
 
   test("a credential change makes the catalogue unavailable rather than stale", async () => {

@@ -26,6 +26,7 @@ import {
   aiConnection,
   cachedModels,
   fetchAvailableModels,
+  modelToolSupport,
   preferredModel,
 } from "../services/ai-models";
 import { setModel } from "../services/ai-settings";
@@ -38,6 +39,21 @@ export const RETRY_MODELS = "__retry_models__";
 
 /** The `sp-menu-item` value of the disabled placeholder shown during the first fetch. */
 export const LOADING_MODELS = "__loading__";
+
+/** What a listed model's row says when the backend reported it cannot call tools. */
+export const NO_TOOLS_SUFFIX = " — no tools";
+
+/**
+ * A model's row label: its name, plus a note when it is known to be chat-only.
+ *
+ * Labelled, never filtered or disabled. Choosing a chat-only model to ask questions of is a
+ * legitimate thing to do, and a picker that hides half a managed catalogue would be reporting a
+ * capability gap as an outage. Only `toolSupport === false` is labelled — `undefined` is a BYOK
+ * provider saying nothing, and a suffix there would be an invention.
+ */
+function itemLabel(model: { id: string; name: string }): string {
+  return modelToolSupport(model.id) === false ? `${model.name}${NO_TOOLS_SUFFIX}` : model.name;
+}
 
 export interface ModelPickerOptions {
   /** Host re-render scheduler — called whenever a fetch settles. */
@@ -66,6 +82,12 @@ export interface ModelPicker {
   isLoading: () => boolean;
   /** The last fetch's failure, or `""`. */
   error: () => string;
+  /**
+   * Whether the selected model is known NOT to support tools — for a host that wants to say so.
+   *
+   * `false` while the backend has no opinion, so a host reads it as "warn" rather than as "block".
+   */
+  selectedLacksTools: () => boolean;
 }
 
 /**
@@ -143,7 +165,7 @@ export function createModelPicker(opts: ModelPickerOptions): ModelPicker {
         .value=${live(current)}
         @change=${onPickerChange}
       >
-        ${items.map((m) => html`<sp-menu-item value=${m.id}>${m.name}</sp-menu-item>`)}
+        ${items.map((m) => html`<sp-menu-item value=${m.id}>${itemLabel(m)}</sp-menu-item>`)}
         ${
           loading
             ? html`<sp-menu-item disabled value=${LOADING_MODELS}>Loading models…</sp-menu-item>`
@@ -158,5 +180,10 @@ export function createModelPicker(opts: ModelPickerOptions): ModelPicker {
     `;
   }
 
-  return { error: () => failure, isLoading: () => loading, render };
+  return {
+    error: () => failure,
+    isLoading: () => loading,
+    render,
+    selectedLacksTools: () => modelToolSupport(getModel()) === false,
+  };
 }
