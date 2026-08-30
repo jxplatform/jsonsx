@@ -1,5 +1,30 @@
 # Changelog
 
+## [5.0.1](https://github.com/jxsuite/jx/compare/desktop-v5.0.0...desktop-v5.0.1) (2026-08-30)
+
+
+### Bug Fixes
+
+* **desktop:** exclude vendor from the Nix source so the published path is the one consumers ask for ([81d60bc](https://github.com/jxsuite/jx/commit/81d60bca5ea8e67b99a1e789a7c1881f9b2e018a))
+* **desktop:** exclude vendor from the Nix source so the published path is the one consumers ask for ([65debec](https://github.com/jxsuite/jx/commit/65debec14fef2a13f775a36fe5f5529d8504c923)), closes [#250](https://github.com/jxsuite/jx/issues/250)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/compiler bumped to 3.1.0
+    * @jxsuite/create bumped to 1.3.9
+    * @jxsuite/parser bumped to 1.7.0
+    * @jxsuite/protocol bumped to 2.2.0
+    * @jxsuite/schema bumped to 2.1.0
+    * @jxsuite/server bumped to 4.1.0
+    * @jxsuite/starters bumped to 1.7.0
+    * @jxsuite/studio bumped to 4.1.0
+  * devDependencies
+    * @jxsuite/connector bumped to 0.5.7
+    * @jxsuite/server bumped to 4.1.0
+
 ## [5.0.0](https://github.com/jxsuite/jx/compare/desktop-v4.0.0...desktop-v5.0.0) (2026-08-27)
 
 

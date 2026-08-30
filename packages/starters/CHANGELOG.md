@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.7.0](https://github.com/jxsuite/jx/compare/starters-v1.6.5...starters-v1.7.0) (2026-08-30)
+
+
+### Features
+
+* **parser,schema,server:** a format may declare rewrite, repairing a reference a CSV row names ([bca762e](https://github.com/jxsuite/jx/commit/bca762eea4a3a1cd55de02892b7db322155fb1ec))
+* **parser,schema,server:** a format may declare rewrite, repairing a reference a CSV row names ([29a0f36](https://github.com/jxsuite/jx/commit/29a0f36a43319e294e2e69b14c694ff9796bdc5c)), closes [#246](https://github.com/jxsuite/jx/issues/246)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * devDependencies
+    * @jxsuite/parser bumped to 1.7.0
+    * @jxsuite/runtime bumped to 3.1.0
+    * @jxsuite/schema bumped to 2.1.0
+
 ## [1.6.5](https://github.com/jxsuite/jx/compare/starters-v1.6.4...starters-v1.6.5) (2026-08-27)
 
 

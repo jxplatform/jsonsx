@@ -1,5 +1,25 @@
 # Changelog
 
+## [2.2.0](https://github.com/jxsuite/jx/compare/protocol-v2.1.0...protocol-v2.2.0) (2026-08-30)
+
+
+### Features
+
+* **studio:** a hosted backend can import a site into a repository ([2bcbeee](https://github.com/jxsuite/jx/commit/2bcbeee9fdaa5aa5d6b8a879bc3d8f510d451752))
+
+
+### Bug Fixes
+
+* **studio:** a lapsed Cloudflare grant no longer ends the connect flow before it starts ([83102d2](https://github.com/jxsuite/jx/commit/83102d2eaf64752895efe8118afacc605eaa2aff))
+* **studio:** a lapsed Cloudflare grant no longer ends the connect flow before it starts ([4887415](https://github.com/jxsuite/jx/commit/4887415119c8640e269fc3a5cd878367d946706d))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/schema bumped to 2.1.0
+
 ## [2.1.0](https://github.com/jxsuite/jx/compare/protocol-v2.0.0...protocol-v2.1.0) (2026-08-27)
 
 

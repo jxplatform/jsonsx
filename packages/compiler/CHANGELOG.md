@@ -1,5 +1,26 @@
 # Changelog
 
+## [3.1.0](https://github.com/jxsuite/jx/compare/compiler-v3.0.0...compiler-v3.1.0) (2026-08-30)
+
+
+### Features
+
+* **compiler,server:** a site deployed under a subpath resolves its URLs against url's path ([c4b7f27](https://github.com/jxsuite/jx/commit/c4b7f27c82a19bfa1f62eff8a75597c13a3f90be))
+* **compiler,server:** a site deployed under a subpath resolves its URLs against url's path ([988abd8](https://github.com/jxsuite/jx/commit/988abd8d3614f0ba3ce6cd8b1c1db589fef0a511)), closes [#235](https://github.com/jxsuite/jx/issues/235)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/create bumped to 1.3.9
+    * @jxsuite/runtime bumped to 3.1.0
+    * @jxsuite/schema bumped to 2.1.0
+    * @jxsuite/site bumped to 1.1.0
+  * devDependencies
+    * @jxsuite/connector bumped to 0.5.7
+    * @jxsuite/parser bumped to 1.7.0
+
 ## [3.0.0](https://github.com/jxsuite/jx/compare/compiler-v2.0.8...compiler-v3.0.0) (2026-08-27)
 
 
