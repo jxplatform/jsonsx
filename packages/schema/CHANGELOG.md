@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.1.0](https://github.com/jxsuite/jx/compare/schema-v2.0.0...schema-v2.1.0) (2026-08-30)
+
+
+### Features
+
+* **compiler,server:** a site deployed under a subpath resolves its URLs against url's path ([c4b7f27](https://github.com/jxsuite/jx/commit/c4b7f27c82a19bfa1f62eff8a75597c13a3f90be))
+* **compiler,server:** a site deployed under a subpath resolves its URLs against url's path ([988abd8](https://github.com/jxsuite/jx/commit/988abd8d3614f0ba3ce6cd8b1c1db589fef0a511)), closes [#235](https://github.com/jxsuite/jx/issues/235)
+* **parser,schema,server:** a format may declare rewrite, repairing a reference a CSV row names ([bca762e](https://github.com/jxsuite/jx/commit/bca762eea4a3a1cd55de02892b7db322155fb1ec))
+* **parser,schema,server:** a format may declare rewrite, repairing a reference a CSV row names ([29a0f36](https://github.com/jxsuite/jx/commit/29a0f36a43319e294e2e69b14c694ff9796bdc5c)), closes [#246](https://github.com/jxsuite/jx/issues/246)
+
 ## [2.0.0](https://github.com/jxsuite/jx/compare/schema-v1.9.0...schema-v2.0.0) (2026-08-27)
 
 

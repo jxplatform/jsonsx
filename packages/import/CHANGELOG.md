@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.40.1](https://github.com/jxsuite/jx/compare/import-v0.40.0...import-v0.40.1) (2026-08-30)
+
+
+### Bug Fixes
+
+* **studio:** a lapsed Cloudflare grant no longer ends the connect flow before it starts ([83102d2](https://github.com/jxsuite/jx/commit/83102d2eaf64752895efe8118afacc605eaa2aff))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/markup bumped to 0.4.9
+    * @jxsuite/schema bumped to 2.1.0
+  * optionalDependencies
+    * @jxsuite/compiler bumped to 3.1.0
+
 ## [0.40.0](https://github.com/jxsuite/jx/compare/import-v0.39.8...import-v0.40.0) (2026-08-27)
 
 

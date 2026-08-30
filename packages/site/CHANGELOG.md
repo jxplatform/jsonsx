@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.1.0](https://github.com/jxsuite/jx/compare/site-v1.0.0...site-v1.1.0) (2026-08-30)
+
+
+### Features
+
+* **compiler,server:** a site deployed under a subpath resolves its URLs against url's path ([c4b7f27](https://github.com/jxsuite/jx/commit/c4b7f27c82a19bfa1f62eff8a75597c13a3f90be))
+* **compiler,server:** a site deployed under a subpath resolves its URLs against url's path ([988abd8](https://github.com/jxsuite/jx/commit/988abd8d3614f0ba3ce6cd8b1c1db589fef0a511)), closes [#235](https://github.com/jxsuite/jx/issues/235)
+* **runtime:** @jxsuite/runtime/css, so composing a stylesheet costs no renderer ([d27683a](https://github.com/jxsuite/jx/commit/d27683ad3a985e319d09c0a1bfef6fbbd9cfa167))
+* **runtime:** @jxsuite/runtime/css, so composing a stylesheet costs no renderer ([61bb842](https://github.com/jxsuite/jx/commit/61bb8426cdaeec85634e4ad4244d73ff3bf3c52a))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/runtime bumped to 3.1.0
+    * @jxsuite/schema bumped to 2.1.0
+
 ## [1.0.0](https://github.com/jxsuite/jx/compare/site-v0.1.0...site-v1.0.0) (2026-08-27)
 
 

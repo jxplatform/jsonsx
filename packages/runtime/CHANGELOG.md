@@ -1,5 +1,20 @@
 # Changelog
 
+## [3.1.0](https://github.com/jxsuite/jx/compare/runtime-v3.0.0...runtime-v3.1.0) (2026-08-30)
+
+
+### Features
+
+* **runtime:** @jxsuite/runtime/css, so composing a stylesheet costs no renderer ([d27683a](https://github.com/jxsuite/jx/commit/d27683ad3a985e319d09c0a1bfef6fbbd9cfa167))
+* **runtime:** @jxsuite/runtime/css, so composing a stylesheet costs no renderer ([61bb842](https://github.com/jxsuite/jx/commit/61bb8426cdaeec85634e4ad4244d73ff3bf3c52a))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/schema bumped to 2.1.0
+
 ## [3.0.0](https://github.com/jxsuite/jx/compare/runtime-v2.1.0...runtime-v3.0.0) (2026-08-27)
 
 

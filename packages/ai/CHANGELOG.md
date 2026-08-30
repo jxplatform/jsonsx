@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.37.0](https://github.com/jxsuite/jx/compare/ai-v0.36.5...ai-v0.37.0) (2026-08-30)
+
+
+### Features
+
+* **studio,ai:** the assistant uses the backend's per-model capabilities ([4f7a9dd](https://github.com/jxsuite/jx/commit/4f7a9ddab4ca039a0dea83741dd39bc8345b87ea))
+
+
+### Bug Fixes
+
+* **studio:** a lapsed Cloudflare grant no longer ends the connect flow before it starts ([83102d2](https://github.com/jxsuite/jx/commit/83102d2eaf64752895efe8118afacc605eaa2aff))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/protocol bumped to 2.2.0
+
 ## [0.36.5](https://github.com/jxsuite/jx/compare/ai-v0.36.4...ai-v0.36.5) (2026-08-27)
 
 

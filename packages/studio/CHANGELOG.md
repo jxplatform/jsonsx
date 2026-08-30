@@ -1,5 +1,39 @@
 # Changelog
 
+## [4.1.0](https://github.com/jxsuite/jx/compare/studio-v4.0.0...studio-v4.1.0) (2026-08-30)
+
+
+### Features
+
+* **parser,schema,server:** a format may declare rewrite, repairing a reference a CSV row names ([bca762e](https://github.com/jxsuite/jx/commit/bca762eea4a3a1cd55de02892b7db322155fb1ec))
+* **parser,schema,server:** a format may declare rewrite, repairing a reference a CSV row names ([29a0f36](https://github.com/jxsuite/jx/commit/29a0f36a43319e294e2e69b14c694ff9796bdc5c)), closes [#246](https://github.com/jxsuite/jx/issues/246)
+* **studio,ai:** the assistant uses the backend's per-model capabilities ([4f7a9dd](https://github.com/jxsuite/jx/commit/4f7a9ddab4ca039a0dea83741dd39bc8345b87ea))
+* **studio:** a hosted backend can import a site into a repository ([2bcbeee](https://github.com/jxsuite/jx/commit/2bcbeee9fdaa5aa5d6b8a879bc3d8f510d451752))
+* **studio:** link About dialog in the Studio menu, add desktop window favicon ([e49fd41](https://github.com/jxsuite/jx/commit/e49fd41b95f540411b62e6749a2986421c78c4f7))
+* **studio:** link About dialog in the Studio menu, add desktop window favicon ([5a48a1c](https://github.com/jxsuite/jx/commit/5a48a1c409ad93137d23140c570fa193e1bd8801))
+
+
+### Bug Fixes
+
+* **studio:** a lapsed Cloudflare grant no longer ends the connect flow before it starts ([83102d2](https://github.com/jxsuite/jx/commit/83102d2eaf64752895efe8118afacc605eaa2aff))
+* **studio:** a lapsed Cloudflare grant no longer ends the connect flow before it starts ([4887415](https://github.com/jxsuite/jx/commit/4887415119c8640e269fc3a5cd878367d946706d))
+* **studio:** drop the class the Verify switch never needed ([cbb8114](https://github.com/jxsuite/jx/commit/cbb8114fd5cadbc710f04ed8afe8506e97b1cb1c))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/ai bumped to 0.37.0
+    * @jxsuite/collab bumped to 0.8.5
+    * @jxsuite/create bumped to 1.3.9
+    * @jxsuite/formulas bumped to 0.0.16
+    * @jxsuite/markup bumped to 0.4.9
+    * @jxsuite/protocol bumped to 2.2.0
+    * @jxsuite/runtime bumped to 3.1.0
+    * @jxsuite/schema bumped to 2.1.0
+    * @jxsuite/site bumped to 1.1.0
+
 ## [4.0.0](https://github.com/jxsuite/jx/compare/studio-v3.0.0...studio-v4.0.0) (2026-08-27)
 
 

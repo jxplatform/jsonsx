@@ -1,5 +1,40 @@
 # Changelog
 
+## [4.1.0](https://github.com/jxsuite/jx/compare/server-v4.0.0...server-v4.1.0) (2026-08-30)
+
+
+### Features
+
+* **compiler,server:** a site deployed under a subpath resolves its URLs against url's path ([c4b7f27](https://github.com/jxsuite/jx/commit/c4b7f27c82a19bfa1f62eff8a75597c13a3f90be))
+* **compiler,server:** a site deployed under a subpath resolves its URLs against url's path ([988abd8](https://github.com/jxsuite/jx/commit/988abd8d3614f0ba3ce6cd8b1c1db589fef0a511)), closes [#235](https://github.com/jxsuite/jx/issues/235)
+* **parser,schema,server:** a format may declare rewrite, repairing a reference a CSV row names ([bca762e](https://github.com/jxsuite/jx/commit/bca762eea4a3a1cd55de02892b7db322155fb1ec))
+* **parser,schema,server:** a format may declare rewrite, repairing a reference a CSV row names ([29a0f36](https://github.com/jxsuite/jx/commit/29a0f36a43319e294e2e69b14c694ff9796bdc5c)), closes [#246](https://github.com/jxsuite/jx/issues/246)
+
+
+### Bug Fixes
+
+* **server:** a copy map's keys and a directory content source are references the engine can see ([9974204](https://github.com/jxsuite/jx/commit/997420475d738bc134f21108b5e8d193ae065314))
+* **server:** a copy map's keys and a directory content source are references the engine can see ([5221a26](https://github.com/jxsuite/jx/commit/5221a26123622abdfcea5fc0e6e0fd37a57f7a93)), closes [#242](https://github.com/jxsuite/jx/issues/242) [#243](https://github.com/jxsuite/jx/issues/243)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/collab bumped to 0.8.5
+    * @jxsuite/compiler bumped to 3.1.0
+    * @jxsuite/create bumped to 1.3.9
+    * @jxsuite/import bumped to 0.40.1
+    * @jxsuite/protocol bumped to 2.2.0
+    * @jxsuite/runtime bumped to 3.1.0
+    * @jxsuite/schema bumped to 2.1.0
+    * @jxsuite/site bumped to 1.1.0
+    * @jxsuite/starters bumped to 1.7.0
+  * devDependencies
+    * @jxsuite/auth bumped to 0.5.7
+    * @jxsuite/connector bumped to 0.5.7
+    * @jxsuite/parser bumped to 1.7.0
+
 ## [4.0.0](https://github.com/jxsuite/jx/compare/server-v3.0.0...server-v4.0.0) (2026-08-27)
 
 
