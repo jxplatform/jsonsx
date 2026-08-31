@@ -17,8 +17,10 @@ void mock.module("../src/settings/extension-sections", () => {
   throw new Error("extension-sections chunk unavailable");
 });
 const {
+  getExtensionCatalog,
   getExtensions,
   getFormats,
+  loadExtensionCatalog,
   loadExtensions,
   loadFormats,
   refreshExtensionUi,
@@ -55,6 +57,19 @@ describe("format registry when the backend fails", () => {
     });
     expect(await loadExtensions()).toEqual([]);
     expect(getExtensions()).toEqual([]);
+  });
+
+  /* Same cache discipline as the extensions payload above: first touch in this file, so the load
+     path is reachable. A platform that cannot answer must cost the Extensions section its OFFER,
+     never its ability to render what the project already names. */
+  test("loadExtensionCatalog degrades to an empty list when the member throws", async () => {
+    installMockPlatform({
+      listExtensionCatalog: async () => {
+        throw new Error("catalogue exploded");
+      },
+    });
+    expect(await loadExtensionCatalog()).toEqual([]);
+    expect(getExtensionCatalog()).toEqual([]);
   });
 });
 

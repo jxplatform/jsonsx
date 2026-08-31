@@ -8,6 +8,7 @@ import {
   buildProjectFormatRegistry,
   createNodeFormatIO,
   importImplementation,
+  probeExtension,
   unknownFormatError,
 } from "../src/site/format-host";
 
@@ -220,6 +221,99 @@ describe("buildProjectFormatRegistry (deprecated formats view)", () => {
       });
       expect(registry.byExtension(".md")?.name).toBe("Markdown");
       expect(registry.byName("Content")).toBeUndefined(); // No format block → not in the view
+    } finally {
+      rmSync(root, { force: true, recursive: true });
+    }
+  });
+});
+
+describe("probeExtension", () => {
+  /**
+   * A throwaway project with a hand-built node_modules entry. `exports` is written verbatim so a
+   * test can omit the manifest subpath and prove the probe follows the exports map rather than the
+   * package directory.
+   */
+  function fixture(pkg: { name: string; exports?: Record<string, string> } | null): string {
+    const root = mkdtempSync(join(tmpdir(), "jx-probe-"));
+    writeFileSync(join(root, "package.json"), JSON.stringify({ name: "site" }));
+    if (pkg) {
+      const dir = join(root, "node_modules", ...pkg.name.split("/"));
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(
+        join(dir, "package.json"),
+        JSON.stringify({
+          name: pkg.name,
+          version: "1.0.0",
+          ...(pkg.exports ? { exports: pkg.exports } : {}),
+        }),
+      );
+      writeFileSync(join(dir, "jx-extension.json"), JSON.stringify({ name: pkg.name }));
+    }
+    return root;
+  }
+
+  test("reports a package installed in the project", () => {
+    const root = fixture({
+      exports: { "./jx-extension.json": "./jx-extension.json" },
+      name: "@acme/jx-toml",
+    });
+    try {
+      const found = probeExtension(root, "@acme/jx-toml");
+      expect(found.project).toBe(true);
+      expect(found.host).toBe(false);
+      expect(found.manifestPath?.endsWith("jx-extension.json")).toBe(true);
+    } finally {
+      rmSync(root, { force: true, recursive: true });
+    }
+  });
+
+  test("reports a package this host ships but the project has not installed", () => {
+    const root = fixture(null);
+    try {
+      // @jxsuite/parser is a workspace package, so the compiler's own graph resolves it.
+      const found = probeExtension(root, "@jxsuite/parser");
+      expect(found.project).toBe(false);
+      expect(found.host).toBe(true);
+      expect(found.manifestPath?.endsWith("jx-extension.json")).toBe(true);
+    } finally {
+      rmSync(root, { force: true, recursive: true });
+    }
+  });
+
+  test("prefers the project's manifest when both resolve", () => {
+    const root = fixture({
+      exports: { "./jx-extension.json": "./jx-extension.json" },
+      name: "@jxsuite/parser",
+    });
+    try {
+      const found = probeExtension(root, "@jxsuite/parser");
+      expect(found.project).toBe(true);
+      expect(found.host).toBe(true);
+      // The project copy, not the workspace one — the order createNodeFormatIO resolves in.
+      expect(found.manifestPath?.startsWith(root)).toBe(true);
+    } finally {
+      rmSync(root, { force: true, recursive: true });
+    }
+  });
+
+  test("a package whose exports map omits the manifest does not resolve", () => {
+    // Present in node_modules, and its exports map has no "./jx-extension.json" entry. The registry
+    // Would throw on this package, so the probe must not report it as available.
+    const root = fixture({ exports: { ".": "./index.js" }, name: "@acme/jx-half" });
+    try {
+      const found = probeExtension(root, "@acme/jx-half");
+      expect(found.project).toBe(false);
+      expect(found.host).toBe(false);
+      expect(found.manifestPath).toBeUndefined();
+    } finally {
+      rmSync(root, { force: true, recursive: true });
+    }
+  });
+
+  test("an unknown package resolves from neither", () => {
+    const root = fixture(null);
+    try {
+      expect(probeExtension(root, "@acme/nope")).toEqual({ host: false, project: false });
     } finally {
       rmSync(root, { force: true, recursive: true });
     }

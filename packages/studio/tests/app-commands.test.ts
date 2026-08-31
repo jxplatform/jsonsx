@@ -84,6 +84,9 @@ describe("the set", () => {
       // Verb over a modal; the Library's category, layout, filter, rescan and new-entry states are
       // Each a record, so the palette and the assistant can reach what only its own buttons could.
       "library",
+      // `packages.remove` — uninstalling an extension's dependency, which the Extensions section
+      // And the Packages table both render from.
+      "packages",
       "palette",
       // `pane.splitRight` — the pane model (a parallel workstream).
       "pane",

@@ -1,16 +1,15 @@
 /// <reference lib="dom" />
 /**
- * The three Project Settings sections the document adds — Extensions, Deploy and Raw JSON.
+ * The two Project Settings sections the document adds directly — Deploy and Raw JSON.
  *
- * They live together because each is a small, direct view of ONE `project.json` key and none of
- * them owns a dialog, a picker or a schema form: `extensions` (an array of package names),
- * `build.adapter` (one enum), and the file itself.
+ * They live together because each is a small, direct view of ONE `project.json` key and neither
+ * owns a dialog, a picker or a schema form: `build.adapter` (one enum), and the file itself.
  *
- * **Extensions had no UI at all** — plan §9.2's last row — despite `site-context.ts` carrying a
- * dedicated branch to react to the array changing. Adding or removing a package here is therefore
- * the first way to turn an extension on from inside Studio, and the chokepoint's own
- * `refreshExtensionSurfaces()` re-reads the formats and the contributed sections afterwards, so the
- * section list beside this one updates without a reload.
+ * **Extensions used to be the third.** It was a free-text field over the `extensions` array, which
+ * wrote `project.json` and nothing else — so a name that was not installed produced a project that
+ * failed to build. It now needs a catalogue, a package list and an install path, which is more than
+ * "a direct view of one key", and it lives in `./extensions-section.ts`. What stayed behind is the
+ * error plumbing both still share.
  *
  * **Raw JSON does not open a second editor.** It shows what is on disk and hands the author to the
  * Code editor over the SAME tab — one document, three editors (§9.3), so switching to the text and
@@ -46,7 +45,7 @@ function clearError(container: HTMLElement): void {
 }
 
 /** The error line for a section, if its last write failed. */
-function errorLine(container: HTMLElement) {
+export function errorLine(container: HTMLElement) {
   const message = errors.get(container);
   return message === undefined
     ? nothing
@@ -80,92 +79,6 @@ async function persist(
 /** The live project configuration, or an empty one before a project is open. */
 function config(): ProjectConfig {
   return (projectState?.projectConfig ?? {}) as ProjectConfig;
-}
-
-// ─── Extensions ───────────────────────────────────────────────────────────────
-
-/** Pending package name per container, so typing survives the section re-rendering. */
-const pendingExtension = new WeakMap<HTMLElement, string>();
-
-/**
- * The `extensions` array, as a list you can add to and remove from.
- *
- * @param {HTMLElement} container
- */
-export function renderExtensionsSection(container: HTMLElement): void {
-  const rerender = () => renderExtensionsSection(container);
-  const extensions = config().extensions ?? [];
-  const pending = pendingExtension.get(container) ?? "";
-
-  /* Both handlers re-read rather than closing over the render's values. Typing updates the pending
-     name WITHOUT a re-render (re-rendering per keystroke would fight the field's own value), so a
-     closed-over `pending` would always be whatever it was when the section was last drawn — which
-     is "" on the first add. */
-  const add = () => {
-    const name = (pendingExtension.get(container) ?? "").trim();
-    const current = config().extensions ?? [];
-    if (!name || current.includes(name)) {
-      return;
-    }
-    pendingExtension.delete(container);
-    void persist(container, { extensions: [...current, name] }, rerender);
-  };
-
-  const remove = (name: string) => {
-    const current = config().extensions ?? [];
-    void persist(container, { extensions: current.filter((e) => e !== name) }, rerender);
-  };
-
-  const tpl = html`
-    <div class="settings-section">
-      <h3 class="settings-section-title">Extensions</h3>
-      <p class="settings-field-desc">
-        Packages this project loads. An extension can contribute formats, elements, data connectors
-        — and settings sections of its own, which appear in the list beside this one.
-      </p>
-      ${errorLine(container)}
-      <div class="settings-list-panel">
-        ${
-          extensions.length === 0
-            ? html`<div class="settings-empty-state">No extensions.</div>`
-            : extensions.map(
-                (name) => html`
-                  <div class="settings-row">
-                    <span class="settings-row-name">${name}</span>
-                    <sp-action-button
-                      size="xs"
-                      quiet
-                      title=${`Remove ${name}`}
-                      @click=${() => remove(name)}
-                    >
-                      <sp-icon-delete slot="icon"></sp-icon-delete>
-                    </sp-action-button>
-                  </div>
-                `,
-              )
-        }
-        <div class="settings-inline-form">
-          <sp-textfield
-            size="s"
-            class="settings-extension-name"
-            placeholder="@scope/package"
-            .value=${pending}
-            @input=${(e: Event) => {
-              pendingExtension.set(container, (e.target as HTMLInputElement).value);
-            }}
-            @keydown=${(e: KeyboardEvent) => {
-              if (e.key === "Enter") {
-                add();
-              }
-            }}
-          ></sp-textfield>
-          <sp-action-button size="s" @click=${add}>Add</sp-action-button>
-        </div>
-      </div>
-    </div>
-  `;
-
-  litRender(tpl, container);
 }
 
 // ─── Deploy ───────────────────────────────────────────────────────────────────

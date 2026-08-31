@@ -140,6 +140,9 @@ function makeSession(initialRoot: string | null) {
     dataDeleteRow: mock(async () => ({ ok: true })),
     listSecrets: mock(async () => ({ names: [] })),
     setSecrets: mock(async () => ({ names: [], ok: true })),
+    listExtensionCatalog: mock(async () => [
+      { name: "@jxsuite/feed", sections: [{ key: "feed" }], source: "first-party" },
+    ]),
     pickDirectory: mock(async () => "/picked"),
     openProject: mock(async () => {
       root = "/proj/opened";
@@ -573,6 +576,16 @@ describe("per-window RPC", () => {
     const session = sessions.at(-1)!;
     expect(await lastRequests().pickDirectory()).toBe("/picked");
     expect(session.pickDirectory).toHaveBeenCalledTimes(1);
+  });
+
+  test("listExtensionCatalog delegates to this window's session", async () => {
+    // Each window binds its own ProjectSession, so a forwarder that reached a module-global
+    // Session would answer the wrong project's catalogue in a second window.
+    openProjectWindow("/proj/catalogue");
+    const session = sessions.at(-1)!;
+    const catalog = (await lastRequests().listExtensionCatalog()) as { name: string }[];
+    expect(catalog[0]?.name).toBe("@jxsuite/feed");
+    expect(session.listExtensionCatalog).toHaveBeenCalledTimes(1);
   });
 
   test("getProjectRoot reports this window's root", () => {

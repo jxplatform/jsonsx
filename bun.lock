@@ -201,6 +201,10 @@
         "rcedit": "^5.0.2",
       },
     },
+    "packages/extension-catalog": {
+      "name": "@jxsuite/extension-catalog",
+      "version": "0.1.0",
+    },
     "packages/formulas": {
       "name": "@jxsuite/formulas",
       "version": "0.0.16",
@@ -290,6 +294,7 @@
         "@jxsuite/collab": "workspace:^",
         "@jxsuite/compiler": "workspace:^",
         "@jxsuite/create": "workspace:^",
+        "@jxsuite/extension-catalog": "workspace:^",
         "@jxsuite/import": "workspace:^",
         "@jxsuite/protocol": "workspace:^",
         "@jxsuite/runtime": "workspace:^",
@@ -850,6 +855,8 @@
     "@jxsuite/desktop": ["@jxsuite/desktop@workspace:packages/desktop"],
 
     "@jxsuite/examples": ["@jxsuite/examples@workspace:examples"],
+
+    "@jxsuite/extension-catalog": ["@jxsuite/extension-catalog@workspace:packages/extension-catalog"],
 
     "@jxsuite/feed": ["@jxsuite/feed@workspace:extensions/feed"],
 

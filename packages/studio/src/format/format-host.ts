@@ -9,7 +9,7 @@
 
 import { setProjectSchemasForMonaco } from "../services/monaco-lazy";
 import { getPlatform } from "../platform";
-import type { ExtensionsInfo } from "../types";
+import type { ExtensionCatalogEntry, ExtensionsInfo } from "../types";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 
 export interface StudioFormatHints {
@@ -76,6 +76,8 @@ export function refreshFormats() {
   _formats = [];
   _extensionsLoaded = null;
   _extensions = [];
+  _catalogLoaded = null;
+  _catalog = [];
 }
 
 /** Seed the registry directly (tests and hosts that preload format metadata). */
@@ -122,6 +124,50 @@ export function setExtensions(extensions: ExtensionsInfo[]) {
   _extensionsLoaded = Promise.resolve(extensions);
 }
 
+// ─── Extension catalogue (specs/extensions.md §9.2) ──────────────────────────
+/* The AVAILABLE half beside the ENABLED half above, cached the same way and for a sharper reason:
+   the Extensions section and the AI assistant's system prompt both need "what could this project
+   turn on", and `buildSystemPrompt` is synchronous. Two caches would be two answers to one
+   question, so there is one, loaded here and read synchronously by both. */
+
+let _catalog: ExtensionCatalogEntry[] = [];
+let _catalogLoaded: Promise<ExtensionCatalogEntry[]> | null = null;
+
+/**
+ * Load (and cache) what this backend can offer. Backed by the optional `listExtensionCatalog`
+ * member; a platform without it (or a failure) degrades to an empty list, and the Extensions
+ * section falls back to a typed package name.
+ *
+ * @returns {Promise<ExtensionCatalogEntry[]>}
+ */
+export function loadExtensionCatalog(): Promise<ExtensionCatalogEntry[]> {
+  if (!_catalogLoaded) {
+    _catalogLoaded = (async () => {
+      try {
+        const platform = getPlatform() as {
+          listExtensionCatalog?: () => Promise<ExtensionCatalogEntry[]>;
+        };
+        _catalog = (await platform.listExtensionCatalog?.()) ?? [];
+      } catch {
+        _catalog = [];
+      }
+      return _catalog;
+    })();
+  }
+  return _catalogLoaded;
+}
+
+/** The last-loaded catalogue (synchronous access for render and prompt paths). */
+export function getExtensionCatalog(): ExtensionCatalogEntry[] {
+  return _catalog;
+}
+
+/** Seed the catalogue directly (tests and hosts that preload it). */
+export function setExtensionCatalog(catalog: ExtensionCatalogEntry[]) {
+  _catalog = catalog;
+  _catalogLoaded = Promise.resolve(catalog);
+}
+
 /**
  * Fetch the active project's entry documents ONCE and hand the same payload to every consumer.
  *
@@ -166,6 +212,9 @@ export function refreshExtensionUi(platform: {
   fetchProjectSchemas?: () => Promise<{ project?: unknown; document?: unknown }>;
 }): void {
   void shareProjectSchemas(platform);
+  // `installed` and `bundled` are per-project facts, so an install or a project switch can move
+  // Them even when the shipped half has not changed.
+  void loadExtensionCatalog();
   void import("../settings/extension-sections")
     .then(({ syncExtensionSettingsSections }) => syncExtensionSettingsSections())
     .catch(() => {

@@ -190,6 +190,16 @@ export const STUDIO_ROUTES = {
     "Only .json documents open (backs listFormats); descriptor-contributed settings sections " +
       "do not appear.",
   ),
+  extensionCatalog: route(
+    "GET",
+    "/__studio/extension-catalog",
+    "Extensions this backend can OFFER (ExtensionCatalogEntry[]) — the shipped first-party " +
+      "catalogue plus any package in the project's own dependencies exporting a jx-extension.json, " +
+      "each marked with whether the host resolves it without a project install and whether the " +
+      "project has it installed. A capability rather than a constant: a Worker ships a fixed set " +
+      "of extension packages (specs/extensions.md §5.5). Backs listExtensionCatalog.",
+    "The Extensions section offers no catalogue; adding an extension stays a typed package name.",
+  ),
   projectSchemas: route(
     "GET",
     "/__studio/project-schemas",

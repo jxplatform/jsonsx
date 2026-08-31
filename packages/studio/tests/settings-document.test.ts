@@ -36,7 +36,7 @@ import {
   settingsPaneMounted,
 } from "../src/panels/settings-pane";
 import { resetExtensionSettingsSections } from "../src/settings/extension-sections";
-import { refreshFormats, setExtensions } from "../src/format/format-host";
+import { refreshFormats, setExtensionCatalog, setExtensions } from "../src/format/format-host";
 import { closeAllTabs, activeTab, workspace } from "../src/workspace/workspace";
 import "../src/ui/form-controls";
 import type { AnyCommand } from "../src/commands/registry";
@@ -157,6 +157,7 @@ beforeEach(() => {
   resetExtensionSettingsSections();
   refreshFormats();
   setExtensions([]);
+  setExtensionCatalog([]);
   installMockPlatform();
   closeAllTabs();
   resetSettingsDocumentState();
@@ -202,6 +203,27 @@ describe("the settings document", () => {
     // A change notification with nothing mounted must be a no-op rather than a null dereference.
     setSettingsSection("contexts");
     expect(host.querySelector(".settings-doc")).not.toBeNull();
+  });
+
+  test("the Extensions section renders the backend's catalogue through the document", async () => {
+    // The section is reached the way a reader reaches it — through the settings document's inner
+    // Nav — rather than by calling its renderer, so the registration is covered too.
+    setExtensionCatalog([
+      {
+        description: "File-based content collections",
+        installed: false,
+        name: "@jxsuite/parser",
+        sections: [{ key: "content", title: "Content Types" }],
+        source: "first-party",
+        title: "Content & Markdown",
+      },
+    ]);
+    await mount();
+    setSettingsSection("extensions");
+    await flush(3);
+    expect(body().querySelector(".settings-section-title")?.textContent).toBe("Extensions");
+    expect(body().querySelector(".settings-toggle-package")?.textContent).toBe("@jxsuite/parser");
+    expect(body().querySelector("sp-switch")).not.toBeNull();
   });
 
   test("mounting twice on the same host does not rebuild the section body", async () => {
