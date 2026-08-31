@@ -57,9 +57,14 @@ export interface SpecStatus {
  */
 export const NUMBERED_HEADING = /^#{2,6}\s+(\d+(?:\.\d+)*[a-z]?)\\?\.?\s+(.*)$/;
 const BLOCKQUOTE_STATUS = /^>\s*\*\*Status:\s*([A-Za-z]+)/;
-const HEADER_VERSION = /^\*\*Version:\*\*\s*(.+)$/;
-const HEADER_STATUS = /^\*\*Status:\*\*\s*(.+)$/;
-const HEADER_UPDATED = /^\*\*Updated:\*\*\s*(.+)$/;
+/*
+ * The header block is four labelled lines that must stay four lines, so each carries an explicit
+ * `\` hard break (see scripts/lib/unwrap-prose.ts). `[^\\]+` stops the value swallowing it; no
+ * metadata value contains a backslash.
+ */
+const HEADER_VERSION = /^\*\*Version:\*\*\s*([^\\]+)/;
+const HEADER_STATUS = /^\*\*Status:\*\*\s*([^\\]+)/;
+const HEADER_UPDATED = /^\*\*Updated:\*\*\s*([^\\]+)/;
 const FOOTER_VERSION = /Specification v([0-9][A-Za-z0-9.-]*)/;
 const CHANGELOG_HEADING = /^##\s+Changelog\s*$/;
 // `- **<version>** (<YYYY-MM-DD>) — <summary>` (em-dash or hyphen separator).

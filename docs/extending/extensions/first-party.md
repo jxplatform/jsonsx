@@ -1,6 +1,6 @@
 ---
 title: "First-party extensions"
-description: "What @jxsuite/parser, @jxsuite/connector, @jxsuite/auth, and @jxsuite/search each contribute: sections, formats, classes, mounts, and settings."
+description: "What parser, connector, auth, search, and feed each contribute to a Jx project: sections, formats, classes, server mounts, and Studio settings."
 spec:
   - extensions.md#2
 code:
@@ -8,11 +8,12 @@ code:
   - extensions/connector/jx-extension.json
   - extensions/auth/jx-extension.json
   - extensions/search/jx-extension.json
+  - extensions/feed/jx-extension.json
 ---
 
 # First-party extensions
 
-Four extensions ship with Jx, and they are deliberately unprivileged: each is wired through the same manifest, admission blocks, and capability roles available to any third-party package. They are both the batteries most projects start with and the reference implementations to crib from when you build your own. This page maps what each one contributes; follow the links for the mechanics.
+Five extensions ship with Jx, and they are deliberately unprivileged: each is wired through the same manifest, admission blocks, and capability roles available to any third-party package. They are both the batteries most projects start with and the reference implementations to crib from when you build your own. This page maps what each one contributes; follow the links for the mechanics.
 
 | Package              | Sections              | Formats       | Server mounts          | Connector providers  |
 | -------------------- | --------------------- | ------------- | ---------------------- | -------------------- |
@@ -20,6 +21,7 @@ Four extensions ship with Jx, and they are deliberately unprivileged: each is wi
 | `@jxsuite/connector` | `connections`, `data` | —             | `/_jx/data` (order 20) | D1, Supabase, Sqlite |
 | `@jxsuite/auth`      | `auth`                | —             | `/_jx/auth` (order 10) | —                    |
 | `@jxsuite/search`    | `search`              | —             | —                      | —                    |
+| `@jxsuite/feed`      | `feed`                | —             | —                      | —                    |
 
 ## @jxsuite/parser: content and Markdown
 
@@ -69,9 +71,19 @@ Headless full-text search, and the reference for the [`emit` capability](/docs/e
 
 User-level docs: [Site search](/docs/framework/site/search).
 
+## @jxsuite/feed: syndication feeds
+
+Atom and JSON Feed documents written at build time, and the reference for the [`head` capability](/docs/extending/extensions/capabilities).
+
+- **Section**: `feed`, one entry per feed. Each names the `collection` it syndicates and the `basePath` its entries are served under, and may set a title, a description, the `formats` to emit, the `output` base path, a `pageSize`, and whether to write RFC 5005 `archive` pages.
+- **Emit**: writes `/feed.xml` (Atom, RFC 4287) and `/feed.json` (JSON Feed) from the loaded content collection. RSS 2.0 is deliberately not offered: it has no standards body, and every reader handles Atom.
+- **Head**: contributes the `<link rel="alternate">` tags that let a browser and a reader discover the feeds, so a page does not have to declare them by hand.
+- **Classes**: `Feed`, which owns the section and both capabilities. It registers no format and no state prototype, which makes it the smallest of the five and the easiest to read first.
+- **Studio settings**: the **Feeds** section (`layout: "map"`), one entry at a time.
+
 ## How they depend on each other
 
-Auth depends on the connector (its dialect seam and permission types); search reads what the parser loads but depends only on core; all of them may depend on core packages; core packages never depend on any of them. That direction is CI-enforced, and it is what guarantees the claim these pages keep making: anything the first-party extensions do, yours can do too.
+Auth depends on the connector (its dialect seam and permission types); search and feed both read what the parser loads but depend only on core; all of them may depend on core packages; core packages never depend on any of them. That direction is CI-enforced, and it is what guarantees the claim these pages keep making: anything the first-party extensions do, yours can do too.
 
 ## Related
 

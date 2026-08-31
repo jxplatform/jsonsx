@@ -21,6 +21,7 @@ import { componentRegistry } from "../files/components";
 import { activeRegistry } from "../commands/active-registry";
 import { registerAiTools } from "./ai-tools";
 import { cancelAsk, registerAskTool, resetAsk } from "./ai-ask";
+import { registerExtensionTools } from "./ai-extension-tools";
 import { registerProjectTools } from "./ai-project-tools";
 import { registerImportTools, resetImportGuard } from "./ai-import-tools";
 import { createGatedToolRegistry } from "./gated-registry";
@@ -29,12 +30,13 @@ import { adoptProject } from "./project-adoption";
 import { abortImportRun, resetImportRuns } from "./import-run";
 import { runAgentLoop } from "./tool-executor";
 import { AI_TOOL_TIERS, buildSystemPrompt, toolActive } from "./ai-system-prompt";
+import type { ExtensionCatalogSummary } from "./ai-system-prompt";
 import { getBaseUrl, getOpenAiKey } from "./ai-settings";
 import { preferredModel } from "./ai-models";
 import { pruneOrphanToolMessages, trimContext } from "./context-manager";
 import { renderCheck } from "./render-critic";
 import { openFileInTab, reloadFileInTab } from "../files/files";
-import { refreshExtensionUi } from "../format/format-host";
+import { getExtensionCatalog, refreshExtensionUi } from "../format/format-host";
 import * as sessionStore from "./ai-session-store";
 
 /**
@@ -107,6 +109,9 @@ export function createDocumentAssistant() {
       }
     },
   });
+  /* No context: both verbs run the human's own command records, so the gate is read rather than
+     recomputed (§12.4, "the agent counts as a surface"). */
+  registerExtensionTools(innerRegistry);
   registerProjectTools(innerRegistry, {
     getTab: () => activeTab.value,
     renderCheck: renderCheck as (
@@ -201,6 +206,19 @@ export function createDocumentAssistant() {
           .filter((e) => e.type === "file")
           .map((e) => e.path)
       : undefined;
+    /* The synchronous snapshot beside the async load, exactly as `getExtensions()` sits beside
+       `loadExtensions()`: `buildSystemPrompt` is a pure function and this is called per turn, so
+       the catalogue is read from the ONE cache the Extensions section also reads. Two caches would
+       be two answers to "what can this project turn on". */
+    const catalog: ExtensionCatalogSummary[] = [];
+    for (const entry of getExtensionCatalog()) {
+      catalog.push({
+        name: entry.name,
+        sections: entry.sections.map((section) => section.key),
+        ...(entry.title === undefined ? {} : { title: entry.title }),
+        ...(entry.description === undefined ? {} : { description: entry.description }),
+      });
+    }
     return buildSystemPrompt({
       document: tab ? toRaw(tab.doc.document) : undefined,
       projectConfig: (workspace.projectConfig as ProjectConfig | null) || undefined,
@@ -209,6 +227,7 @@ export function createDocumentAssistant() {
       hasProject: Boolean(workspace.projectRoot),
       canImport: Boolean(getPlatform().importSite),
       ...(inventory && inventory.length > 0 ? { fileInventory: inventory } : {}),
+      ...(catalog.length > 0 ? { extensionCatalog: catalog } : {}),
     });
   }
 

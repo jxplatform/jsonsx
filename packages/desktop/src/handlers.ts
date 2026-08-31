@@ -26,6 +26,7 @@ export function getProjectRoot(): string | null {
 
 export const { listFormats } = _default;
 export const { listExtensions } = _default;
+export const { listExtensionCatalog } = _default;
 export const { fetchProjectSchemas } = _default;
 export const { formatAction } = _default;
 export const { openProject } = _default;

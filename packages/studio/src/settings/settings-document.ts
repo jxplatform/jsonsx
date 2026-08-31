@@ -43,11 +43,8 @@ import { renderContextsSection } from "./contexts-section";
 import { renderCssVarsEditor } from "./css-vars-editor";
 import { renderDefsEditor } from "./defs-editor";
 import { renderDependenciesEditor } from "./dependencies-editor";
-import {
-  renderDeploySection,
-  renderExtensionsSection,
-  renderRawJsonSection,
-} from "./project-sections";
+import { renderExtensionsSection } from "./extensions-section";
+import { renderDeploySection, renderRawJsonSection } from "./project-sections";
 import { renderGeneralSettings } from "./general-settings";
 import { renderHeadEditor } from "./head-editor";
 import { renderLocalesSection } from "./locales-section";

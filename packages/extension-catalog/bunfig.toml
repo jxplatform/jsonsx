@@ -1,0 +1,14 @@
+[test]
+coverageReporter = ["text", "lcov"]
+coverageSkipTestFiles = true
+coveragePathIgnorePatterns = [
+  "**/tests/**",
+  "./result/**",
+  # The docs anchor assertion imports scripts/docs/lib/headings.ts, which imports the parser's real
+  # slugifier so the repo has ONE definition of an anchor. That pulls three files this workspace
+  # does not own into the report; a sibling's files belong to that sibling's job.
+  "../../extensions/**",
+  "../../scripts/**",
+  "../markup/**",
+]
+coverageThreshold = { lines = 0.99, functions = 0.99 }

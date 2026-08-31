@@ -16,6 +16,9 @@ code:
   - packages/studio/src/settings/defs-editor.ts
   - packages/studio/src/settings/dependencies-editor.ts
   - packages/studio/src/settings/extension-sections.ts
+  - packages/studio/src/settings/extensions-section.ts
+  - packages/studio/src/settings/extension-rows.ts
+  - packages/studio/src/settings/extension-commands.ts
   - packages/studio/src/panels/settings-pane.ts
   - packages/studio/src/tabs/project-config.ts
 ---
@@ -106,7 +109,19 @@ Adding packages and choosing which of their components your site uses is covered
 
 ## Extensions
 
-The packages this project loads as extensions. An extension can contribute formats, elements, data connectors, and settings sections of its own. Type a package name and press :kbd[Enter] or click **Add** to switch one on; the delete button beside a name removes it. The section list beside this one updates as soon as the change is saved, so a section an extension contributes appears without reloading Studio.
+Extensions add what Jx does not do on its own: content collections, site search, feeds, sign-ins and databases. Each one is a row with a switch, and the switch is the whole gesture.
+
+- **Available** lists what your setup can run. Turning one on installs its package first if you do not have it, then enables it. The row says so before you click.
+- **Installed** lists extensions already among your project's dependencies, including any third-party ones.
+- **Named in project.json** lists anything your configuration asks for that Studio could not describe. You can still turn those off, which is what you usually want.
+
+Each row names the settings sections the extension owns. Those sections appear beside this one as soon as the change is saved, so a section an extension contributes shows up without reloading Studio, and disappears again when you turn it off.
+
+**Turning an extension off leaves its package installed.** Turning it back on is then instant, and nothing about your pinned version changes. To remove the package itself, use the delete button on its row, which is offered only once the extension is off: deleting the package while your configuration still names it would break the next build.
+
+:::doc-note
+An extension has to be two things at once: a dependency your project has installed, and a name in your configuration. That is why the switch does both. If a row warns that an extension is named but not installed, turning it off and on again installs it.
+:::
 
 ## Deploy
 

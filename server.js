@@ -50,7 +50,7 @@ await createDevServer({
     },
     ...studioBuildEntries(),
   ],
-  port: 3000,
+  port: Number(process.env.JX_DEV_PORT ?? 3000),
   root: resolve(import.meta.dir, "."),
 });
 

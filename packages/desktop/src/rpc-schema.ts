@@ -15,6 +15,7 @@ import type {
   DataRowUpdate,
   DataRowsQuery,
   DataRowsResult,
+  ExtensionCatalogEntry,
   ExtensionsInfo,
   SecretsListResponse,
   SecretsSetRequest,
@@ -364,6 +365,12 @@ export interface StudioRPC {
       listExtensions: {
         params: void;
         response: ExtensionsInfo[];
+      };
+      // The AVAILABLE half beside the ENABLED half above (specs/extensions.md §9.2). Same reason
+      // For the exact wire type rather than a loose one.
+      listExtensionCatalog: {
+        params: void;
+        response: ExtensionCatalogEntry[];
       };
       // Pre-bundled per-project entry schemas for Monaco (project.schema.json / document.schema.json)
       fetchProjectSchemas: {

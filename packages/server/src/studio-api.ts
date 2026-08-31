@@ -1497,6 +1497,26 @@ export async function handleStudioApi(
     }
   }
 
+  // What this backend can OFFER, enabled or not (specs/extensions.md §9.2) — the shipped
+  // First-party catalogue plus any dependency of THIS project exporting a jx-extension.json, each
+  // Marked with whether the project resolves it and whether this host does.
+  //
+  // Deliberately NOT a field on /__studio/formats. That route builds the project's registry and
+  // Fails when a declared extension does not resolve, which is exactly the state a reader is in
+  // When they need the catalogue to repair it; riding on formats would make the answer unavailable
+  // Precisely when it is the fix.
+  if (path === "/__studio/extension-catalog" && req.method === "GET") {
+    const dir = url.searchParams.get("dir") || activeProjectRoot || root;
+    const projectRoot = isAbsolute(dir) ? dir : resolve(root, dir);
+    try {
+      assertAccessible(projectRoot, root, activeProjectRoot);
+      const { buildExtensionCatalog } = await import("./extension-catalog.ts");
+      return Response.json(await buildExtensionCatalog(projectRoot));
+    } catch (error) {
+      return problem("invalidRequest", errorMessage(error));
+    }
+  }
+
   // Pre-bundled per-project entry schemas (project.schema.json / document.schema.json) for the
   // Studio's editor — regenerated on demand when missing or older than project.json, then bundled
   // Into self-contained compound documents so no relative $ref resolution is needed client-side.

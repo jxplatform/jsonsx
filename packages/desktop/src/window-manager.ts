@@ -313,6 +313,7 @@ function buildWindowRpc(entry: WindowEntry, getWin: () => BrowserWindow) {
         setPreviewOverlay: (params) => session.setPreviewOverlay(params),
         clearPreviewOverlay: (params) => session.clearPreviewOverlay(params),
         listDirectory: (params) => session.listDirectory(params),
+        listExtensionCatalog: () => session.listExtensionCatalog(),
         listExtensions: () => session.listExtensions(),
         listFormats: () => session.listFormats(),
         locateFile: (params) => session.locateFile(params),

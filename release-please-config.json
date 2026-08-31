@@ -135,6 +135,11 @@
       "release-type": "node",
       "component": "feed",
       "bump-minor-pre-major": true
+    },
+    "packages/extension-catalog": {
+      "release-type": "node",
+      "component": "extension-catalog",
+      "bump-minor-pre-major": true
     }
   }
 }

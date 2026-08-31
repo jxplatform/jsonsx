@@ -1012,6 +1012,47 @@ describe("formats (session backend registry)", () => {
     expect(await projectless.listExtensions?.()).toEqual([]);
   });
 
+  /*
+   * The catalogue is a CAPABILITY rather than a constant precisely because of this backend: a
+   * Worker ships a fixed set of extension packages (specs/extensions.md §5.5), decided by the
+   * platform build rather than by this repository's extensions/ tree. So cloud asks its gateway,
+   * and never serves the shipped first-party list.
+   */
+  test("listExtensionCatalog asks the gateway and marks everything bundled", async () => {
+    const calls = mockFetch({
+      "/extension-catalog": {
+        body: [
+          { name: "@jxsuite/parser", sections: [{ key: "content" }], source: "first-party" },
+          { name: "@jxsuite/feed", sections: [{ key: "feed" }], source: "first-party" },
+        ],
+      },
+      "/file?path=package.json": {
+        body: { content: JSON.stringify({ dependencies: { "@jxsuite/parser": "^1.7.0" } }) },
+      },
+    });
+    const p = createCloudPlatform(PROJECT);
+    const catalog = await p.listExtensionCatalog?.();
+
+    // Nothing resolves a module in a Worker, so enabling one of these is a project.json write
+    // Alone — which is what `bundled` means.
+    expect(catalog?.every((e) => e.bundled === true)).toBe(true);
+    // `installed` degrades to DECLARED, the only fact this adapter has.
+    expect(catalog?.find((e) => e.name === "@jxsuite/parser")?.installed).toBe(true);
+    expect(catalog?.find((e) => e.name === "@jxsuite/feed")?.installed).toBe(false);
+    expect(calls.some((c) => c.url === `${BASE}/extension-catalog`)).toBe(true);
+  });
+
+  test("the catalogue degrades to nothing rather than to the shipped list", async () => {
+    /*
+     * The whole contract. A session whose gateway predates the route must offer NOTHING: offering
+     * five extensions three of which the Worker cannot load would put a toggle in front of the
+     * reader that silently does not work.
+     */
+    mockFetch({ "/extension-catalog": { status: 404, body: { error: "no such route" } } });
+    expect(await createCloudPlatform(PROJECT).listExtensionCatalog?.()).toEqual([]);
+    expect(await createCloudPlatform(null).listExtensionCatalog?.()).toEqual([]);
+  });
+
   /* The cloud composes the entry documents server-side from bundled artifacts (it has no
      node_modules and no filesystem), so the studio just registers what it is handed. Before this
      member existed the cloud always fell back to the core schemas, and extension sections got no

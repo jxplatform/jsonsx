@@ -162,6 +162,78 @@ describe("ai-system-prompt — state-aware modes", () => {
 });
 
 describe("ai-system-prompt — tool-table/gating consistency", () => {
+  test("the prompt names the extensions the project has enabled", () => {
+    // BuildProjectSummary has always received `extensions` and dropped it, so a model working in a
+    // Parser project was never told parser was on.
+    const prompt = buildSystemPrompt({
+      projectConfig: { extensions: ["@jxsuite/parser"], name: "Site" },
+      projectRoot: "/site",
+    });
+    expect(prompt).toContain("Extensions enabled: @jxsuite/parser");
+  });
+
+  test("the catalogue lists each entry with what it contributes, marking the enabled ones", () => {
+    const prompt = buildSystemPrompt({
+      extensionCatalog: [
+        {
+          description: "File-based content collections",
+          name: "@jxsuite/parser",
+          sections: ["content"],
+          title: "Content & Markdown",
+        },
+        { name: "@jxsuite/feed", sections: ["feed"], title: "Feeds" },
+      ],
+      projectConfig: { extensions: ["@jxsuite/parser"], name: "Site" },
+      projectRoot: "/site",
+    });
+    expect(prompt).toContain("@jxsuite/parser — Content & Markdown.");
+    expect(prompt).toContain("Contributes: content.");
+    expect(prompt).toContain("[enabled]");
+    // The one that is NOT enabled must not be marked.
+    expect(prompt).toContain("@jxsuite/feed — Feeds. Contributes: feed.");
+    expect(prompt.split("@jxsuite/feed")[1]?.split("\n")[0]).not.toContain("[enabled]");
+  });
+
+  test("the guidance names capabilities, and only when there is a catalogue", () => {
+    const withCatalog = buildSystemPrompt({
+      extensionCatalog: [{ name: "@jxsuite/parser", sections: ["content"] }],
+      projectConfig: { name: "Site" },
+      projectRoot: "/site",
+    });
+    expect(withCatalog).toContain("schema error");
+    expect(withCatalog).toContain("fails the build");
+    // Capabilities, never packages: the mapping is the entry's own description.
+    expect(withCatalog).toContain("a blog or any folder of Markdown");
+
+    const without = buildSystemPrompt({ projectConfig: { name: "Site" }, projectRoot: "/site" });
+    expect(without).not.toContain("Extensions available.");
+  });
+
+  test("a long catalogue is capped and says how much it dropped", () => {
+    const many = Array.from({ length: 30 }, (_, i) => ({
+      name: `@acme/ext-${i}`,
+      sections: [`s${i}`],
+    }));
+    const prompt = buildSystemPrompt({
+      extensionCatalog: many,
+      projectConfig: { name: "Site" },
+      projectRoot: "/site",
+    });
+    expect(prompt).toContain("@acme/ext-19");
+    expect(prompt).not.toContain("@acme/ext-20");
+    expect(prompt).toContain("and 10 more");
+  });
+
+  test("neither block appears without a project", () => {
+    const prompt = buildSystemPrompt({
+      extensionCatalog: [{ name: "@jxsuite/parser", sections: ["content"] }],
+      hasProject: false,
+      projectConfig: { extensions: ["@jxsuite/parser"], name: "Site" },
+    });
+    expect(prompt).not.toContain("Extensions available.");
+    expect(prompt).not.toContain("Extensions enabled:");
+  });
+
   test("AI_TOOL_TIERS names exactly match the registered tools", async () => {
     const { AI_TOOL_TIERS } = await import("../src/services/ai-system-prompt");
     const { createToolRegistry } = await import("@jxsuite/ai");
@@ -169,9 +241,13 @@ describe("ai-system-prompt — tool-table/gating consistency", () => {
     const { registerProjectTools } = await import("../src/services/ai-project-tools");
     const { registerAskTool } = await import("../src/services/ai-ask");
     const { registerImportTools } = await import("../src/services/ai-import-tools");
+    const { registerExtensionTools } = await import("../src/services/ai-extension-tools");
 
     const registry = createToolRegistry();
     registerAskTool(registry);
+    // Takes no context: both verbs run the human's command records rather than reimplementing the
+    // Writes, so there is nothing to inject.
+    registerExtensionTools(registry);
     registerImportTools(registry, { getTab: () => null });
     registerAiTools(registry, { getTab: () => null, validate: async () => [] });
     registerProjectTools(registry, {

@@ -55,7 +55,14 @@ describe("STUDIO_ROUTES", () => {
       expect(core).toContain(name);
     }
     // Known-optional surfaces stay optional.
-    for (const name of ["sites", "starters", "cfProxy", "gitClone", "projectSchemas"] as const) {
+    for (const name of [
+      "sites",
+      "starters",
+      "cfProxy",
+      "gitClone",
+      "projectSchemas",
+      "extensionCatalog",
+    ] as const) {
       expect(optional).toContain(name);
     }
   });
@@ -63,6 +70,30 @@ describe("STUDIO_ROUTES", () => {
   test("the formats route documents the additive extensions payload", () => {
     expect(STUDIO_ROUTES.formats.summary).toContain("extensions");
     expect(STUDIO_ROUTES.formats.summary).toContain("listExtensions");
+  });
+
+  test("the extension-catalogue route is optional and says what its absence costs", () => {
+    expect(STUDIO_ROUTES.extensionCatalog.path).toBe("/__studio/extension-catalog");
+    expect(STUDIO_ROUTES.extensionCatalog.method).toBe("GET");
+    // Optional because a backend that cannot enumerate what it supports must be able to say so by
+    // Omission; Studio then falls back to a typed package name, which is what it does today.
+    expect(STUDIO_ROUTES.extensionCatalog.optional).toBe(true);
+    expect(STUDIO_ROUTES.extensionCatalog.summary).toContain("listExtensionCatalog");
+    expect(STUDIO_ROUTES.extensionCatalog.degradation).toContain("typed package name");
+  });
+
+  test("the catalogue is a separate route from formats, not a field on it", () => {
+    /*
+     * Load-bearing rather than stylistic. The formats route is scoped to the project's registry and
+     * fails when a declared extension does not resolve — which is exactly the state a reader is in
+     * when they need the catalogue to fix it. Riding on formats would make the catalogue
+     * unavailable precisely when it is the answer.
+     */
+    expect(STUDIO_ROUTES.extensionCatalog.path).not.toBe(STUDIO_ROUTES.formats.path);
+    // Each degrades on its own terms: losing formats costs non-JSON documents, losing the
+    // Catalogue costs only the offer. One route could not carry two different degradations.
+    expect(STUDIO_ROUTES.formats.degradation).toContain(".json");
+    expect(STUDIO_ROUTES.extensionCatalog.degradation).not.toContain(".json");
   });
 
   test("the project-schemas route serves pre-bundled entry documents", () => {

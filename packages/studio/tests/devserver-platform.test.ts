@@ -9,7 +9,7 @@ import { clearSeededSettings, seedSettings } from "./harness";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { createDevServerPlatform } from "../src/platforms/devserver";
 import { LOCATION_ID_FILE } from "@jxsuite/protocol/routes";
-import type { FsEvent, StudioPlatform } from "../src/types";
+import type { ExtensionCatalogEntry, FsEvent, StudioPlatform } from "../src/types";
 import { recordCollabSockets } from "./collab-socket-recorder";
 
 /** Minimal EventSource stub: records the latest instance and lets tests emit named events. */
@@ -1000,6 +1000,27 @@ describe("formats", () => {
     expect(await p.listExtensions()).toEqual([]);
     route("/__studio/formats", () => json({}, 500));
     expect(await p.listExtensions()).toEqual([]);
+  });
+
+  test("listExtensionCatalog reads its own route and degrades to []", async () => {
+    const catalog: ExtensionCatalogEntry[] = [
+      {
+        installed: false,
+        name: "@jxsuite/feed",
+        sections: [{ key: "feed", title: "Feeds" }],
+        source: "first-party",
+        title: "Feeds",
+      },
+    ];
+    route("/__studio/extension-catalog", (c) => {
+      expect(c.search.get("dir")).toBe(".");
+      return json(catalog);
+    });
+    const p = createDevServerPlatform();
+    expect(await p.listExtensionCatalog?.()).toEqual(catalog);
+    // A backend without the route costs the OFFER, not the section.
+    route("/__studio/extension-catalog", () => json({}, 404));
+    expect(await p.listExtensionCatalog?.()).toEqual([]);
   });
 
   test("fetchProjectSchemas returns the bundled pair and degrades to {}", async () => {

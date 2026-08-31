@@ -82,6 +82,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `desktop.md`
 
+- **0.4.9-draft** (2026-08-31) — The PAL member table names listExtensionCatalog, the extension catalogue a backend answers for itself (extensions.md §9.2).
 - **0.4.8-draft** (2026-08-28) — Distinguish the window's own icon (favicon-driven, studio.md 11.2) from the taskbar/dock icon (StartupWMClass) in section 9.3.
 - **0.4.7-draft** (2026-08-27) — The files route answers in stable path order, in every backend.
 - **0.4.6-draft** (2026-08-27) — The PAL is project-relative in both directions; an adapter translates a request space or a reply space, never both.
@@ -134,6 +135,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `extensions.md`
 
+- **0.4.3-draft** (2026-08-31) — The extension catalogue (§9.2): a host answers for what it can run, with bundled and installed probed rather than declared; §2 lists feed.
 - **0.4.2-draft** (2026-08-29) — A format may declare rewrite: replace authored values in its own source text, for a format that is read but never round-tripped.
 - **0.4.1-draft** (2026-08-27) — Studio conversion and creation are parse/serialize consumers; what parse returns is decided by documentKinds.
 - **0.4.0-draft** (2026-08-26) — §8.4: an emitter must not emit the same content twice — the search index carries page preamble plus sections, not the corpus twice.
@@ -248,6 +250,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `server.md`
 
+- **0.2.23** (2026-08-31) — The route-group summary names the extension catalogue the dev server serves (extensions.md §9.2).
 - **0.2.22** (2026-08-29) — A deployment base declared by the project's url is stripped from the request path at the edge, so the dev server answers both the bare and the based spelling.
 - **0.2.21** (2026-08-27) — A rename resets any co-editing room keyed to the old path, so a shutdown flush cannot recreate the moved file.
 - **0.2.20** (2026-08-27) — Directory listing and project-wide search answer in stable path order, in both implementations.

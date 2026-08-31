@@ -251,6 +251,73 @@ export interface ExtensionsInfo {
   }[];
 }
 
+// ─── Extension catalogue ─────────────────────────────────────────────────────
+/* The AVAILABLE half of the pair whose ENABLED half is ExtensionsInfo above. A backend answers it
+   for itself rather than serving a constant, because not every host can run every extension: a
+   Worker ships a fixed set of extension packages (specs/extensions.md §5.5), and one it does not
+   bundle is dropped from the registry before composition. Offering such an extension would promise
+   an action the host would refuse. */
+
+/** One `project.json` section an extension's classes claim (specs/extensions.md §9). */
+export interface ExtensionSectionInfo {
+  /** The `project.json` top-level property, e.g. "content". */
+  key: string;
+  /** The owning class's `project.title`, e.g. "Content Types". */
+  title?: string;
+}
+
+/** One extension a backend can offer a project, whether or not the project enables it. */
+export interface ExtensionCatalogEntry {
+  /** Package name: the identity, and the `bun add` argument. */
+  name: string;
+  /**
+   * The string that goes in `project.json` `extensions[]`. Usually `name`, but a linked or
+   * path-installed package enables under a different specifier — the same distinction
+   * {@link ExtensionsInfo} draws between `specifier` and `name`. Absent means they agree.
+   */
+  specifier?: string;
+  title?: string;
+  description?: string;
+  /**
+   * The sections enabling it makes legal.
+   *
+   * The one field a client cannot compute for itself: `listExtensions` describes only extensions
+   * already enabled, which is the state the reader is trying to leave. It is also what lets a
+   * surface warn before disabling something whose sections the project still uses.
+   */
+  sections: ExtensionSectionInfo[];
+  /** File extensions its format classes claim (".md", ".csv"), when it claims any. */
+  formats?: string[];
+  /** Other catalogue members it depends on — auth needs connector. */
+  requires?: string[];
+  /**
+   * THIS host resolves the package without a project install, so enabling it is a config write
+   * alone. Probed per host, never declared: what a desktop build stages and what a Worker bundles
+   * are different facts, and neither is knowable from the package list.
+   */
+  bundled?: boolean;
+  /**
+   * The PROJECT resolves it.
+   *
+   * Answered here rather than derived from `listPackages`, because that member does not mean one
+   * thing across backends: the dev server drops a declared dependency it cannot resolve, while the
+   * desktop reads the manifest and keeps it. A host with no module resolution at all degrades this
+   * to "declared in package.json" and says so in its own documentation.
+   */
+  installed?: boolean;
+  /** The shipped catalogue, or a package discovered in this project's own dependencies. */
+  source: "first-party" | "project";
+  /** Documentation deep link. */
+  docs?: string;
+  /**
+   * Why this entry cannot be enabled as it stands, as one sentence for a disabled control.
+   *
+   * Set rather than dropped: a package the reader installed on purpose vanishing with no
+   * explanation is worse than a row that says what is wrong with it.
+   */
+  problem?: string;
+}
+
 /**
  * Response of the project-schemas route: the project's generated entry documents
  * (project.schema.json / document.schema.json), PRE-BUNDLED into self-contained compound schemas so

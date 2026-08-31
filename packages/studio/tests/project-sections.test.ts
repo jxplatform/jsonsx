@@ -1,9 +1,10 @@
 /**
- * Tests for src/settings/project-sections.ts — the Extensions, Deploy and Raw JSON sections.
+ * Tests for src/settings/project-sections.ts — the Deploy and Raw JSON sections.
  *
- * All three write through `updateSiteConfig`, so what is pinned here is the same contract the rest
- * of the settings tree keeps: the value lands in the live config AND in `project.json`, and a
- * rejected write is shown rather than dropped.
+ * Both write through `updateSiteConfig`, so what is pinned here is the same contract the rest of
+ * the settings tree keeps: the value lands in the live config AND in `project.json`, and a rejected
+ * write is shown rather than dropped. Extensions moved to `extensions-section.test.ts` when it grew
+ * a catalogue and an install path.
  */
 import {
   flush,
@@ -18,7 +19,6 @@ import { activeTab } from "../src/workspace/workspace";
 import {
   BUILD_ADAPTERS,
   renderDeploySection,
-  renderExtensionsSection,
   renderRawJsonSection,
 } from "../src/settings/project-sections";
 import type { MockPlatformState } from "./harness";
@@ -59,89 +59,6 @@ const failing = {
 beforeEach(() => {
   resetWorkspaceWithTab();
 });
-
-// ─── Extensions ──────────────────────────────────────────────────────────────
-
-describe("the Extensions section", () => {
-  test("lists the declared packages", () => {
-    const { container } = setup(
-      { extensions: ["@jxsuite/parser", "@jxsuite/search"] },
-      renderExtensionsSection,
-    );
-    const names = [...container.querySelectorAll(".settings-row-name")].map((n) => n.textContent);
-    expect(names).toEqual(["@jxsuite/parser", "@jxsuite/search"]);
-  });
-
-  test("an empty array says so rather than rendering nothing", () => {
-    const { container } = setup({ extensions: [] }, renderExtensionsSection);
-    expect(container.querySelector(".settings-empty-state")?.textContent).toContain(
-      "No extensions",
-    );
-  });
-
-  test("a project with no extensions key is the empty case, not a crash", () => {
-    const { container } = setup({}, renderExtensionsSection);
-    expect(container.querySelector(".settings-empty-state")).not.toBeNull();
-  });
-
-  test("Add appends the package to the live config and to project.json", async () => {
-    const { container, state } = setup(
-      { extensions: ["@jxsuite/parser"] },
-      renderExtensionsSection,
-    );
-    const input = container.querySelector(".settings-extension-name")!;
-    (input as unknown as { value: string }).value = "  @acme/jx-guestbook  ";
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-    pointer([...container.querySelectorAll("sp-action-button")].at(-1)!, "click");
-    await flush(4);
-    expect(config().extensions).toEqual(["@jxsuite/parser", "@acme/jx-guestbook"]);
-    expect(written(state).extensions).toEqual(["@jxsuite/parser", "@acme/jx-guestbook"]);
-  });
-
-  test("Enter in the name field adds it too", async () => {
-    const { container } = setup({ extensions: [] }, renderExtensionsSection);
-    const input = container.querySelector(".settings-extension-name")!;
-    (input as unknown as { value: string }).value = "@acme/one";
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-    input.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Enter" }));
-    await flush(4);
-    expect(config().extensions).toEqual(["@acme/one"]);
-  });
-
-  test("a blank name, and one already listed, are both refused silently", async () => {
-    const { container, state } = setup({ extensions: ["@acme/one"] }, renderExtensionsSection);
-    const input = container.querySelector(".settings-extension-name")!;
-    (input as unknown as { value: string }).value = "   ";
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-    input.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Enter" }));
-    (input as unknown as { value: string }).value = "@acme/one";
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-    input.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Enter" }));
-    // A key that is not Enter does nothing at all.
-    input.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "a" }));
-    await flush(4);
-    expect(config().extensions).toEqual(["@acme/one"]);
-    expect(state.files.has("project.json")).toBe(false);
-  });
-
-  test("the delete button removes one package", async () => {
-    const { container } = setup(
-      { extensions: ["@jxsuite/parser", "@jxsuite/search"] },
-      renderExtensionsSection,
-    );
-    pointer(container.querySelector('[title="Remove @jxsuite/parser"]')!, "click");
-    await flush(4);
-    expect(config().extensions).toEqual(["@jxsuite/search"]);
-  });
-
-  test("a rejected write is shown in the section instead of being dropped", async () => {
-    const { container } = setup({ extensions: ["@acme/one"] }, renderExtensionsSection, failing);
-    pointer(container.querySelector('[title="Remove @acme/one"]')!, "click");
-    await flush(4);
-    expect(errorText(container)).toBe("Could not save project.json — EROFS: read-only file system");
-  });
-});
-
 // ─── Deploy ──────────────────────────────────────────────────────────────────
 
 describe("the Deploy section", () => {
