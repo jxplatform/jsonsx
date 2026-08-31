@@ -1,6 +1,13 @@
 // PostToolUse validator — runs after Edit/Write/MultiEdit and ALERTS on any
 // codebase-rule violation in the file that was just edited.
 //
+// Covers BOTH source families, because both have CI gates that only ever spoke
+// at push time:
+//   • .ts/.js/.json/.css — oxfmt --check, oxlint, oxlint --type-aware
+//   • .md               — oxfmt --check, `docs:prose`, `docs:markdown`
+// The markdown half exists because `docs:prose` bans the em dash outright and
+// nothing said so until CI did. See the prose section below.
+//
 // NON-DESTRUCTIVE by design: it only READS the file (oxfmt --check, oxlint with
 // no --fix). It never writes, never `git add`s, never reverts. Contrast with
 // nano-staged, which backs up the tree and restores it on task failure — correct
@@ -11,7 +18,7 @@
 // problem back into the session as feedback. The edit itself is left untouched.
 
 import { execFileSync } from "node:child_process";
-import { realpathSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import { relative as relativePath, resolve as resolvePath } from "node:path";
 
 const raw = await new Promise((resolve) => {
@@ -54,7 +61,7 @@ if (rel === "" || rel.startsWith("..") || resolvePath(root, rel) !== target) {
 }
 
 // Call the locally-installed binaries directly (fast; no bunx re-resolution).
-const bin = (name) => `${process.cwd()}/node_modules/.bin/${name}`;
+const bin = (name) => (name === "bun" ? "bun" : `${process.cwd()}/node_modules/.bin/${name}`);
 const check = (name, args) => {
   try {
     execFileSync(bin(name), args, { stdio: ["ignore", "pipe", "pipe"] });
@@ -84,6 +91,67 @@ if (/\.(ts|tsx)$/.test(file)) {
   const typecheck = check("oxlint", ["--type-aware", "-c", ".oxlintrc.typecheck.json", file]);
   if (typecheck) {
     problems.push(`• Type errors:\n${typecheck}`);
+  }
+}
+
+/*
+ * 4) Prose rules, for the Markdown that CI actually gates. (.md only.)
+ *
+ * `scripts/docs/check-prose.ts` bans the em dash and seven other patterns, and
+ * `prose.json` budgets nothing any more — so a single `—` typed into a docs page
+ * is a hard CI failure with no local signal until push. That is the gap this
+ * closes.
+ *
+ * The corpus is IMPORTED rather than re-described here. It is a specific set —
+ * docs/**.md minus generated pages, the shipped READMEs, and the marketing pages
+ * — and `specs/**` is deliberately NOT in it, so the specs keep their own voice.
+ * A regex approximating that here would drift and start flagging files the gate
+ * permits, which is worse than staying quiet.
+ *
+ * Named files put `check()` in per-page mode (`full = false`), which is what
+ * suppresses the whole-corpus staleness sweep over budgets and allow entries —
+ * the script's own docstring calls that "the per-page workflow".
+ */
+if (file.endsWith(".md")) {
+  try {
+    const { check: checkProse, corpusFiles } = await import(
+      `${process.cwd()}/scripts/docs/check-prose.ts`
+    );
+    if (corpusFiles().includes(rel)) {
+      const config = JSON.parse(readFileSync(`${process.cwd()}/scripts/docs/prose.json`, "utf8"));
+      const { violations } = checkProse(config, [rel], false);
+      if (violations.length > 0) {
+        problems.push(`• Prose rules (\`bun run docs:prose\`):\n${violations.join("\n")}`);
+      }
+    }
+  } catch (error) {
+    // A missing/renamed script must not wedge every markdown edit. Stay silent:
+    // CI still owns the verdict, and a hook that shouts about its own plumbing
+    // trains you to ignore it.
+    void error;
+  }
+}
+
+/*
+ * 5) The markdown formatter's own gate. (.md only.)
+ *
+ * Invoked as `bun run docs:markdown <file>` — the same script with the same
+ * flags CI runs — rather than by importing `normalizeMarkdown` and judging its
+ * result here. The flags are the reason: that gate is `--check --no-wrap` today
+ * because the one-line-per-paragraph rule is landed but DORMANT, and when the
+ * sweep lands and `--no-wrap` goes, a hook that had imported the escape half
+ * would silently stay narrower than the thing it claims to mirror. Going through
+ * the script also gets `isFormattable`'s exemptions (CHANGELOG, fixtures,
+ * vendor) for free.
+ *
+ * The escape half is worth the subprocess on its own: CLAUDE.md's Specs policy
+ * notes the escape and the UNRECOVERABLE link/bold flattening are the same
+ * event, so this firing is the prompt to check the file's links survived.
+ */
+if (file.endsWith(".md")) {
+  const markdown = check("bun", ["run", "docs:markdown", file]);
+  if (markdown) {
+    problems.push(`• Markdown format (\`bun run docs:markdown\`):\n${markdown}`);
   }
 }
 
