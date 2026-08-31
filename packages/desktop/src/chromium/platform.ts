@@ -6,6 +6,7 @@ import type {
   AppInfo,
   ComponentMeta,
   CreateProjectDestination,
+  ExtensionCatalogEntry,
   ExtensionsInfo,
   FsEvent,
   ImportProgressEvent,
@@ -596,6 +597,9 @@ export function createDesktopPlatform() {
     /** The extensions payload behind descriptor-contributed settings sections. */
     async listExtensions() {
       return request("listExtensions", {}) as Promise<ExtensionsInfo[]>;
+    },
+    async listExtensionCatalog() {
+      return request("listExtensionCatalog", {}) as Promise<ExtensionCatalogEntry[]>;
     },
 
     /** Pre-bundled per-project entry schemas for Monaco registration. */

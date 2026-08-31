@@ -25,6 +25,7 @@ import type {
   DataRowsResult,
   DataRowUpdate,
   DirEntry,
+  ExtensionCatalogEntry,
   ExtensionsInfo,
   FsEvent,
   ImportProgressEvent,
@@ -743,6 +744,20 @@ export function createDevServerPlatform() {
       }
       const body = await readJson<{ extensions?: ExtensionsInfo[] }>(res);
       return body.extensions ?? [];
+    },
+
+    /**
+     * What this backend can offer, enabled or not.
+     *
+     * Its own route rather than a field on `formats`: that one builds the project's registry and
+     * fails when a declared extension does not resolve, which is exactly when a reader needs the
+     * catalogue to repair it.
+     */
+    async listExtensionCatalog(): Promise<ExtensionCatalogEntry[]> {
+      const res = await fetch(
+        `/__studio/extension-catalog?dir=${encodeURIComponent(serverPath("."))}`,
+      );
+      return res.ok ? await readJson<ExtensionCatalogEntry[]>(res) : [];
     },
 
     /** Pre-bundled per-project entry schemas for Monaco registration (empty when unavailable). */

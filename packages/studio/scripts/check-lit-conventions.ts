@@ -284,7 +284,7 @@ export const SPECTRUM_DEBT: Record<string, number> = {
   "settings/head-editor.ts": 5,
   "settings/locales-section.ts": 3,
   "settings/preferences-dialog.ts": 1,
-  "settings/project-sections.ts": 2,
+  "settings/project-sections.ts": 1,
   /* Content-type field cards. Rebuilt wholesale on every edit today, so the reader has no window
      in which to diverge — which is why they are here rather than fixed. */
   "settings/schema-field-ui.ts": 9,

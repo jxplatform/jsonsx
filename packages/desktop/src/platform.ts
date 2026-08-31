@@ -538,6 +538,9 @@ export function createDesktopPlatform() {
     async listExtensions() {
       return rpc.request.listExtensions();
     },
+    async listExtensionCatalog() {
+      return rpc.request.listExtensionCatalog();
+    },
 
     /** Pre-bundled per-project entry schemas for Monaco registration. */
     async fetchProjectSchemas() {

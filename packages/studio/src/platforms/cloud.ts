@@ -25,6 +25,7 @@ import type {
   ComponentMeta,
   CreateProjectDestination,
   DirEntry,
+  ExtensionCatalogEntry,
   ExtensionsInfo,
   FsEvent,
   GitBranchesResult,
@@ -624,6 +625,45 @@ export function createCloudPlatform(project: CloudProject | null): StudioPlatfor
         }
         const body = (await res.json()) as { extensions?: ExtensionsInfo[] };
         return body.extensions ?? [];
+      } catch {
+        return [];
+      }
+    },
+
+    /**
+     * The extensions THIS WORKER bundles — not the shipped first-party catalogue.
+     *
+     * A Worker ships a fixed set of extension packages (specs/extensions.md §5.5), decided by the
+     * platform build rather than by this repository's `extensions/` tree, so the gateway is the
+     * only thing that knows. Everything it returns is therefore `bundled: true`: enabling one is a
+     * `project.json` write alone, and an extension the Worker does not bundle is dropped from the
+     * registry before composition — advertising it would promise a toggle that silently does
+     * nothing.
+     *
+     * `installed` here means DECLARED. Nothing resolves a module in a Worker: `addPackage` is a
+     * manifest edit and resolution happens later in Pages CI, so the manifest is the only fact this
+     * adapter has, and it is the one the reader is being asked about.
+     *
+     * Degrades to an EMPTY list, which is the whole contract: a session whose gateway predates this
+     * route must offer nothing rather than five extensions three of which it cannot load.
+     */
+    async listExtensionCatalog(): Promise<ExtensionCatalogEntry[]> {
+      try {
+        const res = await api("/extension-catalog");
+        if (!res.ok) {
+          return [];
+        }
+        const entries = (await res.json()) as ExtensionCatalogEntry[];
+        const pkg = await readPackageJson();
+        const declared = new Set([
+          ...Object.keys((pkg["dependencies"] ?? {}) as Record<string, string>),
+          ...Object.keys((pkg["devDependencies"] ?? {}) as Record<string, string>),
+        ]);
+        for (const entry of entries) {
+          entry.bundled = true;
+          entry.installed = declared.has(entry.name);
+        }
+        return entries;
       } catch {
         return [];
       }

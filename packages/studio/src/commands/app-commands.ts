@@ -46,6 +46,7 @@ import { signalsCommands } from "../panels/signals-panel";
 import { formulaEditorCommands } from "../panels/formula-workspace";
 import { styleCommands } from "../panels/style-panel";
 import { gridCommands } from "../grid/grid-open";
+import { extensionCommands } from "../settings/extension-commands";
 import { settingsCommands } from "../settings/settings-document";
 import { collabCommands } from "../collab/collab-commands";
 import { assistantCommands } from "../panels/ai-panel";
@@ -136,6 +137,9 @@ export function appCommandSet(): AnyCommand[] {
     ...formulaEditorCommands(),
     ...gridCommands(),
     ...settingsCommands(),
+    // The three verbs over project.json `extensions[]` — palette-only, and projected here so the
+    // Level check, the chrome budget and the generated keyboard sheet all see them.
+    ...extensionCommands(),
     ...collabCommands(),
     ...assistantCommands(),
     ...preferencesCommands(),

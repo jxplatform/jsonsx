@@ -5,6 +5,7 @@ code:
   - packages/studio/src/panels/chat-panel.ts
   - packages/studio/src/services/ai-ask.ts
   - packages/studio/src/services/ai-import-tools.ts
+  - packages/studio/src/services/ai-extension-tools.ts
   - packages/studio/src/services/ai-system-prompt.ts
   - packages/studio/src/services/ai-settings.ts
   - packages/studio/src/services/tool-executor.ts
@@ -26,6 +27,8 @@ The assistant is the **fourth tab of the Inspector**, beside Content, Style and 
 **With nothing open**, the assistant bootstraps. Describe a site and it creates a project for you: name, folders, starter pages, and a design quickstart (colors and fonts) derived from your description, then keeps building inside it. It will ask you where to put the project before creating anything. Tell it a folder (or, on the cloud, a GitHub account or organization). It can also clone a live site. Point it at a URL and it crawls the pages, extracts the styles and assets, finds the shared layout and the repeating components, and opens the project. Where Studio runs against your own machine it opens straight away, so the Files panel fills up in front of you while the crawl runs; where the project is a repository being built for you, it opens once the import is committed, because there is nothing to look at until then. It reports each phase as it goes, and stops to ask you about the judgement calls that are yours to make. The **[New Project](/docs/studio/projects/create)** dialog's **Agent** and **Import** tabs are these same two jobs as a form you fill in.
 
 **With a project open**, the assistant works across files. It can list and read any project file, find files by name, create new pages and components, and rewrite files whole. Anything it writes as a Jx document is validated before it touches disk. It can also open a page on the canvas to continue there.
+
+It also knows which extensions your project has turned on and which ones your setup can run, so a request that needs a capability Jx does not have on its own can be answered by turning one on rather than by hand-building it. Ask for a blog and it enables the content extension before writing your first collection. It installs the package and enables it in one step, the same way the **[Extensions](/docs/studio/projects/settings)** section does, and it tells you which it turned on. Installing is not undoable, and it will not uninstall anything without asking.
 
 **With a page on the canvas**, the assistant edits that page live: text, styles, element properties, adding, moving, and removing elements, and the page's state entries. This is the most precise mode, and the one you can watch and undo; see **[Document assistant](/docs/studio/ai/document-assistant)**.
 

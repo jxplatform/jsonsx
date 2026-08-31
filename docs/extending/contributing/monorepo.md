@@ -78,6 +78,15 @@ Three things make a schema go stale, and only one of them is forgetting to run t
 
 `bun run schema:verify` still blocks in CI. The lane cannot push to a fork, and a required check is what keeps a stale schema off `main` when it cannot.
 
+A third committed build output follows the same shape: `packages/extension-catalog/catalog.json`, the list of first-party extensions Studio offers, generated from every `extensions/*/jx-extension.json` and the class descriptors it names.
+
+```bash
+bun run catalog:verify  # is the catalogue what the extensions tree produces?
+bun run catalog:sync    # regenerate it
+```
+
+It is its own gate rather than part of `schema:verify`, which derives its file set from tracked `*schema.json` and would never see this artifact. It also refuses to build at all when a package's `exports` map omits `./jx-extension.json`, or when the first-party docs page does not document an extension: both are conditions that would ship a catalogue entry nobody could act on.
+
 ## The Electrobun SDK is a submodule, not a dependency
 
 `packages/desktop` is built on Electrobun, and Electrobun 2 publishes **no SDK to npm**. The `electrobun` package you get from `bun install` is a command bootstrap: every import specifier it exports, types included, resolves to a module whose whole body throws and tells you to run Hutch. The real SDK reaches a project only when Hutch downloads that release's core archive over the network and copies it into a gitignored `.hutch/devkit`.

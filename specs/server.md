@@ -2,9 +2,9 @@
 
 ## Development Server with Live Reload, Proxy Resolution, and Studio API
 
-**Version:** 0.2.22
+**Version:** 0.2.23
 **Status:** Implemented
-**Updated:** 2026-08-29
+**Updated:** 2026-08-31
 **License:** MIT
 
 ---
@@ -260,7 +260,7 @@ The canonical endpoint list is the `STUDIO_ROUTES` table in `@jxsuite/protocol` 
 - **Filesystem** — directory listing and project-wide search on one route (`files?dir=` / `files?glob=`), file CRUD, upload, rename (with refactor report, and a reset of any co-editing room keyed to the old path), locate. Both listing shapes answer in **stable path order**: `readdir` and glob scans report in filesystem order, which varies with a directory's write history, and Studio's collection grid inserts rows in listing order, so an unsorted listing reaches the user as a table that reshuffles itself between opens. Codepoint order, not locale collation, so two implementations agree.
 - **Realtime co-editing** — `GET /__studio/collab`: a WebSocket upgrade speaking the `@jxsuite/collab` wire envelope (one socket per project, documents multiplexed by path); a plain GET answers the capability probe. Implemented in `src/collab.ts`: rooms seed from the file on disk, persistence is explicit (flush on save, plus graceful shutdown), and genuinely external file changes bump the doc epoch and reset subscribers.
   A **rename is not an external change** — it comes from this API's own route — but it moves a file out from under a room keyed to its path, so the rename handler reports the OLD path through the same reset. Without it the room survives the move holding pre-rename content and the shutdown flush writes it back, recreating the file the rename deleted; a room enters the flush worklist on its seed transaction, so an unedited document is not exempt. A host mounting `handleStudioApi` itself supplies the hook (`onFileMoved`); `createDevServer` wires it.
-- **Documents / components / formats** — component discovery, CEM extraction, the project's format/extension registry, generated project schemas, format parse/serialize dispatch, plugin schemas, code services (§5)
+- **Documents / components / formats** — component discovery, CEM extraction, the project's format/extension registry, the extension catalogue this backend can offer (extensions.md §9.2), generated project schemas, format parse/serialize dispatch, plugin schemas, code services (§5)
 - **Packages** — dependency list/add/remove/install, an install-staleness check, the newest published version of
   every dependency (`packages/versions`, reported whether or not the pin is behind — comparing them is the
   client's job), bulk version updates
@@ -458,6 +458,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.2.23** (2026-08-31) — The route-group summary names the extension catalogue the dev server serves (extensions.md §9.2).
 - **0.2.22** (2026-08-29) — A deployment base declared by the project's url is stripped from the request path at the edge, so the dev server answers both the bare and the based spelling.
 - **0.2.21** (2026-08-27) — A rename resets any co-editing room keyed to the old path, so a shutdown flush cannot recreate the moved file.
 - **0.2.20** (2026-08-27) — Directory listing and project-wide search answer in stable path order, in both implementations.
@@ -494,4 +495,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/server` Specification v0.2.22_
+_`@jxsuite/server` Specification v0.2.23_

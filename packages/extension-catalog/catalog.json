@@ -1,0 +1,73 @@
+[
+  {
+    "description": "Better Auth sessions, sign-in flows, and table permissions served over /_jx/auth",
+    "docs": "/docs/extending/extensions/first-party#jxsuiteauth-sessions-and-permissions",
+    "name": "@jxsuite/auth",
+    "sections": [
+      {
+        "key": "auth",
+        "title": "Authentication"
+      }
+    ],
+    "title": "Authentication",
+    "requires": [
+      "@jxsuite/connector"
+    ]
+  },
+  {
+    "description": "Database connections and dynamic data tables served over /_jx/data",
+    "docs": "/docs/extending/extensions/first-party#jxsuiteconnector-connections-and-data-tables",
+    "name": "@jxsuite/connector",
+    "sections": [
+      {
+        "key": "connections",
+        "title": "Connections"
+      },
+      {
+        "key": "data",
+        "title": "Data Tables"
+      }
+    ],
+    "title": "Data & Connections"
+  },
+  {
+    "description": "Atom (RFC 4287) and JSON Feed generation from content collections, with RFC 5005 archives and automatic <link rel=\"alternate\"> discovery",
+    "docs": "/docs/extending/extensions/first-party#jxsuitefeed-syndication-feeds",
+    "name": "@jxsuite/feed",
+    "sections": [
+      {
+        "key": "feed",
+        "title": "Feeds"
+      }
+    ],
+    "title": "Feeds"
+  },
+  {
+    "description": "File-based content collections with Markdown and CSV formats",
+    "docs": "/docs/extending/extensions/first-party#jxsuiteparser-content-and-markdown",
+    "name": "@jxsuite/parser",
+    "sections": [
+      {
+        "key": "content",
+        "title": "Content Types"
+      }
+    ],
+    "title": "Content & Markdown",
+    "formats": [
+      ".csv",
+      ".md"
+    ]
+  },
+  {
+    "description": "Build-time search index emission from content collections (MiniSearch) with section-level deep links and a headless browser client",
+    "docs": "/docs/extending/extensions/first-party#jxsuitesearch-build-time-site-search",
+    "name": "@jxsuite/search",
+    "sections": [
+      {
+        "key": "search",
+        "title": "Site Search"
+      }
+    ],
+    "title": "Search"
+  }
+]

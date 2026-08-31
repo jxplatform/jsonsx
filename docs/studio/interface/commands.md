@@ -182,27 +182,30 @@ Everything Studio can do is a command, and every command is reachable by name: p
 
 ## Project
 
-| Command                 | Id                      | Shortcut | Level       | Requires                                    |
-| ----------------------- | ----------------------- | -------- | ----------- | ------------------------------------------- |
-| Add Language            | `i18n.addLocale`        | —        | project     | an open project                             |
-| Build Site              | `project.buildSite`     | —        | project     | a site project                              |
-| Edit Collection in Grid | `collection.editInGrid` | —        | project     | a project that declares content collections |
-| Edit Redirects          | `redirects.open`        | —        | project     | an open project                             |
-| Import Redirects…       | `redirects.import`      | —        | project     | an open project                             |
-| Library: Filter Files   | `library.setSearch`     | —        | project     | an open project                             |
-| Library: New Entry      | `library.newEntry`      | —        | project     | an open project                             |
-| Library: Rescan Files   | `library.refresh`       | —        | project     | an open project                             |
-| Library: Set Layout     | `library.setLayout`     | —        | project     | an open project                             |
-| Library: Show Category  | `library.setCategory`   | —        | project     | an open project                             |
-| Library: Show Language  | `library.setLocale`     | —        | project     | a project with more than one locale         |
-| New Project…            | `project.new`           | —        | application | —                                           |
-| Open Data Grid          | `data.openGrid`         | —        | project     | a platform that serves the data routes      |
-| Open Library            | `library.open`          | `⌘⇧E`    | project     | an open project                             |
-| Open Project Settings   | `settings.open`         | `⌘⇧,`    | project     | an open project                             |
-| Open Project Styles     | `styles.open`           | —        | project     | an open project                             |
-| Open Project…           | `project.open`          | `⌘O`     | project     | —                                           |
-| Open Recent…            | `project.openRecent`    | —        | project     | —                                           |
-| Validate Redirects      | `redirects.validate`    | —        | project     | an open project                             |
+| Command                      | Id                         | Shortcut | Level       | Requires                                    |
+| ---------------------------- | -------------------------- | -------- | ----------- | ------------------------------------------- |
+| Add Language                 | `i18n.addLocale`           | —        | project     | an open project                             |
+| Build Site                   | `project.buildSite`        | —        | project     | a site project                              |
+| Disable Extension            | `project.disableExtension` | —        | project     | an open project                             |
+| Edit Collection in Grid      | `collection.editInGrid`    | —        | project     | a project that declares content collections |
+| Edit Redirects               | `redirects.open`           | —        | project     | an open project                             |
+| Enable Extension             | `project.enableExtension`  | —        | project     | an open project                             |
+| Import Redirects…            | `redirects.import`         | —        | project     | an open project                             |
+| Library: Filter Files        | `library.setSearch`        | —        | project     | an open project                             |
+| Library: New Entry           | `library.newEntry`         | —        | project     | an open project                             |
+| Library: Rescan Files        | `library.refresh`          | —        | project     | an open project                             |
+| Library: Set Layout          | `library.setLayout`        | —        | project     | an open project                             |
+| Library: Show Category       | `library.setCategory`      | —        | project     | an open project                             |
+| Library: Show Language       | `library.setLocale`        | —        | project     | a project with more than one locale         |
+| New Project…                 | `project.new`              | —        | application | —                                           |
+| Open Data Grid               | `data.openGrid`            | —        | project     | a platform that serves the data routes      |
+| Open Library                 | `library.open`             | `⌘⇧E`    | project     | an open project                             |
+| Open Project Settings        | `settings.open`            | `⌘⇧,`    | project     | an open project                             |
+| Open Project Styles          | `styles.open`              | —        | project     | an open project                             |
+| Open Project…                | `project.open`             | `⌘O`     | project     | —                                           |
+| Open Recent…                 | `project.openRecent`       | —        | project     | —                                           |
+| Remove Package (destructive) | `packages.remove`          | —        | project     | an open project                             |
+| Validate Redirects           | `redirects.validate`       | —        | project     | an open project                             |
 
 ## Source Control
 

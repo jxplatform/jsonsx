@@ -66,6 +66,16 @@ export interface ExtraEdge {
 
 const EXTRA_EDGES: ExtraEdge[] = [
   {
+    patterns: [
+      "extensions/*/jx-extension.json",
+      "extensions/*/package.json",
+      "extensions/*/src/*.class.json",
+    ],
+    seeds: ["packages/extension-catalog"],
+    evidence: ["packages/extension-catalog/tests/catalog.test.ts"],
+    why: "packages/extension-catalog/catalog.json is GENERATED from every extension's manifest and the class descriptors it names, and no package.json edge records that: the catalogue names the extensions as data precisely so core keeps no dependency on them (specs/extensions.md §2). Its test holds the committed bytes to those files, so a manifest edit must retest it.",
+  },
+  {
     patterns: ["packages/runtime/src/runtime.ts"],
     seeds: ["packages/compiler"],
     evidence: ["packages/compiler/tests/shadow-dom.test.ts"],

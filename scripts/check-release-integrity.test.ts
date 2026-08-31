@@ -58,7 +58,10 @@ describe("readTargets", () => {
     const targets = await readTargets();
     expect(targets.length).toBeGreaterThan(0);
     for (const t of targets) {
-      expect(t.tag).toMatch(/^[a-z]+-v\d+\.\d+\.\d+/);
+      // A component may be hyphenated (`extension-catalog`), so this is not `[a-z]+`. What the
+      // Shape has to guarantee is the `-v<semver>` suffix release-please tags with, because that
+      // Is the string `gh release view` is handed.
+      expect(t.tag).toMatch(/^[a-z][a-z-]*-v\d+\.\d+\.\d+/);
     }
   });
 

@@ -37,10 +37,31 @@ interface BuildSystemPromptOptions {
   canImport?: boolean | undefined;
   /** Project-relative file paths for the inventory section (project modes; capped). */
   fileInventory?: string[] | undefined;
+  /**
+   * What this backend can run, enabled or not.
+   *
+   * Passed in rather than read here, because it comes from the PLATFORM and this builder is a pure
+   * function of its options. Without it the model can only discover an extension by being told
+   * about one, which is how a request for a blog gets a hand-built Markdown pipeline instead of
+   * `@jxsuite/parser`.
+   */
+  extensionCatalog?: readonly ExtensionCatalogSummary[] | undefined;
+}
+
+/** One extension this backend can run — the prompt's view of a catalogue entry. */
+export interface ExtensionCatalogSummary {
+  name: string;
+  title?: string | undefined;
+  description?: string | undefined;
+  /** `project.json` keys that become legal once it is enabled. */
+  sections?: readonly string[] | undefined;
 }
 
 /** Max file paths embedded in the prompt's inventory section. */
 const FILE_INVENTORY_CAP = 100;
+
+/** Max catalogue entries listed in the prompt. */
+const EXTENSION_CATALOG_CAP = 20;
 
 // ─── Tool tiers (single source of truth for prompt AND gating) ──────────────
 
@@ -134,6 +155,21 @@ export const AI_TOOL_TIERS: AiToolInfo[] = [
     name: "search_files",
     tier: "project",
     blurb: "search_files(query, extensions?) — find files by file NAME (not content).",
+  },
+  {
+    name: "enable_extension",
+    tier: "project",
+    blurb:
+      "enable_extension(package) — turn on a Jx extension: installs its npm package if missing and " +
+      'adds it to project.json "extensions". Call this BEFORE writing the project.json section it ' +
+      "owns; a section belonging to a disabled extension is a schema error.",
+  },
+  {
+    name: "disable_extension",
+    tier: "project",
+    blurb:
+      'disable_extension(package) — remove an extension from project.json "extensions". Its npm ' +
+      "package stays installed. Remove the sections it owns first.",
   },
   {
     name: "create_component",
@@ -645,6 +681,7 @@ export function buildSystemPrompt({
   treeEditable = true,
   canImport = true,
   fileInventory,
+  extensionCatalog,
 }: BuildSystemPromptOptions = {}) {
   const hasDocument = Boolean(document);
 
@@ -722,7 +759,12 @@ Be concise. Don't explain what Jx is unless asked. Just build.`;
 
   // 6. Project context
   if (hasProject && (projectConfig || components || projectRoot)) {
-    const projectSummary = buildProjectSummary({ projectConfig, components, projectRoot });
+    const projectSummary = buildProjectSummary({
+      components,
+      extensionCatalog,
+      projectConfig,
+      projectRoot,
+    });
     if (projectSummary) {
       sections.push(`## Project Context\n\n${projectSummary}`);
     }
@@ -841,6 +883,7 @@ function buildProjectSummary({
   projectConfig,
   components,
   projectRoot,
+  extensionCatalog,
 }: Omit<BuildSystemPromptOptions, "document">) {
   const lines: string[] = [];
 
@@ -850,6 +893,13 @@ function buildProjectSummary({
 
   if (projectRoot) {
     lines.push(`Root: ${projectRoot}`);
+  }
+
+  /* One line, closing a gap that was pure oversight: this function has always received the whole
+     `projectConfig`, `extensions` included, and dropped it on the floor. */
+  const enabled = projectConfig?.extensions ?? [];
+  if (enabled.length > 0) {
+    lines.push(`Extensions enabled: ${enabled.join(", ")}`);
   }
 
   // Available components — tag + purpose so the model can reuse them
@@ -895,6 +945,43 @@ function buildProjectSummary({
       if (groups.other.length > 0) {
         lines.push(fmt(groups.other));
       }
+    }
+  }
+
+  /*
+   * The catalogue, last, so the design-token block keeps its prominence. The guidance names
+   * CAPABILITIES rather than packages on purpose: the capability-to-package mapping is what each
+   * entry's own description is for, and hardcoding "@jxsuite/parser" here would be a second,
+   * staler copy of the backend's answer.
+   */
+  if (extensionCatalog && extensionCatalog.length > 0) {
+    const enabledSet = new Set(enabled);
+    lines.push(
+      `Extensions available. Turn one on with enable_extension BEFORE writing the project.json ` +
+        `section it owns: a section belonging to a disabled extension is a schema error, and an ` +
+        `"extensions" entry whose package is not installed fails the build. When a request needs ` +
+        `a capability the core does not have (a blog or any folder of Markdown, a search box, a ` +
+        `feed, sign-ins, a database table), look for it below rather than hand-building it.`,
+    );
+    for (const entry of extensionCatalog.slice(0, EXTENSION_CATALOG_CAP)) {
+      const parts = [`  ${entry.name}`];
+      if (entry.title) {
+        parts.push(` — ${entry.title}.`);
+      }
+      if (entry.description) {
+        parts.push(` ${entry.description}`);
+      }
+      if (entry.sections && entry.sections.length > 0) {
+        parts.push(` Contributes: ${entry.sections.join(", ")}.`);
+      }
+      if (enabledSet.has(entry.name)) {
+        parts.push(" [enabled]");
+      }
+      lines.push(parts.join(""));
+    }
+    if (extensionCatalog.length > EXTENSION_CATALOG_CAP) {
+      const more = extensionCatalog.length - EXTENSION_CATALOG_CAP;
+      lines.push(`  … and ${more} more (open_settings { section: "extensions" })`);
     }
   }
 

@@ -2,9 +2,9 @@
 
 ## Extension Packages, Schema Composition, and the Capability Contract
 
-**Version:** 0.4.2-draft
+**Version:** 0.4.3-draft
 **Status:** Partial
-**Updated:** 2026-08-29
+**Updated:** 2026-08-31
 **License:** MIT
 
 Supersedes v1 ("Format-Extension Classes and the Capability Contract"). The
@@ -70,6 +70,7 @@ extensions/
   connector/                 # @jxsuite/connector — database connections + dynamic data tables over /_jx/data
   auth/                      # @jxsuite/auth — Better Auth sessions and sign-in flows over /_jx/auth, plus the ctx.auth permission evaluator the data mount authorizes against
   search/                    # @jxsuite/search — build-time search index + headless browser query client
+  feed/                      # @jxsuite/feed — Atom and JSON Feed documents emitted from a content collection
 ```
 
 Rules:
@@ -844,6 +845,56 @@ defaults per type/enum/format. Enum choices may be dynamic via
 config (with `{@param}` segment substitution and the `$formats` virtual root),
 e.g. `#/$context/connections`, `#/$context/auth/roles`.
 
+### 9.2 The extension catalogue
+
+§3 says a project opts in with one line, and that line is only half the truth:
+the package must also be a dependency, or the registry cannot resolve it.
+Nothing in the model connects the two, so a host that lets a person type a
+package name into `extensions` produces a project that fails to build.
+
+The **catalogue** is what a host offers instead: the extensions it can run,
+whether or not this project enables them, each annotated with what the project
+would still have to do.
+
+| Key           | Type                         | Meaning                                                                   |
+| ------------- | ---------------------------- | ------------------------------------------------------------------------- |
+| `name`        | `string`                     | Package name; the `extensions` entry and the install argument.            |
+| `specifier`   | `string`                     | The `extensions` entry, when it differs from `name` (a linked package).   |
+| `title`       | `string`                     | Manifest `title`.                                                         |
+| `description` | `string`                     | Manifest `description`.                                                   |
+| `sections`    | `{ key, title? }[]`          | The sections enabling it makes legal, from its classes' `project` blocks. |
+| `formats`     | `string[]`                   | File extensions its format classes claim.                                 |
+| `requires`    | `string[]`                   | Other catalogue members it depends on.                                    |
+| `bundled`     | `boolean`                    | THIS host resolves it without a project install.                          |
+| `installed`   | `boolean`                    | The project resolves it.                                                  |
+| `source`      | `"first-party" \| "project"` | The shipped catalogue, or a package found in the project's dependencies.  |
+| `problem`     | `string`                     | Why it cannot be enabled as it stands.                                    |
+
+Three rules make it correct rather than merely convenient.
+
+**It is a host capability, not a constant.** Not every host can run every
+extension: a Worker ships a fixed set of packages (§5.5), and one it does not
+bundle is dropped from the registry before composition. A host that served a
+shipped list would offer an action it would then refuse, so a host answers for
+itself and one that cannot answer offers nothing.
+
+**`bundled` and `installed` are probed, never declared.** What a packaged
+application stages and what a Worker bundles are facts about a build, not about
+this repository, so they are answered by resolving `<name>/jx-extension.json`
+the way §6.1 says a host resolves it. A declared value would be a claim made
+somewhere that cannot see the answer.
+
+**Discovery follows the exports map, and `"jx"` is a hint.** A package is an
+extension to a host exactly when `<name>/jx-extension.json` resolves, because
+that is the only path §4 gives. A package declaring `"jx"` whose `exports` omit
+that subpath will fail to enable, so it is reported with a `problem` naming the
+missing entry rather than silently dropped: the difference between an omission
+and a message the reader can act on.
+
+**No version rides the catalogue.** It names packages, and the version is
+resolved when one is installed. A range recorded here would be read long after
+it was written, and can name a version that was never published.
+
 ---
 
 ## 10. Studio format hints
@@ -1180,6 +1231,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.4.3-draft** (2026-08-31) — The extension catalogue (§9.2): a host answers for what it can run, with bundled and installed probed rather than declared; §2 lists feed.
 - **0.4.2-draft** (2026-08-29) — A format may declare rewrite: replace authored values in its own source text, for a format that is read but never round-tripped.
 - **0.4.1-draft** (2026-08-27) — Studio conversion and creation are parse/serialize consumers; what parse returns is decided by documentKinds.
 - **0.4.0-draft** (2026-08-26) — §8.4: an emitter must not emit the same content twice — the search index carries page preamble plus sections, not the corpus twice.
@@ -1209,4 +1261,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_Jx Extensions Specification v0.4.2-draft_
+_Jx Extensions Specification v0.4.3-draft_
