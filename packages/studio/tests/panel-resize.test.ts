@@ -22,7 +22,7 @@ document.body.innerHTML = `
 `;
 
 const { mountShell, shell } = await import("../src/shell");
-await import("../src/ui/panel-resize");
+const { setupHandle } = await import("../src/ui/panel-resize");
 // The grid is projected by the shell's own effect, not by the resize module.
 mountShell();
 
@@ -140,5 +140,92 @@ describe("the assistant has no handle", () => {
     expect(widthOf("--panel-w-chat")).toBe("");
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}") as Record<string, unknown>;
     expect(Object.keys(saved)).not.toContain("chat");
+  });
+});
+
+// ─── The optional `snap` hook ─────────────────────────────────────────────────
+
+describe("ResizeTarget.snap", () => {
+  /** A standalone handle over a plain number, so the assertions are about `setupHandle` alone. */
+  function harness(snap?: (v: number, m: { altKey: boolean; shiftKey: boolean }) => number) {
+    const handle = document.createElement("div");
+    document.body.append(handle);
+    const state = { value: 100 };
+    setupHandle(handle, {
+      axis: "x",
+      max: () => 200,
+      min: () => 50,
+      read: () => state.value,
+      reset: () => 100,
+      scale: () => 1,
+      settle: () => {},
+      // Spread rather than `snap,` — `exactOptionalPropertyTypes` distinguishes an absent optional
+      // Property from one explicitly set to undefined, and the docks pass the former.
+      ...(snap ? { snap } : {}),
+      write: (v) => {
+        state.value = v;
+      },
+    });
+    return { handle, state };
+  }
+
+  function move(handle: HTMLElement, from: number, to: number, init: MouseEventInit = {}) {
+    handle.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, clientX: from }));
+    handle.dispatchEvent(new MouseEvent("pointermove", { bubbles: true, clientX: to, ...init }));
+    handle.dispatchEvent(new MouseEvent("pointerup", { bubbles: true, clientX: to }));
+  }
+
+  test("an absent snap is the identity — the three docks and the splitter are unaffected", () => {
+    const { handle, state } = harness();
+    move(handle, 0, 23);
+    expect(state.value).toBe(123);
+  });
+
+  test("snap adjusts the value that is written", () => {
+    const { handle, state } = harness((v) => Math.round(v / 10) * 10);
+    move(handle, 0, 23);
+    expect(state.value).toBe(120);
+  });
+
+  test("snap runs AFTER the clamp, so it sees a bounded value", () => {
+    /* The pointer asks for 400, which the max clamps to 200. A snap running BEFORE the clamp would
+       be handed 400 and could round it somewhere the bounds already excluded. */
+    const seen: number[] = [];
+    const { handle } = harness((v) => {
+      seen.push(v);
+      return v;
+    });
+    move(handle, 0, 300);
+    expect(seen).toEqual([200]);
+  });
+
+  test("a snap CANNOT push the value back out of bounds — setupHandle re-clamps after it", () => {
+    /* The Edit canvas's snap list is the project's declared breakpoints, which owe nothing to the
+       pane's width: a breakpoint 4px past the wall would otherwise be reachable, and the stored
+       width, the readout and the rendered column would then all disagree. */
+    const { handle, state } = harness(() => 5000);
+    move(handle, 0, 10);
+    expect(state.value).toBe(200);
+    const low = harness(() => -5000);
+    move(low.handle, 0, 10);
+    expect(low.state.value).toBe(50);
+  });
+
+  test("the modifier state reaches the snap, which is how Alt bypasses it", () => {
+    const { handle, state } = harness((v, m) => (m.altKey ? v : 150));
+    move(handle, 0, 23);
+    expect(state.value).toBe(150);
+    move(handle, 0, 11, { altKey: true });
+    expect(state.value).toBe(161);
+  });
+
+  test("shift reaches it too", () => {
+    const seen: { altKey: boolean; shiftKey: boolean }[] = [];
+    const { handle } = harness((v, m) => {
+      seen.push(m);
+      return v;
+    });
+    move(handle, 0, 10, { shiftKey: true });
+    expect(seen).toEqual([{ altKey: false, shiftKey: true }]);
   });
 });

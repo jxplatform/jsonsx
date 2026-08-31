@@ -1925,7 +1925,14 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       // Block action bar anchors to the panel the selection was actually made in, not panel 0.
       let panelMedia: string | null = null;
       const clicked = panelHostingCanvas(state.canvasEl)?.panel;
-      if (clicked && !clicked.mediaName?.startsWith("git-diff")) {
+      /* A panel with NO media name is not an artboard, and a click in it is not a statement about
+         the breakpoint. Edit draws exactly one full-width column (`canvasPanelTemplate(null, …)`,
+         so `mediaName` is `""`), which `panelMediaToActiveMedia` mapped to `null` — so every click
+         into the page silently reset the pane to Base, undoing the size switcher and, now, any
+         width the author had dragged the column to. Design's own panels are `"base"` or a real
+         breakpoint key, so requiring a name changes nothing there; the only case it drops is the
+         no-`$media` single panel, whose project has no breakpoint to be reset FROM. */
+      if (clicked?.mediaName && !clicked.mediaName.startsWith("git-diff")) {
         panelMedia = panelMediaToActiveMedia(clicked.mediaName);
         // The breakpoint belongs to the tab THIS host renders, resolved the same way every other
         // Doc-touching message in this switch resolves it. `updateUi` writes to `activeTab`, which

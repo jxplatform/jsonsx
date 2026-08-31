@@ -3,8 +3,10 @@ import { describe, expect, test } from "bun:test";
 import {
   activeBreakpointsForWidth,
   isSchemeQuery,
+  mediaForWidth,
   parseMediaEntries,
   schemeOfQuery,
+  snapEditWidth,
 } from "../src/utils/canvas-media";
 
 // ─── Scheme-query classification ────────────────────────────────────────────
@@ -217,5 +219,118 @@ describe("parseMediaEntries + activeBreakpointsForWidth integration", () => {
     expect(active.has("--lg")).toBe(true);
     expect(active.has("--md")).toBe(true);
     expect(active.has("--sm")).toBe(true);
+  });
+});
+
+// ─── mediaForWidth ────────────────────────────────────────────────────────────
+
+describe("mediaForWidth", () => {
+  // What `packages/create/templates.ts` ships as DESKTOP_FIRST_MEDIA, and what all 12 starters use.
+  const desktopFirst = [
+    { name: "--lg", query: "(max-width: 1024px)", type: "max", width: 1024 },
+    { name: "--md", query: "(max-width: 768px)", type: "max", width: 768 },
+    { name: "--sm", query: "(max-width: 640px)", type: "max", width: 640 },
+  ];
+  // MOBILE_FIRST_MEDIA, in the order parseMediaEntries sorts `min` entries into.
+  const mobileFirst = [
+    { name: "--sm", query: "(min-width: 640px)", type: "min", width: 640 },
+    { name: "--md", query: "(min-width: 768px)", type: "min", width: 768 },
+    { name: "--lg", query: "(min-width: 1024px)", type: "min", width: 1024 },
+  ];
+
+  test("desktop-first: a width wider than every max-width query is Base", () => {
+    expect(mediaForWidth(desktopFirst, 1200)).toBeNull();
+    expect(mediaForWidth(desktopFirst, 1025)).toBeNull();
+  });
+
+  test("desktop-first: picks the NARROWEST matching band, not merely a matching one", () => {
+    // 700 satisfies both --lg (≤1024) and --md (≤768); --md is the band being looked at.
+    expect(mediaForWidth(desktopFirst, 700)).toBe("--md");
+    expect(mediaForWidth(desktopFirst, 900)).toBe("--lg");
+    expect(mediaForWidth(desktopFirst, 500)).toBe("--sm");
+  });
+
+  test("desktop-first: an exact declared width lands on that breakpoint", () => {
+    expect(mediaForWidth(desktopFirst, 1024)).toBe("--lg");
+    expect(mediaForWidth(desktopFirst, 768)).toBe("--md");
+    expect(mediaForWidth(desktopFirst, 640)).toBe("--sm");
+  });
+
+  test("mobile-first: a width below every min-width query is Base", () => {
+    expect(mediaForWidth(mobileFirst, 375)).toBeNull();
+    expect(mediaForWidth(mobileFirst, 639)).toBeNull();
+  });
+
+  test("mobile-first: picks the WIDEST matching band", () => {
+    // 900 satisfies --sm (≥640) and --md (≥768); --md is the band.
+    expect(mediaForWidth(mobileFirst, 900)).toBe("--md");
+    expect(mediaForWidth(mobileFirst, 1400)).toBe("--lg");
+    expect(mediaForWidth(mobileFirst, 700)).toBe("--sm");
+  });
+
+  test("a mixed min/max project resolves by distance, not by the array's order", () => {
+    /* `parseMediaEntries` decides its whole sort from the FIRST entry's `type`, so a project mixing
+       the two shapes is ordered arbitrarily. Distance does not read the order at all: at 800 the
+       `min: 768` entry is 32 away and the `max: 1024` one is 224, so the tighter band wins whichever
+       way the array happens to be arranged. */
+    const mixed = [
+      { name: "--wide", query: "(max-width: 1024px)", type: "max", width: 1024 },
+      { name: "--tablet", query: "(min-width: 768px)", type: "min", width: 768 },
+    ];
+    expect(mediaForWidth(mixed, 800)).toBe("--tablet");
+    expect(mediaForWidth(mixed.toReversed(), 800)).toBe("--tablet");
+  });
+
+  test("a tie resolves to the narrower entry", () => {
+    // 800 is 32px from both; the tighter constraint is the one an author is checking.
+    const equidistant = [
+      { name: "--upper", query: "(max-width: 832px)", type: "max", width: 832 },
+      { name: "--lower", query: "(min-width: 768px)", type: "min", width: 768 },
+    ];
+    expect(mediaForWidth(equidistant, 800)).toBe("--lower");
+    expect(mediaForWidth(equidistant.toReversed(), 800)).toBe("--lower");
+  });
+
+  test("a document declaring no size breakpoints is always Base", () => {
+    expect(mediaForWidth([], 768)).toBeNull();
+  });
+});
+
+// ─── snapEditWidth ────────────────────────────────────────────────────────────
+
+describe("snapEditWidth", () => {
+  const targets = [640, 768, 1024, 1200];
+
+  test("pulls onto a target inside the tolerance", () => {
+    expect(snapEditWidth(765, targets)).toBe(768);
+    expect(snapEditWidth(774, targets)).toBe(768);
+    expect(snapEditWidth(1200, targets)).toBe(1200);
+  });
+
+  test("leaves a width outside the tolerance exactly where it is", () => {
+    expect(snapEditWidth(700, targets)).toBe(700);
+    expect(snapEditWidth(777, targets)).toBe(777);
+  });
+
+  test("the tolerance is inclusive at its edge", () => {
+    expect(snapEditWidth(776, targets)).toBe(768);
+    expect(snapEditWidth(760, targets)).toBe(768);
+  });
+
+  test("picks the nearest target when two are in range", () => {
+    expect(snapEditWidth(645, [640, 648])).toBe(648);
+    expect(snapEditWidth(643, [640, 648])).toBe(640);
+  });
+
+  test("an explicit tolerance is honoured, and zero snaps only on an exact hit", () => {
+    // 640 is 60px away and 768 is 68px; a wider tolerance still picks the NEAREST, not the first.
+    expect(snapEditWidth(700, targets, 80)).toBe(640);
+    expect(snapEditWidth(740, targets, 80)).toBe(768);
+    expect(snapEditWidth(769, targets, 0)).toBe(769);
+    expect(snapEditWidth(768, targets, 0)).toBe(768);
+  });
+
+  test("no targets is identity", () => {
+    expect(snapEditWidth(742, [])).toBe(742);
   });
 });

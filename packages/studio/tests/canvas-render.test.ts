@@ -37,6 +37,7 @@ import { toRaw } from "../src/reactivity";
 import { shell } from "../src/shell";
 import { setFormats } from "../src/format/format-host";
 import { setEditZoom } from "../src/canvas/canvas-utils";
+import { resetEditWidths, setEditWidth } from "../src/canvas/edit-width";
 import { MARKDOWN_FORMAT } from "./format-fixture";
 import { createCommandRegistry } from "../src/commands/registry";
 import { makeContext } from "../src/commands/context";
@@ -471,6 +472,8 @@ const rafTurn = () =>
 beforeEach(() => {
   setupShell();
   resetStudioState();
+  // A dragged width is per pane and outlives a tab close; tests must not inherit one.
+  resetEditWidths();
   closeAllTabs();
   setFormats([]);
   setMode("design");
@@ -634,6 +637,89 @@ describe("tab close/reopen lifecycle", () => {
     renderCanvas();
     await flush();
     expect(columnWidth()).toBe("900px");
+  });
+
+  test("the column carries a resize handle on each side, and only in Edit", async () => {
+    const handles = () => stageEl().querySelectorAll(".edit-width-handle").length;
+    openSyncedTab({
+      $media: { "--": "900px" },
+      children: [{ tagName: "p", textContent: "Hi" }],
+      tagName: "div",
+    } as never);
+
+    setMode("edit");
+    renderCanvas();
+    await flush();
+    expect(handles()).toBe(2);
+    const column = stageEl().querySelector(".content-edit-column")!;
+    expect(column.querySelector(".edit-width-handle.start")).not.toBeNull();
+    expect(column.querySelector(".edit-width-handle.end")).not.toBeNull();
+
+    // Design draws every breakpoint side by side, so a width gesture there would be a gesture over
+    // Which artboard, not over the page. It has pan and zoom instead.
+    setMode("design");
+    renderCanvas();
+    await flush();
+    expect(handles()).toBe(0);
+  });
+
+  test("a dragged width outranks the switcher's, and a mode change forgets it", async () => {
+    const tab = openSyncedTab({
+      $media: { "--": "900px", "--md": "(max-width: 768px)" },
+      children: [{ tagName: "p", textContent: "Hi" }],
+      tagName: "div",
+    } as never);
+    const columnWidth = () =>
+      (stageEl().querySelector(".content-edit-column") as HTMLElement).style.maxWidth;
+
+    setMode("edit");
+    renderCanvas();
+    await flush();
+    expect(columnWidth()).toBe("900px");
+
+    setEditWidth(PRIMARY_PANE, tab, 820);
+    renderCanvas();
+    await flush();
+    expect(columnWidth()).toBe("820px");
+
+    /* The width is an INSPECTION and dies with the mode; the breakpoint it landed on is what
+       survives, because `activeMedia` persists and the width does not. */
+    setMode("design");
+    renderCanvas();
+    await flush();
+    setMode("edit");
+    renderCanvas();
+    await flush();
+    expect(columnWidth()).toBe("900px");
+  });
+
+  test("a re-render repaints the column width over a drag's imperative one", async () => {
+    /*
+     * The template must not BIND the column width, because the drag writes it imperatively on every
+     * pointermove. lit dirty-checks its own committed value, so a pass computing the same width it
+     * last committed skips the write and the imperative value survives — which is how a page
+     * dragged to 330px made the next document 330px wide too. Caught in a browser, pinned here.
+     */
+    const tab = openSyncedTab({
+      $media: { "--": "900px" },
+      children: [{ tagName: "p", textContent: "Hi" }],
+      tagName: "div",
+    } as never);
+    const column = () => stageEl().querySelector(".content-edit-column") as HTMLElement;
+    setMode("edit");
+    renderCanvas();
+    await flush();
+    expect(column().style.maxWidth).toBe("900px");
+
+    /* A drag, which is a bare style write the template never learns about. The store is left
+       alone on purpose, so the NEXT pass computes the same 900px this one committed — which is the
+       condition a bound attribute cannot survive. */
+    column().style.maxWidth = "330px";
+
+    renderCanvas();
+    await flush();
+    expect(column().style.maxWidth).toBe("900px");
+    void tab;
   });
 
   test("a breakpoint the document no longer declares falls back to the base width", async () => {
@@ -1468,7 +1554,7 @@ describe("edit mode", () => {
 
     const column = stageEl().querySelector(".content-edit-column") as HTMLElement;
     expect(column).not.toBeNull();
-    expect(column.getAttribute("style")).toContain("max-width:320px");
+    expect(column.style.maxWidth).toBe("320px");
     expect(stageEl().querySelector(".content-edit-canvas")).not.toBeNull();
     expect(canvasPanels.length).toBe(1);
 
@@ -1492,7 +1578,7 @@ describe("edit mode", () => {
     renderCanvas();
     await flush();
     const column = stageEl().querySelector(".content-edit-column") as HTMLElement;
-    expect(column.getAttribute("style")).toContain("max-width:600px");
+    expect(column.style.maxWidth).toBe("600px");
   });
 
   test("re-applies the persisted edit zoom after a render", async () => {

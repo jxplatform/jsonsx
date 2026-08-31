@@ -20,7 +20,7 @@ Those seven names come from one list in Studio, which is why the pane's context 
 
 ## Edit
 
-Edit is for writing. The canvas becomes the page itself: click any text and type, press `/` for blocks, fill in the page's metadata alongside. It reads like the finished page because it is the finished page. The context bar's **Size** control works here too: pick a [breakpoint](/docs/studio/design/breakpoints) and the column narrows to it, so you can write against the width your readers will have. Full guide: **[Edit mode](/docs/studio/editing)**.
+Edit is for writing. The canvas becomes the page itself: click any text and type, press `/` for blocks, fill in the page's metadata alongside. It reads like the finished page because it is the finished page. The context bar's **Size** control works here too: pick a [breakpoint](/docs/studio/design/breakpoints) and the column narrows to it, so you can write against the width your readers will have. Or drag the handle on either side of the column, and the width becomes anything you like with the breakpoint following it. Full guide: **[Edit mode](/docs/studio/editing)**.
 
 ![Jx Studio editing markdown content inline with a WYSIWYG editor](../../images/mode-edit.png)
 

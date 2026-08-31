@@ -43,6 +43,19 @@ export interface ResizeTarget {
   scale: () => number;
   /** Persist. Called once on release and once on reset — never during the drag. */
   settle: () => void;
+  /**
+   * Pull the value onto a preferred one before it is written — magnetic snapping.
+   *
+   * Offered a value already inside `min`/`max`, and RE-CLAMPED afterwards, because a snap has no
+   * way to know the bounds: `snapEditWidth` returns any target within its tolerance, so a
+   * breakpoint declared 4px past the pane's own width would otherwise be reachable and the stored
+   * width, the readout and the rendered column would all disagree. Clamping on both sides means a
+   * target outside the range simply does not take.
+   *
+   * The modifier state is passed because a snap has to be escapable: the Edit canvas offers Alt as
+   * the bypass. Omitted by the docks and the pane splitter, which snap to nothing.
+   */
+  snap?: (value: number, modifiers: { altKey: boolean; shiftKey: boolean }) => number;
 }
 
 /**
@@ -79,6 +92,16 @@ const HANDLES: { selector: string; dock: DockId; axis: "x" | "y"; grow: 1 | -1 }
  * @param {"x" | "y"} axis — which coordinate the drag reads
  * @param {1 | -1} grow — the sign a positive move along `axis` contributes to the dock's size
  */
+/** Bound, snap, bound again — see {@link ResizeTarget.snap} for why the second one is not spare. */
+function resolveValue(target: ResizeTarget, wanted: number, e: PointerEvent): number {
+  const bound = (v: number) => Math.min(target.max(), Math.max(target.min(), v));
+  const bounded = bound(wanted);
+  if (!target.snap) {
+    return bounded;
+  }
+  return bound(target.snap(bounded, { altKey: e.altKey, shiftKey: e.shiftKey }));
+}
+
 export function setupHandle(handle: HTMLElement, target: ResizeTarget) {
   const { axis } = target;
   let drag: { start: number; startSize: number } | null = null;
@@ -101,12 +124,19 @@ export function setupHandle(handle: HTMLElement, target: ResizeTarget) {
       return;
     }
     const delta = (coord(e) - drag.start) * target.scale();
-    const wanted = drag.startSize + delta;
-    const floored = Math.max(target.min(), wanted);
-    target.write(Math.min(target.max(), floored));
+    target.write(resolveValue(target, drag.startSize + delta, e));
   });
 
-  handle.addEventListener("pointerup", (e) => {
+  /*
+   * Every way a drag can END, not just the happy one.
+   *
+   * `pointerup` was the only exit, so a capture lost any other way — the OS cancelling the pointer,
+   * a touch gesture being stolen, the handle's subtree being replaced under it — left `drag`
+   * non-null, `.dragging` on the element and, worst of all, `user-select: none` on the BODY, with
+   * no further event able to clear any of it. At the shell's edge that never bit; a handle sitting
+   * inside a canvas column over a cross-origin iframe is materially more exposed.
+   */
+  const end = (e: PointerEvent) => {
     if (!drag) {
       return;
     }
@@ -114,12 +144,15 @@ export function setupHandle(handle: HTMLElement, target: ResizeTarget) {
     try {
       handle.releasePointerCapture(e.pointerId);
     } catch {
-      /* Synthetic events */
+      /* Synthetic events, and a capture that was already lost. */
     }
     handle.classList.remove("dragging");
     document.body.style.userSelect = "";
     target.settle();
-  });
+  };
+  handle.addEventListener("pointerup", end);
+  handle.addEventListener("pointercancel", end);
+  handle.addEventListener("lostpointercapture", end);
 
   handle.addEventListener("dblclick", () => {
     target.write(target.reset());

@@ -118,6 +118,7 @@ const KNOWN_UNREACHABLE: Record<string, Record<string, string>> = {
       "fit itself; the distinction is real but has no reader while zoom-to-fit is still moving",
     resetFits: TEST_RESET,
   },
+  "canvas/edit-width.ts": { resetEditWidths: TEST_RESET },
   "canvas/iframe-channel.ts": {
     fakeChannelPair:
       "the deterministic in-memory channel pair every cross-frame suite drives postMessage " +
@@ -427,12 +428,6 @@ const KNOWN_UNREACHABLE: Record<string, Record<string, string>> = {
       "that is gone for good leaves an empty div behind",
   },
   "ui/value-source.ts": { resetCapsCache: TEST_RESET },
-  "utils/canvas-media.ts": {
-    activeBreakpointsForWidth:
-      "which named breakpoints a canvas width activates. The iframe answers this from its own " +
-      "`matchMedia` now, where it cannot disagree with the rendered document; this is the " +
-      "parent-side arithmetic that used to",
-  },
   "utils/geometry.ts": {
     elementsAtPoint:
       "the full front-to-back hit stack at a point. Every hit test the parent still runs wants " +

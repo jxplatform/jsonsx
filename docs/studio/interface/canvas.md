@@ -6,6 +6,7 @@ spec:
   - studio.md#6.7
   - studio-ui-guidelines.md#8.1
 code:
+  - packages/studio/src/canvas/edit-width-drag.ts
   - packages/studio/src/editor/shortcuts.ts
   - packages/studio/src/panels/block-action-bar.ts
   - packages/studio/src/editor/context-menu.ts
@@ -20,6 +21,10 @@ code:
 The canvas is the center of the workspace, where your page renders live. It is the real thing, not a mock-up, and you work on it directly: click to put the cursor in the text and select the block, drag the block bar's handle to rearrange. How it behaves depends on the current [mode](/docs/studio/interface/modes); this page covers the interactions shared by the visual modes.
 
 ![Jx Studio design canvas showing one component across four responsive breakpoints with a style inspector](../../images/mode-design.png)
+
+## Resizing the page
+
+In **Edit** the canvas is a single centred column with a drag handle on each side. Dragging either one resizes the page symmetrically, and the [breakpoint](/docs/studio/design/breakpoints) follows the width. Design has no handles, because it already draws every breakpoint side by side.
 
 ## Pan and zoom
 
