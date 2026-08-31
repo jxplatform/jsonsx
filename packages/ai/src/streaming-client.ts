@@ -5,7 +5,7 @@
  * and concrete implementations for OpenAI and Anthropic. Designed upfront so switching
  * providers is a new implementation, not a refactor.
  *
- * The union and its six members are exported because they are the contract a third-party Studio
+ * The union and its seven members are exported because they are the contract a third-party Studio
  * backend implements for the `ai/chat` route, not an internal detail — see the docs page below.
  *
  * @license MIT
@@ -17,6 +17,7 @@ import type { ProblemDetails } from "@jxsuite/protocol";
 
 export type StreamEvent =
   | StreamDeltaEvent
+  | StreamReasoningEvent
   | StreamToolCallStartEvent
   | StreamToolCallDeltaEvent
   | StreamToolCallEndEvent
@@ -25,6 +26,21 @@ export type StreamEvent =
 
 export interface StreamDeltaEvent {
   type: "delta";
+  content: string;
+}
+
+/**
+ * A chain-of-thought fragment from a thinking model — OpenAI-compatible providers stream it as
+ * `reasoning_content` (DeepSeek, Volcengine) or `reasoning` (OpenRouter) beside `content`.
+ *
+ * It is a SEPARATE event rather than a `delta` because it is not part of the answer and must not be
+ * rendered as one — but it is part of the turn, and DeepSeek's thinking mode requires every prior
+ * turn's reasoning back on any request carrying `tools`. A client that drops these frames replays a
+ * history the provider rejects with 400 `The reasoning_content in the thinking mode must be passed
+ * back to the API`, so a backend implementing this route MUST forward them.
+ */
+export interface StreamReasoningEvent {
+  type: "reasoning";
   content: string;
 }
 
@@ -105,7 +121,14 @@ interface OpenAIToolCallDelta {
 interface OpenAIStreamChunk {
   choices?: {
     index?: number;
-    delta?: { content?: string; tool_calls?: OpenAIToolCallDelta[] };
+    delta?: {
+      content?: string;
+      /** Thinking models' chain-of-thought: DeepSeek/Volcengine spell it this way… */
+      reasoning_content?: string;
+      /** …and OpenRouter this way. Both carry the same thing. */
+      reasoning?: string;
+      tool_calls?: OpenAIToolCallDelta[];
+    };
     finish_reason?: string | null;
   }[];
 }
@@ -133,6 +156,7 @@ interface ErrorResponseBody {
  */
 export const STREAM_EVENT_TYPES = {
   DELTA: "delta",
+  REASONING: "reasoning",
   TOOL_CALL_START: "tool_call_start",
   TOOL_CALL_DELTA: "tool_call_delta",
   TOOL_CALL_END: "tool_call_end",
@@ -320,6 +344,12 @@ export function createOpenAIStreamingClient({
           // Text content
           if (delta.content) {
             yield { type: "delta", content: delta.content };
+          }
+
+          // Chain-of-thought, under either of the two names providers give it.
+          const reasoning = delta.reasoning_content ?? delta.reasoning;
+          if (typeof reasoning === "string" && reasoning) {
+            yield { type: "reasoning", content: reasoning };
           }
 
           // Tool calls

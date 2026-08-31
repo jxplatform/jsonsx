@@ -2,9 +2,9 @@
 
 ## AI Assistant for Jx Studio
 
-**Version:** 0.1.11-draft
+**Version:** 0.1.12-draft
 **Status:** Partial
-**Updated:** 2026-08-30
+**Updated:** 2026-08-31
 **License:** MIT
 
 ---
@@ -91,6 +91,34 @@ recover them later:
 - A client **SHOULD** prefer a reported `contextWindow` over any local heuristic. A model-id prefix
   table only recognizes the families its author knew, so a brokered catalogue of unfamiliar ids is
   budgeted at the default — an amply-sized model trimmed to a fraction of its real window.
+
+### 2.2 The request is the history the provider will accept
+
+> **Status: Implemented.** `toMessagesArray` in `packages/ai/src/chat-state.ts`; the `reasoning`
+> frame in `packages/ai/src/streaming-client.ts` and `packages/server/src/ai-api.ts`.
+
+The conversation Studio displays and the array it puts on the wire are not the same object, and two
+of the differences are contractual rather than cosmetic:
+
+- **An assistant turn carrying neither text nor tool calls MUST NOT be sent.** The store appends an
+  empty assistant message the moment a turn begins, so that message is the answer being generated
+  _by the request that would carry it_ — a turn which has not happened yet. Most providers read the
+  trailing `{"role":"assistant","content":""}` as an empty prefill and ignore it; DeepSeek's thinking
+  mode instead answers `400 The reasoning_content in the thinking mode must be passed back to the
+API`, because a thinking-mode assistant turn owes it one. That failed the FIRST request of every
+  conversation, before any history existed to be malformed.
+- **A turn's reasoning MUST be replayed when the provider streamed one.** Thinking models emit a
+  chain-of-thought beside the answer (`reasoning_content`, or `reasoning` at OpenRouter). DeepSeek
+  requires the reasoning of all previous turns back on any request carrying `tools` — which is every
+  request the agent loop makes, including turns that called no tool — and ignores the field on
+  requests carrying none. So a client MUST keep it on the message, persist it with the session, and
+  echo it back; a provider that never sends one is never sent one, which is what makes replaying it
+  safe everywhere.
+
+Both halves are one rule: **what the provider streamed is what it is owed back, and nothing else.** A
+normalizing proxy is therefore not free to drop the frames it cannot render — `reasoning` is a member
+of the `StreamEvent` union precisely so a backend that only understands `delta` cannot silently
+strip the turn's other half and leave the next round unanswerable.
 
 > **Status: Partial.** The **Anthropic provider is not yet implemented** (planned). Its client
 > **yields** a single `error` event carrying `code: "NOT_IMPLEMENTED"` and a "use OpenAI" message —
@@ -251,6 +279,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.1.12-draft** (2026-08-31) — Provider contract §2.2: never send an empty assistant turn, and replay a thinking model's reasoning_content.
 - **0.1.11-draft** (2026-08-30) — 2.1: a lapsed grant is not a completed connect; cf_account_required; probe invalidation; per-model toolSupport and contextWindow.
 - **0.1.10-draft** (2026-08-26) — import_site adopts the project when it exists, not when the run ends; the run's log outlives it (§3.5).
 - **0.1.9-draft** (2026-08-26) — ask_user suspends a turn on the author (§3.4); import_site bootstraps a project from a live site (§3.5).
@@ -266,4 +295,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_Jx `@jxsuite/ai` Specification v0.1.11-draft — a stub, subject to expansion._
+_Jx `@jxsuite/ai` Specification v0.1.12-draft — a stub, subject to expansion._

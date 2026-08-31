@@ -28,6 +28,7 @@ export type {
   StreamDoneEvent,
   StreamErrorEvent,
   StreamEvent,
+  StreamReasoningEvent,
   StreamingClient,
   StreamToolCallDeltaEvent,
   StreamToolCallEndEvent,

@@ -1,7 +1,7 @@
 # @jxsuite/ai
 
 The provider-agnostic substrate Jx Studio's assistant is built on: a streaming LLM client
-abstraction that normalizes provider SSE into six event shapes, a tool registry that speaks OpenAI
+abstraction that normalizes provider SSE into seven event shapes, a tool registry that speaks OpenAI
 function-calling, and a reactive chat store. It has no Jx-domain dependencies (just a type-only
 import of `ProblemDetails` from `@jxsuite/protocol`, plus `@vue/reactivity`), and its only platform
 APIs are `fetch`, `TextDecoder` and `AbortSignal`, so the same modules run in the browser and in
@@ -13,7 +13,7 @@ documentation for the Studio feature lives at [`docs/studio/ai.md`](../../docs/s
 | Entrypoint                     | Exports                                                                                                                                     |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | `@jxsuite/ai`                  | Barrel: the three factories, `createToolDefinition`, `createToolRegistry`, `createChatState`, `STREAM_EVENT_TYPES`, and the streaming types |
-| `@jxsuite/ai/streaming-client` | `StreamingClient`, `StreamEvent` and its six members, the three factories and their option types, `STREAM_EVENT_TYPES`                      |
+| `@jxsuite/ai/streaming-client` | `StreamingClient`, `StreamEvent` and its seven members, the three factories and their option types, `STREAM_EVENT_TYPES`                    |
 | `@jxsuite/ai/tools`            | `createToolDefinition`, `createToolRegistry`, `toolSuccess`, `toolError`, and their types                                                   |
 | `@jxsuite/ai/chat-state`       | `createChatState`, `ChatStore`, `Message`, `ToolCallRecord`, `ChatState`, `MessageRole`                                                     |
 

@@ -38,7 +38,14 @@ interface ToolCallDelta {
 interface OpenAIStreamChunk {
   choices?: {
     index?: number;
-    delta?: { content?: string; tool_calls?: ToolCallDelta[] };
+    delta?: {
+      content?: string;
+      /** Thinking models' chain-of-thought: DeepSeek/Volcengine spell it this way… */
+      reasoning_content?: string;
+      /** …and OpenRouter this way. Both carry the same thing. */
+      reasoning?: string;
+      tool_calls?: ToolCallDelta[];
+    };
     finish_reason?: string | null;
   }[];
 }
@@ -348,6 +355,15 @@ export async function handleChat(req: Request): Promise<Response> {
             // Text content
             if (delta.content) {
               writeSSE(controller, { type: "delta", content: delta.content });
+            }
+
+            /* Chain-of-thought, under either of the two names providers give it. Forwarded rather
+               than dropped: DeepSeek's thinking mode requires every prior turn's reasoning back on
+               any request carrying `tools`, so a proxy that swallows these frames makes the NEXT
+               round a 400 the client cannot repair. */
+            const reasoning = delta.reasoning_content ?? delta.reasoning;
+            if (typeof reasoning === "string" && reasoning) {
+              writeSSE(controller, { type: "reasoning", content: reasoning });
             }
 
             // Tool calls
