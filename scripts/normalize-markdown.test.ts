@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { normalizeMarkdown } from "./normalize-markdown.ts";
+import { formatMarkdown, isFormattable, normalizeMarkdown } from "./normalize-markdown.ts";
 
 /**
  * The rules are narrow on purpose: an escape is removed only where Markdown never needed one. Most
@@ -118,5 +118,65 @@ describe("idempotence and fidelity", () => {
   test("cannot recover a flattened link or bold — that is not its job", () => {
     const flattened = "| RFC 6901 | Borrowed | §7 |";
     expect(norm(flattened)).toBe(flattened);
+  });
+});
+
+describe("formatMarkdown runs both rules", () => {
+  test("unescapes and unwraps in one pass", () => {
+    const result = formatMarkdown([String.raw`## 2\. Two`, "", "One two", "three.", ""].join("\n"));
+    expect(result.text).toBe("## 2. Two\n\nOne two three.\n");
+    expect(result.escaped).toEqual([1]);
+    expect(result.wrapped).toEqual([4]);
+  });
+
+  /*
+   * The escape pass runs first because `## 18\.` is a heading the unwrapper has to recognise as
+   * one. Left escaped, the line is an ordinary paragraph and the text under it folds into it.
+   */
+  test("an escaped heading is a heading by the time the unwrapper sees it", () => {
+    const source = [String.raw`## 18\. Standards`, "Body text.", ""].join("\n");
+    expect(formatMarkdown(source).text).toBe("## 18. Standards\nBody text.\n");
+  });
+
+  /*
+   * `--no-wrap`. The repo-wide sweep has not landed, so the gate and the pre-commit hook pass this
+   * and rewrite nobody's line breaks. Deleting it from the two package.json strings is what turns
+   * the rule on.
+   */
+  test("wrap: false leaves line breaks exactly as they were", () => {
+    const source = [String.raw`## 2\. Two`, "", "One two", "three.", ""].join("\n");
+    const result = formatMarkdown(source, { wrap: false });
+    expect(result.text).toBe("## 2. Two\n\nOne two\nthree.\n");
+    expect(result.escaped).toEqual([1]);
+    expect(result.wrapped).toEqual([]);
+  });
+});
+
+describe("isFormattable", () => {
+  // Bytes that belong to something other than a formatter: a bot, a fixture, a pinned submodule.
+  const skipped = [
+    "CHANGELOG.md",
+    "packages/formulas/CHANGELOG.md",
+    "scripts/docs/_fixtures/cadenced.md",
+    "packages/server/tests/_studio_fixtures/md-components/plain.md",
+    "packages/desktop/tests/_fixtures_content/content/docs/advanced.md",
+    "vendor/electrobun/package/README.md",
+  ];
+  for (const path of skipped) {
+    test(`skips ${path}`, () => {
+      expect(isFormattable(path)).toBe(false);
+    });
+  }
+
+  const swept = ["README.md", "docs/README.md", "specs/spec.md", "packages/site/README.md"];
+  for (const path of swept) {
+    test(`sweeps ${path}`, () => {
+      expect(isFormattable(path)).toBe(true);
+    });
+  }
+
+  // A file merely NAMED changelog is prose, not release-please's output.
+  test("only a real CHANGELOG.md is skipped", () => {
+    expect(isFormattable("docs/extending/reference/spec-changelog.md")).toBe(true);
   });
 });

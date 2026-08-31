@@ -6,6 +6,7 @@ We're crafting a comprehensive web-based application suite that aims to encompas
 - Reference the general and package-specific specs (./specs) prior to planning and implementing features, update specs to reflect user requests prior to adding new features. Edit spec sections in place — never renumber headings (user docs anchor them).
 - Every substantive spec edit is a release: run `bun run spec:bump <spec.md> <major|minor|patch> -m "<what changed>"` to advance the version, restamp `**Updated:**`, and add a `## Changelog` entry, then `bun run docs:generate`. CI blocks a changed spec body that wasn't released (`bun run docs:spec-release`). See ./specs/README.md.
 - User documentation (./docs, published at jxsuite.com/docs) must track shipped behavior: behavior-changing work updates the affected docs pages in the same change set. Run `bun run docs:sync` to map your diff to affected pages/specs, and `bun run docs:check` before finishing. Plans must include a "Specs & docs" step.
+- Do not wrap Markdown source: write one paragraph per line, and make a line break that carries meaning an explicit `\` hard break. `bun run format:md` fixes a file. Much of the tree is still wrapped from before the rule and the sweep is pending, so match the rule in what you write rather than reflowing what you touch. See ./CLAUDE.md.
 - Use Chrome MCP to test new UI/UX changes prior to finishing the task.
 
 ## Studio UI Rules
