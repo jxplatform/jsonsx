@@ -11,7 +11,7 @@
         "@commitlint/cli": "^21.2.2",
         "@commitlint/config-conventional": "^21.2.2",
         "@commitlint/types": "^21.2.0",
-        "@ttsc/graph": "^0.28.3",
+        "@ttsc/graph": "^0.28.4",
         "@types/bun": "1.4.0",
         "bun-types": "^1.4.0",
         "bun2nix": "^2.1.2",
@@ -26,7 +26,7 @@
         "release-please": "^17.11.2",
         "ts-migrate": "^0.1.35",
         "ts-migrate-plugins": "^0.1.35",
-        "ttsc": "^0.28.3",
+        "ttsc": "^0.28.4",
         "typescript": "^7.0.2",
       },
     },
@@ -44,7 +44,7 @@
     },
     "extensions/auth": {
       "name": "@jxsuite/auth",
-      "version": "0.5.6",
+      "version": "0.5.7",
       "dependencies": {
         "@jxsuite/connector": "workspace:^",
         "@jxsuite/schema": "workspace:^",
@@ -58,7 +58,7 @@
     },
     "extensions/connector": {
       "name": "@jxsuite/connector",
-      "version": "0.5.6",
+      "version": "0.5.7",
       "dependencies": {
         "@jxsuite/schema": "workspace:^",
         "kysely": "^0.29.5",
@@ -74,7 +74,7 @@
     },
     "extensions/feed": {
       "name": "@jxsuite/feed",
-      "version": "0.3.4",
+      "version": "0.3.5",
       "dependencies": {
         "@jxsuite/schema": "workspace:^",
       },
@@ -84,7 +84,7 @@
     },
     "extensions/parser": {
       "name": "@jxsuite/parser",
-      "version": "1.6.0",
+      "version": "1.7.0",
       "dependencies": {
         "@jxsuite/markup": "workspace:^",
         "@jxsuite/schema": "workspace:^",
@@ -112,7 +112,7 @@
     },
     "extensions/search": {
       "name": "@jxsuite/search",
-      "version": "0.2.5",
+      "version": "0.2.6",
       "dependencies": {
         "@jxsuite/schema": "workspace:^",
         "minisearch": "^7.2.0",
@@ -123,7 +123,7 @@
     },
     "packages/ai": {
       "name": "@jxsuite/ai",
-      "version": "0.36.5",
+      "version": "0.37.0",
       "dependencies": {
         "@jxsuite/protocol": "workspace:^",
         "@vue/reactivity": "3.5.42",
@@ -134,7 +134,7 @@
     },
     "packages/collab": {
       "name": "@jxsuite/collab",
-      "version": "0.8.4",
+      "version": "0.8.5",
       "dependencies": {
         "@jxsuite/schema": "workspace:^",
         "lib0": "^0.2.117",
@@ -144,7 +144,7 @@
     },
     "packages/compiler": {
       "name": "@jxsuite/compiler",
-      "version": "3.0.0",
+      "version": "3.1.0",
       "bin": {
         "jx": "./bin/jx.js",
       },
@@ -168,7 +168,7 @@
     },
     "packages/create": {
       "name": "@jxsuite/create",
-      "version": "1.3.8",
+      "version": "1.3.9",
       "bin": {
         "create-jxsuite": "./index.ts",
       },
@@ -178,7 +178,7 @@
     },
     "packages/desktop": {
       "name": "@jxsuite/desktop",
-      "version": "5.0.0",
+      "version": "5.0.1",
       "dependencies": {
         "@jxsuite/compiler": "workspace:^",
         "@jxsuite/create": "workspace:^",
@@ -203,7 +203,7 @@
     },
     "packages/formulas": {
       "name": "@jxsuite/formulas",
-      "version": "0.0.15",
+      "version": "0.0.16",
       "dependencies": {
         "@jxsuite/schema": "workspace:^",
       },
@@ -213,7 +213,7 @@
     },
     "packages/import": {
       "name": "@jxsuite/import",
-      "version": "0.40.0",
+      "version": "0.40.1",
       "bin": {
         "jx-import": "./src/cli.ts",
       },
@@ -234,7 +234,7 @@
     },
     "packages/markup": {
       "name": "@jxsuite/markup",
-      "version": "0.4.8",
+      "version": "0.4.9",
       "dependencies": {
         "@jxsuite/schema": "workspace:^",
         "hast-util-from-html": "^2.0.3",
@@ -253,14 +253,14 @@
     },
     "packages/protocol": {
       "name": "@jxsuite/protocol",
-      "version": "2.1.0",
+      "version": "2.2.0",
       "dependencies": {
         "@jxsuite/schema": "workspace:^",
       },
     },
     "packages/runtime": {
       "name": "@jxsuite/runtime",
-      "version": "3.0.0",
+      "version": "3.1.0",
       "dependencies": {
         "@jxsuite/schema": "workspace:^",
         "@vue/reactivity": "3.5.42",
@@ -271,7 +271,7 @@
     },
     "packages/schema": {
       "name": "@jxsuite/schema",
-      "version": "2.0.0",
+      "version": "2.1.0",
       "dependencies": {
         "@webref/css": "^8.7.3",
         "@webref/elements": "^2.8.0",
@@ -285,7 +285,7 @@
     },
     "packages/server": {
       "name": "@jxsuite/server",
-      "version": "4.0.0",
+      "version": "4.1.0",
       "dependencies": {
         "@jxsuite/collab": "workspace:^",
         "@jxsuite/compiler": "workspace:^",
@@ -308,7 +308,7 @@
     },
     "packages/site": {
       "name": "@jxsuite/site",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "dependencies": {
         "@jxsuite/runtime": "workspace:^",
         "@jxsuite/schema": "workspace:^",
@@ -316,7 +316,7 @@
     },
     "packages/starters": {
       "name": "@jxsuite/starters",
-      "version": "1.6.5",
+      "version": "1.7.0",
       "devDependencies": {
         "@jxsuite/parser": "workspace:^",
         "@jxsuite/runtime": "workspace:^",
@@ -327,7 +327,7 @@
     },
     "packages/studio": {
       "name": "@jxsuite/studio",
-      "version": "4.0.0",
+      "version": "4.1.0",
       "dependencies": {
         "@atlaskit/pragmatic-drag-and-drop": "^3.1.0",
         "@atlaskit/pragmatic-drag-and-drop-hitbox": "^2.2.0",
@@ -1155,21 +1155,21 @@
 
     "@ts-morph/common": ["@ts-morph/common@0.16.0", "", { "dependencies": { "fast-glob": "^3.2.11", "minimatch": "^5.1.0", "mkdirp": "^1.0.4", "path-browserify": "^1.0.1" } }, "sha512-SgJpzkTgZKLKqQniCjLaE3c2L2sdL7UShvmTmPBejAKd2OKV/yfMpQ2IWpAuA+VY5wy7PkSUaEObIqEK6afFuw=="],
 
-    "@ttsc/darwin-arm64": ["@ttsc/darwin-arm64@0.28.3", "", { "os": "darwin", "cpu": "arm64" }, "sha512-ZdsiVD1OWfecgnBJkF11NX+C5iqLJ6XtEF4pr7nQW806hygSkK8DmMeWuRFerSqID6PQ4AzIhvpPeUKpMFsr0Q=="],
+    "@ttsc/darwin-arm64": ["@ttsc/darwin-arm64@0.28.4", "", { "os": "darwin", "cpu": "arm64" }, "sha512-UFfKbAkQ7C1ZZBptxJIuypu6NQHpVBi9z0kNyHZ6KAmCk3QXmyrXMbqhipk7XrGnGV6Zz39WKlfnM64efvD1Iw=="],
 
-    "@ttsc/darwin-x64": ["@ttsc/darwin-x64@0.28.3", "", { "os": "darwin", "cpu": "x64" }, "sha512-PubVbhvqJnk028bH9QTjas7u0PU2fMFwMezu96pkKC7zVTLekTVyZPOD1wKqN1/eaLvLagZygsGa98k+OlFQVQ=="],
+    "@ttsc/darwin-x64": ["@ttsc/darwin-x64@0.28.4", "", { "os": "darwin", "cpu": "x64" }, "sha512-nr9pEd89VZAcaufIZcH3NGFAu+wBp4QPcapIN+rHO/8c8aBK5i8Be4MSzQ2RHp0kFg7oGSA5c1aRJPiTMSP53A=="],
 
-    "@ttsc/graph": ["@ttsc/graph@0.28.3", "", { "dependencies": { "@modelcontextprotocol/sdk": "^1.26.0", "@typia/mcp": "14.0.0", "typia": "14.0.0" }, "peerDependencies": { "ttsc": "^0.28.3" }, "bin": { "ttsc-graph": "lib/bin.js" } }, "sha512-69yXbsmRxIVF7ssEzA2G6hPHk3PM327hdafsMWbs2vvLBfyOiH3lBm3qYDmbjmdoIwPI/CQnyxKABg0nJ/xJpA=="],
+    "@ttsc/graph": ["@ttsc/graph@0.28.4", "", { "dependencies": { "@modelcontextprotocol/sdk": "^1.26.0", "@typia/mcp": "14.0.0", "typia": "14.0.0" }, "peerDependencies": { "ttsc": "^0.28.4" }, "bin": { "ttsc-graph": "lib/bin.js" } }, "sha512-E+13tQw24eKQbh2p7+E15kWLWeVcBbE80wXGdohyF6GQq+DEEHigL+UIHkjzN72dh2+OyM7GmT1HaF4Je+WBMw=="],
 
-    "@ttsc/linux-arm": ["@ttsc/linux-arm@0.28.3", "", { "os": "linux", "cpu": "arm" }, "sha512-46JdDKxBQPSQHeYQlFGPjnhBd96dH1JXhj+fODQGh0NAGcVoVNHr6WvWElL2YkyUbkjwkbdVKsMzprWwR0TeXQ=="],
+    "@ttsc/linux-arm": ["@ttsc/linux-arm@0.28.4", "", { "os": "linux", "cpu": "arm" }, "sha512-VpvvrcvjuhIh/GExdufaqil6X+tMuCNr+U7SNz0m1sSlU81FoOKLEUNw8fwkKcaLNXqFQ8W6dusqrwY7NlvoNg=="],
 
-    "@ttsc/linux-arm64": ["@ttsc/linux-arm64@0.28.3", "", { "os": "linux", "cpu": "arm64" }, "sha512-F4Kfr+xDOD+t+6MdiSi/u6ESsFdn76i/ErCg0nOmDFqG+l2Tm+9tJL66gw83f7/YBo/Ah8GxsyUBDW7/oFN61A=="],
+    "@ttsc/linux-arm64": ["@ttsc/linux-arm64@0.28.4", "", { "os": "linux", "cpu": "arm64" }, "sha512-7utuxzrvbRYLxHEYyFv75aaGFPK+Me/DV/OfymXNy/Rpezb6gVFIeC8wjqjLD7lC6S96CGGgZtPm+1dI63t7sA=="],
 
-    "@ttsc/linux-x64": ["@ttsc/linux-x64@0.28.3", "", { "os": "linux", "cpu": "x64" }, "sha512-m5VLPOkPWZjrl11/BajN/rD4Np5knVK2Y9nHrt6j0LhIU8m6CAmfPyHGcd7Nw/W26SYvhh9SaHEQ799TjXZBoQ=="],
+    "@ttsc/linux-x64": ["@ttsc/linux-x64@0.28.4", "", { "os": "linux", "cpu": "x64" }, "sha512-5U/1r9xvcarDl77B8Fq9kz1JitBAOwuRCw06bbv3kDR0sswH6tRMrzaUczw93is2b6j62lI+WDbgFaBMQ8/byA=="],
 
-    "@ttsc/win32-arm64": ["@ttsc/win32-arm64@0.28.3", "", { "os": "win32", "cpu": "arm64" }, "sha512-hmXyPEr+JCoO2y4voD2zlhcoL+Ejk3+lp25nnuAN/zuusE959ahcDogFGXT3iEYhB6uVEffg3/wttbvTG7zb/Q=="],
+    "@ttsc/win32-arm64": ["@ttsc/win32-arm64@0.28.4", "", { "os": "win32", "cpu": "arm64" }, "sha512-LEbmIMCNgiJKirvQtBY8OzdB/2vHx3wlUILao2atajRk3g4oE0YWFGZpWvIxHEdwLoP4qwM6+Sd2MiPDEGGHiw=="],
 
-    "@ttsc/win32-x64": ["@ttsc/win32-x64@0.28.3", "", { "os": "win32", "cpu": "x64" }, "sha512-SpjgxyckQDMXnMkUMHFGTQTvVunOhYQ3iotG+gQfd+hAysWa01Z4UA0SxEQhVDnBsn67NVZ/KaL4fXSRJ1WnsA=="],
+    "@ttsc/win32-x64": ["@ttsc/win32-x64@0.28.4", "", { "os": "win32", "cpu": "x64" }, "sha512-PzJkyC1yNp8FF7YzHBp8vkmi7y8IiGsRZXpz4PK4aOYKIaKjy0Wdl3UwHksHNkliLiqrzDq4WMXmx3Lewzvmfg=="],
 
     "@types/bun": ["@types/bun@1.4.0", "", { "dependencies": { "bun-types": "1.4.0" } }, "sha512-K+lZULY23vRgK/CfTjFIV+tyifaNdSMlPh9j+6mQ/cLfpOznLyAuzgV/JQysyECpkBQLVMSyvjlr2fBUSA9wFQ=="],
 
@@ -2441,7 +2441,7 @@
 
     "tslib": ["tslib@1.14.1", "", {}, "sha512-Xni35NKzjgMrwevysHTCArtLDpPvye8zV/0E4EyYn43P7/7qvQwPh9BGkHewbMulVntbigmcT7rdX3BNo9wRJg=="],
 
-    "ttsc": ["ttsc@0.28.3", "", { "optionalDependencies": { "@ttsc/darwin-arm64": "0.28.3", "@ttsc/darwin-x64": "0.28.3", "@ttsc/linux-arm": "0.28.3", "@ttsc/linux-arm64": "0.28.3", "@ttsc/linux-x64": "0.28.3", "@ttsc/win32-arm64": "0.28.3", "@ttsc/win32-x64": "0.28.3" }, "bin": { "ttsc": "lib/launcher/ttsc.js", "ttscserver": "lib/launcher/ttscserver.js", "ttsx": "lib/launcher/ttsx.js" } }, "sha512-9+vVmqg08fMhX8mR7/ARYx/Qca+/uOOIQc7CAXVE5ccrXhL4YpXwVBWW3JPISjuAw3Dxwed03e8/rAZzE2uGrQ=="],
+    "ttsc": ["ttsc@0.28.4", "", { "optionalDependencies": { "@ttsc/darwin-arm64": "0.28.4", "@ttsc/darwin-x64": "0.28.4", "@ttsc/linux-arm": "0.28.4", "@ttsc/linux-arm64": "0.28.4", "@ttsc/linux-x64": "0.28.4", "@ttsc/win32-arm64": "0.28.4", "@ttsc/win32-x64": "0.28.4" }, "bin": { "ttsc": "lib/launcher/ttsc.js", "ttscserver": "lib/launcher/ttscserver.js", "ttsx": "lib/launcher/ttsx.js" } }, "sha512-TmA5/YZSghGhIKgnCs8PAt3exjzgqOb+nEroqGsxEBSAIdIUwOXSn44AenJ0iJ1QMCIdb57KbNWBC5ODLyKN/g=="],
 
     "type-check": ["type-check@0.4.0", "", { "dependencies": { "prelude-ls": "^1.2.1" } }, "sha512-XleUoc9uwGXqjWwXaUTZAmzMcFZ5858QA2vvx1Ur5xIcixXIP+8LnFDgRplU30us6teqdlskFfu+ae4K79Ooew=="],
 
