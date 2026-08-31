@@ -3,9 +3,10 @@
 // Landing under one version number, which is exactly how the spec versions became meaningless.
 //
 // A spec's "body" is everything except its release metadata: the **Version:** and **Updated:**
-// Lines, the `## Changelog` heading and its entries, and the footer version line. Blank lines are
-// Ignored, so pure reflow never demands a bump. The header **Status:** and the per-section
+// Lines, the `## Changelog` heading and its entries, and the footer version line. The header
+// **Status:** and the per-section
 // `> **Status: …**` markers ARE body — changing what is built is a spec change worth releasing.
+// Both sides are unwrapped before they are compared, so re-flowing a spec never demands a bump.
 //
 // The companion content check is check-spec-status.ts (`docs:status`), which enforces that the
 // Newest changelog entry matches the header version and **Updated:** date — so an advanced version
@@ -19,6 +20,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { unwrapProse } from "../lib/unwrap-prose.ts";
 import { compareSpecVersion, parseSpecSource } from "./lib/spec-status.ts";
 
 const ROOT = resolve(import.meta.dir, "../..");
@@ -75,12 +77,25 @@ const METADATA = [
   /Specification v[0-9]/,
 ];
 
-/** Spec text minus its release metadata and blank-line churn. */
+/**
+ * Spec text minus its release metadata and its wrapping.
+ *
+ * Whitespace is not a spec change, and this gate is the one thing standing between a formatting
+ * sweep and thirteen releases minted for it. **Unwrapping is what makes reflow invisible**, and it
+ * happens before the metadata filter because both sides then read as the same document: a spec
+ * written on 100-column lines and the same spec on one line per paragraph normalise to the same
+ * text. Collapsing all whitespace instead would be simpler and wrong — it erases the `>` of a block
+ * quote and the indent of a nested list item, so turning a paragraph into a quote would stop
+ * counting as a change.
+ *
+ * The trailing `\` of an explicit hard break goes too: the formatter writes those into a labelled
+ * run, and a marker that only exists to hold a line break is not body.
+ */
 function normalizedBody(source: string): string {
-  return source
-    .split("\n")
+  return unwrapProse(source)
+    .text.split("\n")
     .filter((line) => !METADATA.some((re) => re.test(line)))
-    .map((line) => line.trimEnd())
+    .map((line) => line.replace(/\\$/, "").trimEnd())
     .filter((line) => line !== "")
     .join("\n");
 }

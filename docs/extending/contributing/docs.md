@@ -4,6 +4,8 @@ description: "How the Jx documentation is written, structured, screenshotted, an
 code:
   - scripts/docs/check-doc-refs.ts
   - scripts/docs/check-doc-sync.ts
+  - scripts/normalize-markdown.ts
+  - scripts/lib/unwrap-prose.ts
   - scripts/docs/generate-reference.ts
   - scripts/docs/build-llm-export.ts
   - scripts/screenshots/manifest.json
@@ -83,6 +85,23 @@ A **View** is a view and an **Editor** is an editor: write "the Code editor", ne
 **The palette** is an acceptable collective for the **Command Center** (:kbd[⌘K]) and **Quick Access** (:kbd[⌘P]) where the difference does not matter. Name one of them where it does.
 
 **Settings** is the project's (contexts, content types, connections, packages); **Preferences** is the application's (appearance, assistant, accounts, keyboard). Never use one word for the other.
+
+## Source formatting
+
+**Write each paragraph on one line.** Do not wrap prose in the source file. Your editor's soft wrap re-flows to whatever width you are reading at; a file wrapped at 100 columns is already flowed to somebody else's width, and the two interleave into ragged half-width lines that change shape with the window. It also makes review harder: editing a wrapped paragraph re-flows every line after the edit, so a one-word change arrives as a five-line diff and a reviewer checking that a rewrite kept every claim has to reconstruct the sentences first.
+
+`bun run format:md` rewrites a wrapped file, so you can write however you like and let the formatter settle it. Much of the corpus is still wrapped from before the rule; the sweep that fixes that is a separate change, and until it lands the CI gate checks escapes only.
+
+The one thing to know is what happens to a line break that means something. Ordinary paragraph breaks are wrapping and get joined. A line break you want the reader to see is a **hard break**, written as a trailing backslash:
+
+```markdown
+**Version:** 0.4.2\
+**Status:** Partial
+```
+
+The formatter keeps those, and writes them for you in the two cases it can recognise: a run of lines that each open with a bold key, as a spec header does, and a line whose whole content is one text directive. Everything else with structure in its line breaks is a different block to begin with, so it is never at risk: tables, fenced and indented code, frontmatter, headings, list items, block quotes, container directives, HTML blocks, and link and footnote definitions all keep their own lines.
+
+Two trailing spaces are also a hard break in Markdown, and the formatter rewrites them to a backslash. An invisible break is one that an editor set to trim trailing whitespace, or a careless paste, deletes without anyone noticing.
 
 ## Callouts
 

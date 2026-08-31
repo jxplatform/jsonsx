@@ -25,6 +25,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
+import { endsInHardBreak } from "../lib/unwrap-prose.ts";
 import { parseSpecSource, splitVersion, versionFloor } from "./lib/spec-status.ts";
 
 const ROOT = resolve(import.meta.dir, "../..");
@@ -198,8 +199,16 @@ const today = new Date().toISOString().slice(0, 10);
 const lines = source.split("\n");
 
 // Header version, and the footer version line when the spec has one.
+/*
+ * The header block is a labelled run — `**Version:** / **Status:** / **Updated:** / **License:**` —
+ * and once the Markdown sweep lands, every line but the last carries a trailing `\` hard break to
+ * hold it there (see scripts/lib/unwrap-prose.ts). Rewriting a line whole would drop the marker and
+ * join the header into one sentence, so the marker is read off the line being replaced. Before the
+ * sweep there is none to read and this is a no-op.
+ */
 const versionIdx = lines.findIndex((l) => l.startsWith("**Version:**"));
-lines[versionIdx] = `**Version:** ${nextVersion}`;
+const versionBreak = endsInHardBreak(lines[versionIdx]!) ? "\\" : "";
+lines[versionIdx] = `**Version:** ${nextVersion}${versionBreak}`;
 const footerIdx = lines.findLastIndex((l) => FOOTER_VERSION_LINE.test(l));
 if (footerIdx !== -1) {
   lines[footerIdx] = lines[footerIdx]!.replace(
@@ -215,9 +224,12 @@ if (updatedIdx === -1) {
   if (statusIdx === -1) {
     die(`specs/${file} has no **Status:** line to anchor **Updated:** to`);
   }
-  lines.splice(statusIdx + 1, 0, `**Updated:** ${today}`);
+  // Inserted mid-run, so it inherits the break of the line it follows.
+  const statusBreak = endsInHardBreak(lines[statusIdx]!) ? "\\" : "";
+  lines.splice(statusIdx + 1, 0, `**Updated:** ${today}${statusBreak}`);
 } else {
-  lines[updatedIdx] = `**Updated:** ${today}`;
+  const updatedBreak = endsInHardBreak(lines[updatedIdx]!) ? "\\" : "";
+  lines[updatedIdx] = `**Updated:** ${today}${updatedBreak}`;
 }
 
 // Prepend the changelog entry, creating the section if the spec has none.

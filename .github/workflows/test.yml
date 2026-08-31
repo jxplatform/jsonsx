@@ -348,6 +348,12 @@ jobs:
       # Markdown: no visual-editor escapes (`## 18\.`, `RESERVED\_KEYS`). One of these once made
       # spec.md's whole Standards Alignment section unfindable, so twelve rows silently stopped
       # being validated. See scripts/normalize-markdown.ts; `bun run format:md` fixes it.
+      #
+      # `--no-wrap` holds back the SECOND rule that script now carries: one paragraph per line.
+      # The sweep that would satisfy it rewrites ~80 files and conflicts with every open pull
+      # request, so it is a separate change; dropping the flag here and from nano-staged's `*.md`
+      # entry in package.json is what turns the rule on, once the sweep has landed. Until then this
+      # step is exactly what it was.
       - run: bun run docs:markdown
       # Standards: every spec's `## N. Standards Alignment` table cites a known standard at its
       # canonical URL, binds a real numbered section, backs a present-tense claim with committed

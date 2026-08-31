@@ -48,7 +48,7 @@
     "eval:headless": "bun run --cwd packages/studio eval:headless",
     "format": "bun scripts/normalize-markdown.ts && oxfmt .",
     "format:md": "bun scripts/normalize-markdown.ts",
-    "docs:markdown": "bun scripts/normalize-markdown.ts --check",
+    "docs:markdown": "bun scripts/normalize-markdown.ts --check --no-wrap",
     "generate:schema": "bun run --cwd packages/schema schema",
     "schema:verify": "bun scripts/check-schema-freshness.ts",
     "lint": "oxlint .",
@@ -104,7 +104,7 @@
   },
   "nano-staged": {
     "*.md": [
-      "bun scripts/normalize-markdown.ts"
+      "bun scripts/normalize-markdown.ts --no-wrap"
     ],
     "*.{ts,json,css,md}": [
       "oxfmt --no-error-on-unmatched-pattern"
