@@ -1,6 +1,6 @@
 /**
- * Every version in `.release-please-manifest.json` must have actually shipped: a GitHub release at
- * its tag, and — for the packages npm receives — that exact version on the registry.
+ * Every version in `.release-please-manifest.json` must have actually shipped a GitHub release at
+ * its tag.
  *
  * NOTHING ASKED THIS QUESTION BEFORE, and the answer was no for six weeks. Two independent ways to
  * lose a release, both of which exit 0:
@@ -21,11 +21,34 @@
  * This is the job that says so. It runs in `release-please.yml` with `if: always()`, so a crashed
  * or no-op release run still gets checked, and again on that workflow's daily schedule.
  *
- *     bun scripts/check-release-integrity.ts            # the gate
- *     bun scripts/check-release-integrity.ts --no-npm   # tags only (no registry round trips)
+ *     bun scripts/check-release-integrity.ts
+ *
+ * ## It deliberately does NOT ask npm, and there is evidence behind that
+ *
+ * It used to, and the registry probe was removed rather than made more patient. `npm publish`
+ * printing `+ @jxsuite/ai@0.37.0` does not mean `npm view @jxsuite/ai@0.37.0` will find it: the
+ * version's `time` entry in the packument is stamped when the registry finishes WRITING, and that
+ * trails acceptance by up to three minutes, for a package or two per release, unpredictably. (On
+ * the 2026-08-30 release: `connector` +76s, `site` +96s, `ai` +187s — and the other sixteen
+ * packages in that same run were readable within a second.)
+ *
+ * So the probe filed an issue every time it raced a slow write. Every "Released versions that never
+ * shipped" issue this repository has ever had, against when npm actually became readable:
+ *
+ *     #177  @jxsuite/ai@0.36.2         readable  39s AFTER the issue was filed
+ *     #199  @jxsuite/connector@0.5.3   readable  36s AFTER the issue was filed
+ *     #264  @jxsuite/ai@0.37.0         readable  82s AFTER the issue was filed
+ *     #264  @jxsuite/site@1.1.0        readable   1s AFTER the issue was filed
+ *
+ * Nought for three: not one real catch, and three rounds of someone investigating a release that
+ * was already fine. A detector whose every firing is noise teaches people to ignore the firing that
+ * is not, which costs more than the check was ever worth.
+ *
+ * The release check is the half that had the value anyway. The six-week `starters` incident had NO
+ * TAG AND NO RELEASE — not merely a missing publish — so this catches it. And it cannot fail the
+ * way the npm probe did: `gh release view` is read-after-write consistent, so a 404 means the
+ * release is genuinely absent rather than merely not replicated yet.
  */
-
-import { readWorkspaces } from "./lib/workspaces.ts";
 
 const CONFIG = "release-please-config.json";
 const MANIFEST = ".release-please-manifest.json";
@@ -49,13 +72,6 @@ export interface ReleaseTarget {
   /** The tag release-please would have created, e.g. `starters-v1.5.0`. */
   tag: string;
   version: string;
-  /** The npm package name, or null when this component never goes to npm (`desktop`). */
-  npmName: string | null;
-}
-
-export interface ReleaseGap extends ReleaseTarget {
-  missingRelease: boolean;
-  missingFromNpm: boolean;
 }
 
 /**
@@ -83,103 +99,63 @@ export function tagFor(path: string, version: string, config: Config): string {
 export async function readTargets(root = "."): Promise<ReleaseTarget[]> {
   const config = (await Bun.file(`${root}/${CONFIG}`).json()) as Config;
   const manifest = (await Bun.file(`${root}/${MANIFEST}`).json()) as Record<string, string>;
-  const workspaces = await readWorkspaces(root);
 
-  return Object.entries(manifest).map(([path, version]) => {
-    const workspace = workspaces.find((w) => w.dir === path);
-    return {
-      path,
-      tag: tagFor(path, version, config),
-      version,
-      npmName: workspace?.publishable ? workspace.name : null,
-    };
-  });
+  return Object.entries(manifest).map(([path, version]) => ({
+    path,
+    tag: tagFor(path, version, config),
+    version,
+  }));
 }
 
-export interface Probes {
-  /**
-   * Does a GitHub RELEASE exist at this tag? A bare tag is not enough — the bundlers attach to The
-   * release, and release-please creates both or neither.
-   */
-  releaseExists: (tag: string) => Promise<boolean>;
-  npmHasVersion: (name: string, version: string) => Promise<boolean>;
-}
+/**
+ * Does a GitHub RELEASE exist at this tag? A bare tag is not enough — the bundlers attach to the
+ * release, and release-please creates both or neither.
+ */
+export type ReleaseExists = (tag: string) => Promise<boolean>;
 
-export async function findGaps(targets: ReleaseTarget[], probes: Probes): Promise<ReleaseGap[]> {
-  const gaps: ReleaseGap[] = [];
+/** The manifest entries whose release release-please never actually created. */
+export async function findGaps(
+  targets: ReleaseTarget[],
+  releaseExists: ReleaseExists,
+): Promise<ReleaseTarget[]> {
+  const gaps: ReleaseTarget[] = [];
   for (const target of targets) {
-    const missingRelease = !(await probes.releaseExists(target.tag));
-    const missingFromNpm = target.npmName
-      ? !(await probes.npmHasVersion(target.npmName, target.version))
-      : false;
-    if (missingRelease || missingFromNpm) {
-      gaps.push({ ...target, missingRelease, missingFromNpm });
+    if (!(await releaseExists(target.tag))) {
+      gaps.push(target);
     }
   }
   return gaps;
 }
 
-export function report(gaps: ReleaseGap[]): string {
-  const lines = gaps.map((g) => {
-    const what = [
-      g.missingRelease ? `no GitHub release \`${g.tag}\`` : null,
-      g.missingFromNpm ? `not on npm as \`${g.npmName}@${g.version}\`` : null,
-    ]
-      .filter(Boolean)
-      .join(", ");
-    return `- **${g.path}** claims ${g.version} in the manifest — ${what}`;
-  });
+export function report(gaps: ReleaseTarget[]): string {
+  const lines = gaps.map(
+    (g) => `- **${g.path}** claims ${g.version} in the manifest — no GitHub release \`${g.tag}\``,
+  );
 
-  const npmGaps = gaps.filter((g) => g.missingFromNpm).map((g) => g.path);
-  const fixes: string[] = [];
-  if (npmGaps.length > 0) {
-    fixes.push(
-      "Backfill npm (idempotent — already-published versions are skipped):\n\n" +
-        "    gh workflow run publish.yml \\\n" +
-        `      -f paths_released='${JSON.stringify(npmGaps)}' \\\n` +
-        "      -f sha=$(git rev-parse origin/main)",
-    );
-  }
-  if (gaps.some((g) => g.missingRelease)) {
-    fixes.push(
-      "A missing GitHub release means release-please skipped the component. Check the " +
-        "`release-please` job log for “Pull request contains releases, but not for component” " +
-        "and read the header of `commitlint.config.ts`.",
-    );
-  }
-
-  return [...lines, "", ...fixes].join("\n");
+  return [
+    ...lines,
+    "",
+    "A missing GitHub release means release-please skipped the component. Check the " +
+      "`release-please` job log for “Pull request contains releases, but not for component” " +
+      "and read the header of `commitlint.config.ts`.",
+    "",
+    "Nothing was published for a component with no release, so re-running `publish.yml` for it " +
+      "once the release exists is the second half of the fix — it is idempotent.",
+  ].join("\n");
 }
 
 if (import.meta.main) {
-  const checkNpm = !process.argv.includes("--no-npm");
-
-  const run = (cmd: string[]) =>
-    Bun.spawnSync(cmd, { stderr: "ignore", stdout: "ignore" }).exitCode === 0;
-
-  const probes: Probes = {
-    releaseExists: async (tag) => run(["gh", "release", "view", tag, "--json", "tagName"]),
-    npmHasVersion: async (name, version) => {
-      if (!checkNpm) {
-        return true;
-      }
-      // One retry: this runs immediately after `publish`, and the registry can take a few seconds
-      // To answer for a version it has just accepted.
-      if (run(["npm", "view", `${name}@${version}`, "version"])) {
-        return true;
-      }
-      await Bun.sleep(15_000);
-      return run(["npm", "view", `${name}@${version}`, "version"]);
-    },
-  };
+  const releaseExists: ReleaseExists = async (tag) =>
+    Bun.spawnSync(["gh", "release", "view", tag, "--json", "tagName"], {
+      stderr: "ignore",
+      stdout: "ignore",
+    }).exitCode === 0;
 
   const targets = await readTargets();
-  const gaps = await findGaps(targets, probes);
+  const gaps = await findGaps(targets, releaseExists);
 
   if (gaps.length === 0) {
-    console.log(
-      `All ${targets.length} released components have a GitHub release, and npm has them.`,
-    );
+    console.log(`All ${targets.length} released components have a GitHub release.`);
     process.exit(0);
   }
 

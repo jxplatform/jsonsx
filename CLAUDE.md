@@ -157,9 +157,28 @@ release-please writes the release pull request body with changelog text HTML-esc
 
 The job creates the GitHub releases first and builds the next pull request second. If it dies in between — a GitHub 5xx during its commit-history walk, which an un-tagged component provokes by forcing a 500-commit backfill — the releases exist but the run failed. **Re-running it is not idempotent in the way that matters**: the pull request is already labelled `autorelease: tagged`, so `releases_created` comes back `false` and `publish`, all four desktop bundlers, `nix-build` and `deploy-site` all skip. That is how `desktop-v2.2.0` shipped with no installers.
 
-`verify-release-integrity` is the answer: `if: always()`, gated on nothing, it asserts every version in `.release-please-manifest.json` has a GitHub release at its tag and — for publishable workspaces — that exact version on npm (`bun run release:integrity`, `--no-npm` to skip the registry). It fails the run and opens ONE `release-incomplete` issue. Nothing `needs:` it, so a red X there blocks nothing else. The daily schedule on the workflow makes it a standing sweep.
+`verify-release-integrity` is the answer: `if: always()`, gated on nothing, it asserts every version in `.release-please-manifest.json` has a GitHub release at its tag (`bun run release:integrity`). It fails the run and opens ONE `release-incomplete` issue. Nothing `needs:` it, so a red X there blocks nothing else. The daily schedule on the workflow makes it a standing sweep.
 
-To backfill npm after a skip, `publish.yml` has a `workflow_dispatch` entry point and is idempotent — the failure report prints the exact `gh workflow run` invocation.
+To backfill npm after a skip, `publish.yml` has a `workflow_dispatch` entry point and is idempotent: `gh workflow run publish.yml -f paths_released='["packages/ai"]' -f sha=$(git rev-parse origin/main)`. Already-published versions are skipped, so running it when nothing was missing is a no-op.
+
+### The gate does not ask npm, and that is a decision with evidence behind it
+
+It used to, and the registry half was **removed rather than made more patient**. `npm publish` printing `+ @jxsuite/ai@0.37.0` does not mean `npm view @jxsuite/ai@0.37.0` will find it: the version's `time` entry in the packument is stamped when the registry finishes writing, and that trails acceptance by up to three minutes, for a package or two per release, unpredictably. On the 2026-08-30 release, `connector` was readable 76s after acceptance, `site` 96s, `ai` 187s — and the other sixteen packages in the same run were readable within a second.
+
+So the probe filed an issue every time it raced a slow write. Every "Released versions that never shipped" issue this repository has ever had, measured against when npm actually became readable:
+
+| Issue | Version                    | Readable                          |
+| ----- | -------------------------- | --------------------------------- |
+| #177  | `@jxsuite/ai@0.36.2`       | 39s **after** the issue was filed |
+| #199  | `@jxsuite/connector@0.5.3` | 36s **after** the issue was filed |
+| #264  | `@jxsuite/ai@0.37.0`       | 82s **after** the issue was filed |
+| #264  | `@jxsuite/site@1.1.0`      | 1s **after** the issue was filed  |
+
+Nought for three: not one real catch, and three rounds of someone investigating a release that was already fine. A detector whose every firing is noise teaches people to ignore the firing that is not, which costs more than the check was ever worth. **Do not add it back with a longer retry** — the lag is a property of the registry, unbounded from here, so any budget is a guess that turns a false red into a slower false red.
+
+The release check is the half that had the value anyway. The six-week `starters` incident had **no tag and no release**, not merely a missing publish, so the surviving check catches it — and it cannot fail the way the npm probe did, because `gh release view` is read-after-write consistent: a 404 means the release is genuinely absent rather than not replicated yet.
+
+What is no longer watched, and where it would surface instead: a run where release-please created the tags but `publish` skipped or failed. `publish` failing is a red job on its own; `publish` **skipping** (the `releases_created == false` re-run case) is now caught only by the missing GitHub release, which that same failure mode also produces.
 
 ## Starter Roots and the Shadowed Core
 
