@@ -512,6 +512,31 @@ describe("POST /__studio/ai/chat — upstream SSE parsing", () => {
     );
   });
 
+  it("forwards a thinking model's reasoning under either field name", async () => {
+    /* Dropping these makes the NEXT round a 400 the client cannot repair: DeepSeek's thinking mode
+       requires every prior turn's reasoning back on any request carrying `tools`. */
+    await withUpstream(
+      (() =>
+        Promise.resolve(
+          sseUpstream([
+            { choices: [{ delta: { reasoning_content: "Weighing it up" } }] },
+            { choices: [{ delta: { reasoning: "and again" } }] },
+            { choices: [{ delta: { content: "Hello", reasoning_content: "" } }] },
+            { choices: [{ delta: {}, finish_reason: "stop" }] },
+          ]),
+        )) as unknown as typeof fetch,
+      async () => {
+        const res = await handleAiApi(chatReq(), new URL("http://localhost/__studio/ai/chat"));
+        const events = await readSSEEvents(res!);
+        expect(events.filter((e) => e.type === "reasoning").map((e) => e.content)).toEqual([
+          "Weighing it up",
+          "and again",
+        ]);
+        expect(events.filter((e) => e.type === "delta").map((e) => e.content)).toEqual(["Hello"]);
+      },
+    );
+  });
+
   it("normalizes a streamed tool call across fragments", async () => {
     await withUpstream(
       (() =>

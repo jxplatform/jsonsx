@@ -112,7 +112,7 @@ The header names the current chat and holds two buttons: the history button (lef
 - Hover a row and click the trash button to delete a chat. Deleting the open one leaves you in a fresh empty chat.
 - When you reopen Studio, your last open chat is restored.
 
-History is stored on your machine and kept per project, so conversations never mix between projects. Each project keeps its 20 most recent chats, and each chat keeps its latest 50 messages.
+History is stored on your machine and kept per project, so conversations never mix between projects. Each project keeps its 20 most recent chats, and each chat keeps its latest 50 messages. What is stored is everything the provider needs to carry on, including a reasoning model's own thinking (which providers such as DeepSeek require back before they will answer again), so a reopened chat continues rather than starting over.
 
 ## By name, not only by button
 

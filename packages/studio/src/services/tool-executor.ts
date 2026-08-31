@@ -126,6 +126,12 @@ export async function runAgentLoop({
             chatState.appendDelta(event.content);
             break;
           }
+          case "reasoning": {
+            /* Kept on the turn, not shown as answer text — the next round has to replay it (see
+               chat-state's toMessagesArray). */
+            chatState.appendReasoning(event.content);
+            break;
+          }
           case "tool_call_start": {
             chatState.appendToolCallStart(event.id, event.name);
             toolCalls.set(event.id, { name: event.name, arguments: "" });

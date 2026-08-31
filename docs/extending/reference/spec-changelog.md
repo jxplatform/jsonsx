@@ -14,6 +14,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `ai.md`
 
+- **0.1.12-draft** (2026-08-31) — Provider contract §2.2: never send an empty assistant turn, and replay a thinking model's reasoning_content.
 - **0.1.11-draft** (2026-08-30) — 2.1: a lapsed grant is not a completed connect; cf_account_required; probe invalidation; per-model toolSupport and contextWindow.
 - **0.1.10-draft** (2026-08-26) — import_site adopts the project when it exists, not when the run ends; the run's log outlives it (§3.5).
 - **0.1.9-draft** (2026-08-26) — ask_user suspends a turn on the author (§3.4); import_site bootstraps a project from a live site (§3.5).

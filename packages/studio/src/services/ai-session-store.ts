@@ -45,6 +45,12 @@ export interface PersistedMessage {
   id?: string;
   role: string;
   content: string;
+  /**
+   * A thinking model's chain-of-thought for the turn. Persisted because the provider requires it
+   * back: a restored DeepSeek conversation whose reasoning was dropped on the way to storage is one
+   * the next send cannot replay (see `@jxsuite/ai`'s `toMessagesArray`).
+   */
+  reasoningContent?: string;
   toolCalls?: unknown[];
   toolCallId?: string;
   timestamp?: number;

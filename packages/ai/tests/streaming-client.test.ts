@@ -138,6 +138,46 @@ describe("createOpenAIStreamingClient", () => {
     expect(events).toEqual([{ type: "done", stopReason: "stop" }]);
   });
 
+  it("yields a reasoning event for a thinking model's reasoning_content", async () => {
+    mockFetch(() =>
+      streamingResponse(
+        sseBody([
+          JSON.stringify({ choices: [{ delta: { reasoning_content: "Weighing it up" } }] }),
+          JSON.stringify({ choices: [{ delta: { content: "Hi", reasoning_content: "…done" } }] }),
+          JSON.stringify({ choices: [{ delta: { reasoning_content: "" } }] }),
+          "[DONE]",
+        ]),
+        { status: 200 },
+      ),
+    );
+    const client = createOpenAIStreamingClient({ baseUrl: "https://x", apiKey: "k" });
+    const events = await collect(client.streamChat([], [], "", new AbortController().signal));
+    expect(events).toEqual([
+      { type: "reasoning", content: "Weighing it up" },
+      { type: "delta", content: "Hi" },
+      { type: "reasoning", content: "…done" },
+      { type: "done", stopReason: "stop" },
+    ]);
+  });
+
+  it("accepts `reasoning` as the field name too", async () => {
+    mockFetch(() =>
+      streamingResponse(
+        sseBody([
+          JSON.stringify({ choices: [{ delta: { reasoning: "OpenRouter spells it this way" } }] }),
+          "[DONE]",
+        ]),
+        { status: 200 },
+      ),
+    );
+    const client = createOpenAIStreamingClient({ baseUrl: "https://x", apiKey: "k" });
+    const events = await collect(client.streamChat([], [], "", new AbortController().signal));
+    expect(events).toEqual([
+      { type: "reasoning", content: "OpenRouter spells it this way" },
+      { type: "done", stopReason: "stop" },
+    ]);
+  });
+
   it("emits pending tool_call_end before done on [DONE]", async () => {
     mockFetch(() =>
       streamingResponse(

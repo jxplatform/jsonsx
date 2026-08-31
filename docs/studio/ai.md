@@ -69,6 +69,13 @@ Fetch models tests the key and endpoint **currently in the form**, not the ones 
 :::
 
 :::doc-note
+**Reasoning models work.** When a model streams its thinking beside its answer, Studio keeps that
+thinking with the turn and hands it back to the provider on the next round, which providers like
+DeepSeek require once the assistant starts calling tools. You never see it in the chat; it is part
+of what the model is owed, not part of the reply.
+:::
+
+:::doc-note
 The key, endpoint, and model choice are stored locally on your machine, per browser or app install. If the Studio backend you're running already holds credentials (a dev server started with an `OPENAI_API_KEY` environment variable, or a Cloudflare account you connected earlier), the assistant unlocks without asking for anything.
 :::
 

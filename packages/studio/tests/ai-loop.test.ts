@@ -16,11 +16,16 @@ import { answerAsk, pendingAsk, registerAskTool, resetAsk } from "../src/service
  *
  * @param {object[][]} rounds
  */
-function fakeClient(rounds: StreamEvent[][]): StreamingClient & { calls: () => number } {
+function fakeClient(
+  rounds: StreamEvent[][],
+): StreamingClient & { calls: () => number; sent: () => object[][] } {
   let call = 0;
+  const sent: object[][] = [];
   return {
     calls: () => call,
-    async *streamChat() {
+    sent: () => sent,
+    async *streamChat(messages: object[]) {
+      sent.push(messages);
       const events = rounds[call] ?? [{ type: "done", stopReason: "stop" }];
       call += 1;
       for (const e of events) {
@@ -73,6 +78,37 @@ describe("ai agent loop — integration", () => {
     expect((children[1] as JxMutableNode).tagName).toBe("span");
     expect(tab.history.index).toBe(1); // One undoable transaction
     expect(chatState.status).toBe("idle");
+    disposeTab(tab);
+  });
+
+  test("sends no empty assistant turn, and replays the reasoning it was given", async () => {
+    /* Both halves are one provider's contract: DeepSeek's thinking mode 400s on an assistant turn
+       with no reasoning_content, and the request used to carry two of them — the placeholder for
+       the answer being generated, then the tool-call turn stripped of its reasoning. */
+    const tab = makeTab();
+    const { chatState, toolRegistry } = harness(tab, async () => []);
+    const client = fakeClient([
+      [
+        { type: "reasoning", content: "They want a span. " },
+        { type: "reasoning", content: "add_child does it." },
+        ...toolCallRound("c1", "add_child", {
+          parentPath: [],
+          index: 1,
+          node: { tagName: "span", textContent: "added" },
+        }),
+      ],
+      [{ type: "done", stopReason: "stop" }],
+    ]);
+
+    chatState.sendMessage("add a span");
+    await runAgentLoop({ chatState, streamingClient: client, toolRegistry, systemPrompt: "" });
+
+    const firstRound = client.sent()[0] as { role: string }[];
+    expect(firstRound.map((m) => m.role)).toEqual(["user"]);
+
+    const secondRound = client.sent()[1] as { role: string; reasoning_content?: string }[];
+    expect(secondRound.map((m) => m.role)).toEqual(["user", "assistant", "tool"]);
+    expect(secondRound[1]!.reasoning_content).toBe("They want a span. add_child does it.");
     disposeTab(tab);
   });
 
