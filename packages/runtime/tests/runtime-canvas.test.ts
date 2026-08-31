@@ -8,8 +8,12 @@ import {
   renderNode as _renderNode,
   setCanvasAssetResolver,
   setCanvasDelinkAnchors,
+  setCanvasDelinkPopovers,
   setCanvasViewportTranspose,
+  elementStyleTags,
+  resolveNestedSelector,
   toCSSText,
+  transposeCanvasPopoverSelector,
   transposeCanvasUnits,
 } from "../src/runtime";
 
@@ -21,10 +25,11 @@ try {
 
 const renderNode: (...args: Parameters<typeof _renderNode>) => HTMLElement = _renderNode as any;
 
-// All three hooks are GLOBAL module state. Reset every one after every test.
+// Every hook is GLOBAL module state. Reset every one after every test.
 afterEach(() => {
   setCanvasViewportTranspose(false);
   setCanvasDelinkAnchors(false);
+  setCanvasDelinkPopovers(false);
   setCanvasAssetResolver(null);
 });
 
@@ -438,5 +443,128 @@ describe("$head asset resolution", () => {
     ).toBeTruthy();
     expect(document.head.querySelector('link[href="/raw/styles/main.css"]')).toBeTruthy();
     expect(seen).toEqual(["/styles/main.css"]);
+  });
+});
+
+// ─── setCanvasDelinkPopovers ────────────────────────────────────────────────────
+
+describe("setCanvasDelinkPopovers", () => {
+  /** A node the studio has stamped, which is what the rewrite is gated on. */
+  function stamped(tag = "nav"): HTMLElement {
+    const el = document.createElement(tag);
+    el.dataset.jxPath = '["children",0]';
+    document.body.append(el);
+    return el;
+  }
+
+  test("flag off (production and preview) leaves the attribute and the selector alone", () => {
+    const el = renderNode(
+      { attributes: { popover: "auto" }, tagName: "nav" } as never,
+      reactive({}),
+      { _path: [], onNodeCreated: (n: HTMLElement) => (n.dataset.jxPath = "[]") } as never,
+    );
+    expect(el.getAttribute("popover")).toBe("auto");
+    const styled = stamped();
+    applyStyle(styled, { ":popover-open": { display: "flex" } });
+    expect(elementStyleTags.get(styled)?.textContent).toContain(":popover-open");
+  });
+
+  test("flag on renames popover on a node the studio can address", () => {
+    setCanvasDelinkPopovers(true);
+    const el = renderNode(
+      { attributes: { popover: "auto" }, tagName: "nav" } as never,
+      reactive({}),
+      { _path: [], onNodeCreated: (n: HTMLElement) => (n.dataset.jxPath = "[]") } as never,
+    );
+    expect(el.dataset.jxPopover).toBe("auto");
+    expect(el.getAttribute("popover")).toBeNull();
+  });
+
+  test("an UNSTAMPED node keeps its native popover — a component's own internals", () => {
+    setCanvasDelinkPopovers(true);
+    const el = renderNode(
+      { attributes: { popover: "auto" }, tagName: "nav" } as never,
+      reactive({}),
+    );
+    expect(el.getAttribute("popover")).toBe("auto");
+    expect(el.dataset.jxPopover).toBeUndefined();
+  });
+
+  test("onNodeCreated stamps the path BEFORE applyAttributes runs", () => {
+    // The gate above rests on this ordering, and it is an unwritten contract between two packages
+    // — the runtime fires the callback and the studio's stamper writes the attribute. Asserted
+    // Directly so a reordering fails here rather than silently un-gating the rewrite.
+    setCanvasDelinkPopovers(true);
+    const seen: boolean[] = [];
+    renderNode({ attributes: { popover: "auto" }, tagName: "nav" } as never, reactive({}), {
+      _path: [],
+      onNodeCreated: (n: HTMLElement) => {
+        seen.push(n.hasAttribute("popover"));
+        n.dataset.jxPath = "[]";
+      },
+    } as never);
+    expect(seen).toEqual([false]);
+  });
+
+  test(":popover-open transposes to the attribute selector, at the same specificity", () => {
+    setCanvasDelinkPopovers(true);
+    const el = stamped();
+    applyStyle(el, { ":popover-open": { display: "flex" }, transform: "translateX(100%)" });
+    const css = elementStyleTags.get(el)?.textContent ?? "";
+    expect(css).toContain("[data-jx-popover-open] { display: flex }");
+    expect(css).not.toContain(":popover-open");
+  });
+
+  test("it transposes inside @media and through the & spelling too", () => {
+    setCanvasDelinkPopovers(true);
+    const el = stamped();
+    applyStyle(el, {
+      "&:popover-open": { opacity: "1" },
+      "@(min-width: 40rem)": { ":popover-open": { gap: "1rem" } },
+    });
+    const css = elementStyleTags.get(el)?.textContent ?? "";
+    expect(css).toContain("[data-jx-popover-open] { opacity: 1 }");
+    expect(css).toContain("@media (min-width: 40rem)");
+    expect(css).not.toContain(":popover-open");
+  });
+
+  test("::backdrop is dropped, not emitted inert", () => {
+    setCanvasDelinkPopovers(true);
+    const el = stamped();
+    applyStyle(el, {
+      "::backdrop": { backgroundColor: "black" },
+      ":popover-open::backdrop": { opacity: "1" },
+      ":popover-open": { display: "flex" },
+    });
+    const css = elementStyleTags.get(el)?.textContent ?? "";
+    expect(css).not.toContain("backdrop");
+    expect(css).toContain("[data-jx-popover-open] { display: flex }");
+  });
+
+  test("an unstamped element's styles are never transposed", () => {
+    setCanvasDelinkPopovers(true);
+    const el = document.createElement("nav");
+    document.body.append(el);
+    applyStyle(el, { ":popover-open": { display: "flex" } });
+    expect(elementStyleTags.get(el)?.textContent).toContain(":popover-open");
+  });
+});
+
+describe("transposeCanvasPopoverSelector", () => {
+  test("substitutes the pseudo-class and drops any backdrop rule", () => {
+    expect(transposeCanvasPopoverSelector("#a:popover-open")).toBe("#a[data-jx-popover-open]");
+    expect(transposeCanvasPopoverSelector("#a")).toBe("#a");
+    expect(transposeCanvasPopoverSelector("#a::backdrop")).toBeNull();
+    expect(transposeCanvasPopoverSelector("#a:popover-open::backdrop")).toBeNull();
+  });
+});
+
+describe("resolveNestedSelector", () => {
+  test("the four branches every emitter now shares", () => {
+    expect(resolveNestedSelector("#a", "&.on")).toBe("#a.on");
+    expect(resolveNestedSelector("#a", ":hover")).toBe("#a:hover");
+    expect(resolveNestedSelector("#a", "[open]")).toBe("#a[open]");
+    expect(resolveNestedSelector("#a", ".child")).toBe("#a.child");
+    expect(resolveNestedSelector("#a", "> li")).toBe("#a > li");
   });
 });

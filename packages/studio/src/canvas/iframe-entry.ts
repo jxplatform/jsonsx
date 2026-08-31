@@ -6,8 +6,10 @@
  */
 
 import { postMessageChannel } from "./iframe-channel";
+import { rectOf } from "../utils/geometry";
 import { displayTagName } from "@jxsuite/schema/guards";
 import {
+  applyCanvasPopoverOpen,
   applyPreviewColorScheme,
   applySiteStyle,
   installCanvasImageRetry,
@@ -227,6 +229,14 @@ export function startCanvasIframe(opts: {
   // The mode of the LIVE render — gates the interactive surfaces (inline editing, insert zones,
   // Grab-drags) that only design/edit modes own. Adopted alongside shadowDoc.
   let currentMode: CanvasMode = "design";
+  /**
+   * The popover the artboard is drawing open, as a serialized path, or null.
+   *
+   * Kept here rather than read back off the DOM because it has to survive a patch: an `attributes`
+   * op routes through `replaceSubtree`, which rebuilds the element and takes the attribute with it,
+   * and the frame must be able to put it back without a round trip to the host.
+   */
+  let popoverOpen: string | null = null;
   /* The host's chord table. Empty until the first `keymap` message, which the host posts on
      `ready` — before any render, so there is nothing to type into during the gap. An empty table
      forwards nothing, which is the honest cold-start answer: the frame does not guess at what the
@@ -392,8 +402,27 @@ export function startCanvasIframe(opts: {
   // The true content height.
   const MAX_CANVAS_HEIGHT = 30_000;
   let lastPostedHeight = -1;
+  /**
+   * The bottom edge of the open popover, relative to the container, or 0 when none is open.
+   *
+   * A popover is positioned, so it contributes nothing to `scrollHeight` and moves no ancestor box
+   * — which is why the `ResizeObserver` below never fires for one. It cannot feed back into an
+   * ever-growing height either: it is contained by the canvas's FIXED-SIZE query container, so
+   * growing the frame does not move it.
+   */
+  function openPopoverBottom(): number {
+    const panel = container.querySelector("[data-jx-popover][data-jx-popover-open]");
+    if (!panel) {
+      return 0;
+    }
+    const box = rectOf(panel);
+    const root = rectOf(container);
+    return Math.max(0, box.bottom - root.top);
+  }
+
   function postContentHeight(): void {
-    const measured = Math.min(container.scrollHeight, MAX_CANVAS_HEIGHT);
+    const content = Math.max(container.scrollHeight, openPopoverBottom());
+    const measured = Math.min(content, MAX_CANVAS_HEIGHT);
     if (measured > 0 && Math.abs(measured - lastPostedHeight) >= 1) {
       lastPostedHeight = measured;
       // A component-definition root (marked by makeStamper) is a fragment, not a page — tell the host
@@ -466,6 +495,16 @@ export function startCanvasIframe(opts: {
     quietFrames = quiet ? (changed ? 1 : quietFrames + 1) : 0;
     // Two consecutive quiet frames, then stop — the state is stable and any change re-arms us.
     if (quietFrames >= IDLE_QUIET_FRAMES) {
+      /* Measure once more now that the box has stopped moving. A CSS TRANSITION changes the content
+         height over time, and the two observers that normally catch that both miss the end of one:
+         `postContentHeight` fires at the START (from whatever changed the DOM) and reads a height
+         the transition has not reached, and the ResizeObserver stops firing once the box settles —
+         so the last value posted is a mid-flight one. A closing popover left a 141px component in a
+         480px frame exactly this way.
+
+         Deduped by `lastPostedHeight`, so the common case posts nothing, and it terminates: this
+         post arms the watcher, the next settle measures the same height, and nothing is posted. */
+      postContentHeight();
       return;
     }
     // A page with a genuinely endless animation never goes quiet. Give up rather than burn a rAF
@@ -648,11 +687,8 @@ export function startCanvasIframe(opts: {
 
   const off = channel.onMessage((msg) => {
     if (msg.kind === "measure") {
-      channel.post({
-        hits: measureHits(msg.paths, container.ownerDocument),
-        kind: "geometry",
-        reqId: msg.reqId,
-      });
+      const { hidden, hits } = measureHits(msg.paths, container.ownerDocument);
+      channel.post({ hidden, hits, kind: "geometry", reqId: msg.reqId });
       return;
     }
     if (msg.kind === "evalExpr") {
@@ -717,6 +753,10 @@ export function startCanvasIframe(opts: {
       }
       try {
         applyIframePatch(shadowDoc, msg.forwardOps, container, renderCtx, msg.echoPaths);
+        /* An `attributes` op routes through `replaceSubtree`, which rebuilds the element and takes
+           `data-jx-popover-open` with it — so a style edit on the open panel would close it under
+           the author's hands. Idempotent, so paying for it on every patch is a no-op. */
+        applyCanvasPopoverOpen(container, popoverOpen);
         // Put the caret back where the author left it. Restoring the SELECTION re-activates the
         // Block through the editing host's own selectionchange path — there is no separate
         // "re-enter" step, because a caret in a block IS the edit.
@@ -811,6 +851,21 @@ export function startCanvasIframe(opts: {
       applyPreviewColorScheme(container.ownerDocument, msg.scheme);
       return;
     }
+    if (msg.kind === "setPopoverOpen") {
+      /* Refused in preview HERE as well as in the host. Preview renders popovers natively and the
+         canvas attribute does not exist there, so a stray message would silently do nothing —
+         better to refuse it in both realms, which is the discipline §4.2 states for every editing
+         affordance: neither side may assume the other's build is current. */
+      if (currentMode === "preview") {
+        return;
+      }
+      popoverOpen = msg.path === null ? null : serializeJxPath(msg.path);
+      applyCanvasPopoverOpen(container, popoverOpen);
+      // The panel entering or leaving flow changes the content box, and the ResizeObserver only
+      // Sees `#jx-canvas-root` — an absolutely positioned panel does not move it.
+      postContentHeight();
+      return;
+    }
     if (msg.kind === "setLocale") {
       /* The other document-level attribute flip, and the whole visible half of an axis-3 locale:
          `dir` is what makes an RTL preview actually mirror, and `lang` is what CSS's `:lang()` and
@@ -871,10 +926,16 @@ export function startCanvasIframe(opts: {
             pageContentPrefix: mapperCtx.pageContentPrefix,
           },
           mode: msg.mode,
+          popoverOpen: msg.popoverOpen ? serializeJxPath(msg.popoverOpen) : null,
           siteStyle: msg.siteStyle,
           ...(msg.allowAutoRequests ? { allowAutoRequests: true } : {}),
         });
         if (gen === latestGen) {
+          /* A render replaces the DOM, so the open attribute goes with it. The host sends the value
+             on the render message for exactly this reason; a frame that kept only its own copy
+             would reopen the wrong panel after a tab switch. */
+          popoverOpen = msg.popoverOpen ? serializeJxPath(msg.popoverOpen) : null;
+          applyCanvasPopoverOpen(container, popoverOpen);
           // Adopt this generation's shadow doc + render context only once it's the live render.
           shadowDoc = rawDoc;
           renderCtx = handle.ctx;

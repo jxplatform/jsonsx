@@ -73,7 +73,7 @@ describe("measureHits", () => {
   test("resolves each found path to its current rect and omits missing ones", () => {
     stampedTree('["children",0]', { height: 8, width: 40, x: 1, y: 2 });
     stampedTree('["children",1]', { height: 9, width: 50, x: 3, y: 4 });
-    const hits = measureHits([
+    const { hits } = measureHits([
       ["children", 0],
       ["children", 1],
       ["children", 99], // No node → omitted.
@@ -84,8 +84,22 @@ describe("measureHits", () => {
     ]);
   });
 
-  test("returns an empty array when nothing matches", () => {
-    expect(measureHits([["children", 0]])).toEqual([]);
+  test("returns no hits when nothing matches", () => {
+    expect(measureHits([["children", 0]])).toEqual({ hidden: [], hits: [] });
+  });
+
+  test("a node that resolves but is not rendered comes back as hidden, not as a 0x0 rect", () => {
+    // The defect: a zero rect is a truthy object, so the overlay drew a box at the artboard origin
+    // And the block action bar anchored to it. A closed popover is the common case.
+    const { outer } = stampedTree('["children",0]', { height: 8, width: 40, x: 1, y: 2 });
+    outer.style.display = "none";
+    expect(measureHits([["children", 0]])).toEqual({ hidden: [["children", 0]], hits: [] });
+  });
+
+  test("a node hidden by an ANCESTOR is hidden too — the closed-popover case", () => {
+    const { outer } = stampedTree('["children",0]', { height: 8, width: 40, x: 1, y: 2 });
+    (outer.parentElement as HTMLElement).style.display = "none";
+    expect(measureHits([["children", 0]]).hits).toEqual([]);
   });
 });
 
@@ -548,5 +562,90 @@ describe("pane focus is reported from every mode", () => {
     stop = undefined;
     bare.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
     expect(posts).toHaveLength(0);
+  });
+});
+
+describe("popovertarget clicks", () => {
+  /** A de-popovered panel plus a trigger naming it, as a canvas render leaves them. */
+  function invokerAndPanel(action?: string) {
+    const panel = document.createElement("nav");
+    panel.dataset.jxPopover = "auto";
+    panel.dataset.jxPath = '["children",1]';
+    panel.id = "menu";
+    const button = document.createElement("button");
+    button.setAttribute("popovertarget", "menu");
+    if (action) {
+      button.setAttribute("popovertargetaction", action);
+    }
+    button.dataset.jxPath = '["children",0]';
+    document.body.append(button, panel);
+    return { button, panel };
+  }
+
+  test("a click on the trigger reports the panel's path alongside the hit", () => {
+    const posted: { kind: string }[] = [];
+    const { button } = invokerAndPanel();
+    const stop = startInteraction(
+      { post: (m: { kind: string }) => posted.push(m) } as never,
+      document,
+    );
+    button.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    stop();
+    const invoke = posted.find((m) => m.kind === "popoverTargetClick") as
+      | { targetPath: unknown; action: string }
+      | undefined;
+    expect(invoke?.targetPath).toEqual(["children", 1]);
+    // Both halves: selecting the button AND opening its panel is what an author expects from a
+    // Control they can also style.
+    expect(posted.some((m) => m.kind === "hit")).toBe(true);
+  });
+
+  test("popovertargetaction travels with it, and an unknown value falls back to toggle", () => {
+    for (const [attr, expected] of [
+      [undefined, "toggle"],
+      ["hide", "hide"],
+      ["show", "show"],
+      ["nonsense", "toggle"],
+    ] as const) {
+      document.body.innerHTML = "";
+      const posted: { kind: string; action?: string }[] = [];
+      const { button } = invokerAndPanel(attr);
+      const stop = startInteraction(
+        { post: (m: { kind: string }) => posted.push(m) } as never,
+        document,
+      );
+      button.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      stop();
+      expect(posted.find((m) => m.kind === "popoverTargetClick")?.action).toBe(expected);
+    }
+  });
+
+  test("a trigger naming a popover the studio cannot address posts nothing", () => {
+    // A component's own internal popover is never stamped, so it stays native and is not ours.
+    const posted: { kind: string }[] = [];
+    const button = document.createElement("button");
+    button.setAttribute("popovertarget", "not-here");
+    document.body.append(button);
+    const stop = startInteraction(
+      { post: (m: { kind: string }) => posted.push(m) } as never,
+      document,
+    );
+    button.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    stop();
+    expect(posted.some((m) => m.kind === "popoverTargetClick")).toBe(false);
+  });
+
+  test("an ordinary click reports no invoker", () => {
+    const posted: { kind: string }[] = [];
+    const el = document.createElement("div");
+    el.dataset.jxPath = '["children",0]';
+    document.body.append(el);
+    const stop = startInteraction(
+      { post: (m: { kind: string }) => posted.push(m) } as never,
+      document,
+    );
+    el.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    stop();
+    expect(posted.some((m) => m.kind === "popoverTargetClick")).toBe(false);
   });
 });

@@ -6,6 +6,7 @@ import {
   setStampPropBindings,
 } from "@jxsuite/runtime";
 import {
+  applyCanvasPopoverOpen,
   applyPreviewColorScheme,
   applySiteStyle,
   EDIT_PLACEHOLDER_CSS,
@@ -1136,5 +1137,93 @@ describe("asset context", () => {
       "url(https://studio.example.com/p/o/r/main/raw/public/bg.png)",
     );
     handle.dispose();
+  });
+});
+
+describe("applyCanvasPopoverOpen", () => {
+  /** Two de-popovered panels with stamped paths, as a render would leave them. */
+  function twoPanels() {
+    const root = document.createElement("div");
+    for (const path of ['["children",0]', '["children",1]']) {
+      const el = document.createElement("nav");
+      el.dataset.jxPopover = "auto";
+      el.dataset.jxPath = path;
+      root.append(el);
+    }
+    document.body.append(root);
+    return root;
+  }
+
+  test("opens exactly one and closes the rest", () => {
+    const root = twoPanels();
+    applyCanvasPopoverOpen(root, '["children",1]');
+    const open = root.querySelectorAll("[data-jx-popover-open]");
+    expect(open).toHaveLength(1);
+    expect((open[0] as HTMLElement).dataset.jxPath).toBe('["children",1]');
+  });
+
+  test("null closes them all", () => {
+    const root = twoPanels();
+    applyCanvasPopoverOpen(root, '["children",0]');
+    applyCanvasPopoverOpen(root, null);
+    expect(root.querySelectorAll("[data-jx-popover-open]")).toHaveLength(0);
+  });
+
+  test("it is idempotent, so the host may post the same value freely", () => {
+    const root = twoPanels();
+    applyCanvasPopoverOpen(root, '["children",0]');
+    applyCanvasPopoverOpen(root, '["children",0]');
+    expect(root.querySelectorAll("[data-jx-popover-open]")).toHaveLength(1);
+  });
+
+  test("a path that is not a popover opens nothing rather than throwing", () => {
+    const root = twoPanels();
+    const plain = document.createElement("div");
+    plain.dataset.jxPath = '["children",2]';
+    root.append(plain);
+    applyCanvasPopoverOpen(root, '["children",2]');
+    expect(root.querySelectorAll("[data-jx-popover-open]")).toHaveLength(0);
+  });
+
+  test("a path naming nothing at all is survivable — the host may be ahead of the frame", () => {
+    const root = twoPanels();
+    expect(() => applyCanvasPopoverOpen(root, '["children",99]')).not.toThrow();
+  });
+});
+
+describe("EDIT_PLACEHOLDER_CSS — the canvas UA substitute", () => {
+  test("the closed rule is inside a cascade layer, so author styles still beat it", () => {
+    expect(EDIT_PLACEHOLDER_CSS).toContain("@layer jx-canvas-ua {");
+    expect(EDIT_PLACEHOLDER_CSS).toContain("[data-jx-popover]:not([data-jx-popover-open])");
+  });
+
+  test("the closed rule is never forced — the canvas must SHOW a base-display defect", () => {
+    // A base `display` on a popover defeats the real UA rule on the shipped page too, so forcing
+    // The canvas rule would hide a live defect. `@jxsuite/schema/overlays` reports it as
+    // `base-display` and the author fixes the document.
+    const layer = EDIT_PLACEHOLDER_CSS.slice(
+      EDIT_PLACEHOLDER_CSS.indexOf("@layer jx-canvas-ua"),
+      EDIT_PLACEHOLDER_CSS.indexOf("[data-jx-popover][data-jx-popover-open]"),
+    );
+    expect(layer).not.toContain("!important");
+    expect(layer).toContain("display: none");
+  });
+
+  test("an open panel is pinned out of its parent's flex alignment", () => {
+    // Measured, not reasoned: every drawer in the fleet sits in its header's flex row, and
+    // `align-items: center` centred a 904px panel on a 64px header — half of it above the artboard
+    // At a negative offset, contributing nothing to the overflow the host measures.
+    expect(EDIT_PLACEHOLDER_CSS).toContain("align-self: start !important");
+    expect(EDIT_PLACEHOLDER_CSS).toContain("flex: none !important");
+  });
+
+  test("`position` IS forced, because shown-in-place is the editing model", () => {
+    // A panel that sets `position: fixed` itself would be laid out against the frame's viewport,
+    // Which in an editable mode is the document's full height. Preview still renders it natively.
+    expect(EDIT_PLACEHOLDER_CSS).toContain("position: relative !important");
+  });
+
+  test("an open panel is labelled without a wrapper element", () => {
+    expect(EDIT_PLACEHOLDER_CSS).toContain("[data-jx-popover][data-jx-popover-open]::before");
   });
 });

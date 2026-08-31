@@ -3,12 +3,34 @@
   "title": "HTML Attribute Metadata",
   "description": "Section assignment, order, and input inference metadata for the properties sidebar.",
   "$sections": [
-    { "key": "identity", "label": "Identity" },
-    { "key": "link", "label": "Link" },
-    { "key": "media", "label": "Media" },
-    { "key": "form", "label": "Form" },
-    { "key": "table", "label": "Table" },
-    { "key": "accessibility", "label": "Accessibility" }
+    {
+      "key": "identity",
+      "label": "Identity"
+    },
+    {
+      "key": "link",
+      "label": "Link"
+    },
+    {
+      "key": "media",
+      "label": "Media"
+    },
+    {
+      "key": "form",
+      "label": "Form"
+    },
+    {
+      "key": "interactive",
+      "label": "Interactive"
+    },
+    {
+      "key": "table",
+      "label": "Table"
+    },
+    {
+      "key": "accessibility",
+      "label": "Accessibility"
+    }
   ],
   "$defs": {
     "id": {
@@ -361,6 +383,29 @@
       "$section": "accessibility",
       "$order": 70,
       "type": "string"
+    },
+    "popover": {
+      "$section": "identity",
+      "$order": 50,
+      "type": "string",
+      "$label": "Popover",
+      "enum": ["auto", "manual", "hint"]
+    },
+    "popovertarget": {
+      "$section": "interactive",
+      "$order": 10,
+      "type": "string",
+      "$label": "Opens popover",
+      "$elements": ["button", "input"],
+      "$input": "popover-target"
+    },
+    "popovertargetaction": {
+      "$section": "interactive",
+      "$order": 20,
+      "type": "string",
+      "$label": "Action",
+      "$elements": ["button", "input"],
+      "enum": ["toggle", "show", "hide"]
     }
   }
 }

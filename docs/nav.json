@@ -422,6 +422,10 @@
               "label": "Color schemes"
             },
             {
+              "path": "framework/concepts/overlays",
+              "label": "Popovers and overlays"
+            },
+            {
               "path": "framework/concepts/lists",
               "label": "Lists and iteration"
             },

@@ -34,7 +34,7 @@ An empty page has no tree to show, so the panel says so and offers **Add an elem
 
 ## Select and navigate
 
-Click a row to select that element. The canvas pans to bring it into view, and the Inspector's [Content](/docs/studio/design/properties), [Style](/docs/studio/design/style-inspector) and [Logic](/docs/studio/logic/events) tabs switch to it. Selection works in both directions: click something on the canvas and its row highlights and scrolls into view in Outline.
+Click a row to select that element. The canvas pans to bring it into view, and the Inspector's [Content](/docs/studio/design/properties), [Style](/docs/studio/design/style-inspector) and [Logic](/docs/studio/logic/events) tabs switch to it. If the element is inside a [popover](/docs/framework/concepts/overlays), the popover opens first, so a row you can see in Outline is always a thing you can see on the canvas. Selection works in both directions: click something on the canvas and its row highlights and scrolls into view in Outline.
 
 ## Select several at once
 

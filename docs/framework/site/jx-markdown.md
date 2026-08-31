@@ -106,7 +106,9 @@ which expands to:
 
 ## Style attributes
 
-Element styles are `style.*` dot-path attributes. CSS pseudo-classes drop their `:` prefix and named media queries drop their `@` prefix, and the transpiler restores both:
+Element styles are `style.*` dot-path attributes. CSS pseudo-classes drop their `:` prefix and named media queries drop their `@` prefix, and the transpiler restores both. Pseudo-_elements_ get two colons back: `backdrop` becomes `::backdrop`, while `before` and `after` keep the one-colon spelling CSS has always accepted.
+
+Only recognised names are restored. An unrecognised one stays bare and is then read as a descendant type selector, which matches nothing and says nothing about it, so [popover](/docs/framework/concepts/overlays) states are on the list: `popover-open`, `open` and `modal` alongside `hover`, `focus` and the rest.
 
 ```markdown
 ::button{style.padding="8px 16px" style.hover.backgroundColor="blue" style.--dark.color="#f0f0f0"}

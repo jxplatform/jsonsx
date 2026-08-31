@@ -19,6 +19,10 @@ import {
   schemeSelectors,
   COLOR_SCHEME_ATTR,
   COLOR_SCHEME_STORAGE_KEY,
+  booleanAttrValue,
+  elementStyleTags,
+  enumeratedAttrNames,
+  isDeclarationAtRule,
 } from "../src/runtime";
 import { evaluateExpression, isMutating } from "../src/expression";
 import type { JxDocument, JxElement } from "@jxsuite/schema/types";
@@ -2407,6 +2411,58 @@ describe("Jx — $schema version guard", () => {
       expect(called).toBe(true);
     } finally {
       warn.mockRestore();
+    }
+  });
+});
+
+describe("enumeratedAttrNames — the compiler's copy of the family rule", () => {
+  test("names exactly the three HTML enumerated attributes, sorted", () => {
+    expect(enumeratedAttrNames()).toEqual(["contenteditable", "draggable", "spellcheck"]);
+  });
+
+  test("every name it returns is treated as enumerated by booleanAttrValue", () => {
+    for (const name of enumeratedAttrNames()) {
+      expect(booleanAttrValue(name, true)).toBe("true");
+      expect(booleanAttrValue(name, false)).toBe("false");
+    }
+  });
+
+  test('popover is deliberately absent — popover="true" is invalid and means manual', () => {
+    expect(enumeratedAttrNames()).not.toContain("popover");
+    expect(booleanAttrValue("popover", true)).toBe("");
+    expect(booleanAttrValue("popover", false)).toBeNull();
+  });
+});
+
+describe("applyStyle — declaration-body at-rules", () => {
+  test("@position-try emits its declarations with no element scope", () => {
+    const el = document.createElement("nav");
+    document.body.append(el);
+    applyStyle(el, {
+      "@position-try --flip-up": { insetBlockStart: "auto" },
+      positionAnchor: "--btn",
+    });
+    const tag = elementStyleTags.get(el);
+    expect(tag?.textContent).toContain("@position-try --flip-up {");
+    expect(tag?.textContent).toContain("inset-block-start: auto");
+    // The defect: a `[data-jx=…]` selector inside kills the whole block, silently.
+    expect(tag?.textContent).not.toContain("@position-try --flip-up { [data-jx");
+  });
+
+  test("@media still scopes its rules to the element", () => {
+    const el = document.createElement("div");
+    document.body.append(el);
+    applyStyle(el, { "@(min-width: 40rem)": { color: "red" } });
+    const tag = elementStyleTags.get(el);
+    expect(tag?.textContent).toContain("@media (min-width: 40rem) { [data-jx=");
+  });
+
+  test("isDeclarationAtRule knows the four, and rejects the rule-bodied ones", () => {
+    for (const key of ["@position-try --x", "@property --y", "@font-face", "@counter-style c"]) {
+      expect(isDeclarationAtRule(key)).toBe(true);
+    }
+    for (const key of ["@media screen", "@supports (x: y)", "@starting-style", "@keyframes spin"]) {
+      expect(isDeclarationAtRule(key)).toBe(false);
     }
   });
 });

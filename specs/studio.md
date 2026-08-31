@@ -2,7 +2,7 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.10.4-draft
+**Version:** 0.10.5-draft
 **Status:** Partial
 **Updated:** 2026-08-31
 **License:** MIT
@@ -302,6 +302,65 @@ registered id un-registers that schema when the model is disposed.
 Monaco's web workers are resolved relative to the studio bundle's own URL. No worker means no
 language service and therefore no diagnostics at all — silently — so each host must ship
 `workers/*.worker.js` beside the bundle it serves.
+
+#### 4.2.2 Popovers, and the top layer the canvas cannot use
+
+> **Status: Implemented.**
+
+An OPEN popover is in the **top layer**, and CSS Position 4 §3.1 gives a top-layer element the
+viewport as its containing block whatever its ancestors say. In an editable mode that viewport is a
+fiction: the frame is sized to its own content height, so a drawer pinned with `inset: 0` lands
+halfway down a long page, and a panel taller than a short component frame is clipped by the
+`overflow: hidden` the canvas document needs. Worse, a top-layer box contributes to no ancestor's
+scrollable overflow, so the artboard can never grow to fit one.
+
+So editable modes **de-popover**: the runtime stamps `popover` onto `data-jx-popover` for nodes the
+studio can ADDRESS — those carrying a `data-jx-path` — exactly as it de-links `<a href>`. That drops
+every `[popover]` UA rule at once, and the one that matters is `position: fixed`: with it gone the
+panel lays out in normal flow at its document position, contributes to the content height, and the
+host grows the artboard by exactly its height. The canvas marks it **POPOVER · SHOWN IN PLACE**, and
+forces `position` and the flex/grid alignment so a panel declared inside a header's flex row is not
+centred on a 64px header with half of it above the artboard.
+
+Two things do NOT rescue this, and both are the intuitive answer: `container-type: size` on the
+canvas's query container does not make it a containing block for fixed descendants (measured in
+Chrome 151: `contain` computes to `none`, and a fixed child measures the window), and leaving the
+top layer is necessary but not sufficient, because a fixed box contributes nothing to an ancestor's
+overflow either.
+
+**The studio re-supplies one UA rule and no more** — `display: none` while closed — inside a cascade
+LAYER, so an author declaration still beats it exactly as it beats the real UA rule on the shipped
+page. That is deliberate rather than an oversight: a popover whose base rule sets `display` is laid
+out on every page whether open or not, and the canvas has to SHOW that defect. §16.6's report names
+it and offers the repair.
+
+`:popover-open` is transposed to `[data-jx-popover-open]` — the same specificity, so a block still
+wins and loses against the same neighbours. **`::backdrop` is dropped rather than emitted inert**:
+there is no backdrop pseudo-element outside the top layer, synthesising one would paint a scrim over
+the document being edited, and a rule that can never match would mark the selector as styled in the
+Style tab while doing nothing. Preview renders all of it natively.
+
+**Which popover is open is per-tab view state, and exactly one.** It writes nothing to the document,
+takes no undo entry, does not replicate over collaboration, and is not restored with a session.
+`canvas.setPopoverOpen` is the single verb — a setter rather than a toggle, because §13.3 clause 3
+requires a command to name the state it ends in, and a toggle could never drive a documentation
+screenshot. Three surfaces are renderings of it: the block action bar, the Style tab's selector
+segment (§6.2), and the trigger's own click in the canvas, which the frame reports because
+de-popovering removed the browser's invoker activation — leaving exactly one writer of open state
+instead of a race between the platform and the editor.
+
+**Selecting reveals.** A selection at or inside a popover opens it, from whichever surface made the
+selection — the canvas, the Outline, quick search, a Problem, or an undo. The rule is asymmetric on
+purpose: selecting outside every popover does NOT close the open one, because reaching a colour
+swatch in the Inspector is a selection change and a panel that shut on every one could never be
+styled.
+
+Three exclusions, all consequences of the `data-jx-path` gate rather than special cases: a popover
+rendered inside a component's own template stays native (the studio cannot address it); a layout
+popover stays native while a page is open and becomes editable when the layout itself is; and
+`<dialog>` is refused, because its UA rules key off `open` rather than `popover`.
+
+---
 
 ### 4.3 Pan, Zoom, and Centering
 
@@ -685,6 +744,22 @@ The Target Line **replaces** the breakpoint tab strip, the selector picker and t
 The breakpoint and scheme axes are selected on the pane context bar (§3.2 ⑦), whose definition site
 is Project Settings › Contexts (§16); the Style tab does not own a third selector and therefore
 cannot disagree with the one the canvas is rendering under.
+
+**The selector axis is element-aware.** The common set is every state any element can be in; beyond
+it, an element is offered only the states the platform actually gives it — `:popover-open`,
+`::backdrop` and `:popover-open::backdrop` on a popover, `[open]` and `:modal` on a `<dialog>`,
+`:checked` / `:invalid` / `:required` / `:user-invalid` on a form field. A rule that can never match
+is worse than a missing one: a menu that offers unmatchable states is a menu people stop reading.
+What the element already DECLARES is unioned in on top, so nothing an author has written can drop
+out of it.
+
+**Choosing `:popover-open` opens the popover on the canvas**, because this section's own rule says a
+control that selects a rendering context has to change the rendering or it is a control over a
+label. `:hover` gets away with not doing this — you can hover the element — and `:popover-open`
+cannot, because a closed popover is not on the screen to be put into that state by hand. It is
+therefore the ONE element state the canvas simulates (§4.2.2); extending that to `:hover` and
+`:focus` is a larger decision and is deliberately not taken here. `::backdrop` stays editable and is
+rendered in Preview only.
 
 **Each axis is a command**, so the popover is one projection of it rather than the capability
 itself: `canvas.setBreakpoint { media, pane? }`, `canvas.setColorScheme { scheme, pane? }`,
@@ -2524,9 +2599,28 @@ from a panel that has stopped working.
 
 > **Status: Implemented.**
 
-Two checks run over the document rather than over the app, and both file their findings as
-**Problems**: the accessibility report (`services/a11y-report.ts`) and the SEO warnings the Search
-appearance window already computed.
+Three checks run over the document rather than over the app, and all file their findings as
+**Problems**: the accessibility report (`services/a11y-report.ts`), the SEO warnings the Search
+appearance window already computed, and the popover report (`services/popover-report.ts`).
+
+**The popover report is separate from the accessibility one, and separate on purpose.** An
+`A11yFinding` is typed to a WCAG criterion, and none of its findings are WCAG failures: a popover
+whose base rule sets `display` is not inaccessible, it is BROKEN — laid out on every page whether or
+not anyone opened it — and forcing that into a criterion field would be a lie in the report's own
+vocabulary. An unnamed popover landmark IS a WCAG matter, and belongs to the accessibility report.
+
+Its rules live in `@jxsuite/schema/overlays` rather than in the studio, because three surfaces judge
+the same documents — this report, `jx build`, and the starter conformance test — and three copies of
+"what is wrong with a popover" is three chances to disagree in front of an author. It runs at the
+one chokepoint every edit passes through, a successful SAVE, beside the component-slot check that is
+already there; a render-time lint would re-file a record every frame, which is the noise a
+notification key exists to prevent.
+
+Every finding that can be repaired carries the command that repairs it, and the ones that cannot
+carry none. Moving `display` into `:popover-open`, removing two attributes that do nothing on the
+element they are written on, and writing the house spelling of `popover` are all mechanical, and
+each is ONE transaction so undo takes one press. "Point this invoker at the right panel" is not —
+which panel is the author's decision — so that finding is a sentence.
 
 **Why Problems and not a panel of their own.** Problems is where this app keeps the records that
 outlive the frame the reader was not watching, and both of these are exactly that: a page shipped
@@ -2881,6 +2975,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.10.5-draft** (2026-08-31) — the canvas de-popovers so an open popover lays out in place and grows the artboard (4.2.2); the selector axis is element-aware and choosing :popover-open changes the rendering (6.2); a third document report checks popover correctness (16.6).
 - **0.10.4-draft** (2026-08-31) — Edit's canvas column is drag-resizable, and the active breakpoint is derived from its width.
 - **0.10.3-draft** (2026-08-30) — 15: a brokered credential row reads from the broker, and carries reconnect, account choice and a disconnect that reaches it.
 - **0.10.2-draft** (2026-08-29) — A format declaring rewrite rather than serialize has its references repaired by the rename refactor, so it is no longer a reported remainder.
@@ -2994,4 +3089,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/studio` Specification v0.10.4-draft_
+_`@jxsuite/studio` Specification v0.10.5-draft_

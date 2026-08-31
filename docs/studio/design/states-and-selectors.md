@@ -32,6 +32,22 @@ The menu offers the common ones: **:hover**, **:focus**, **:active**, **:focus-w
 
 They mean what they mean on the web: `:hover` while the pointer is over the element, `:focus` while it holds keyboard focus, `:first-child` / `:last-child` when it's the first or last among its siblings, `::placeholder` for an input's hint text.
 
+## States only some elements have
+
+Beyond the common set, the menu offers the states the platform actually gives the element you selected, and nothing else, because a rule that can never match is worse than a missing one.
+
+| Element                                        | Also offered                                             |
+| ---------------------------------------------- | -------------------------------------------------------- |
+| A [popover](/docs/framework/concepts/overlays) | `:popover-open`, `::backdrop`, `:popover-open::backdrop` |
+| `<dialog>`                                     | `[open]`, `:modal`, `::backdrop`                         |
+| `<details>`                                    | `[open]`                                                 |
+| `<input>`, `<select>`, `<textarea>`            | `:checked`, `:invalid`, `:required`, `:user-invalid`     |
+| `<a>`                                          | `:visited`, `:target`                                    |
+
+Anything the element already has styles for stays in the menu whatever it is, so a selector you wrote by hand never disappears.
+
+**Picking `:popover-open` opens the popover on the canvas.** You can hover an element to see its `:hover` styles, but a closed popover is not on screen to be put into that state by hand, so choosing the state shows it. It is the one element state the canvas simulates; the rest are editing targets only. `::backdrop` is editable here and shown in **Preview**, where the popover renders the way a visitor sees it.
+
 ## Add your own selector
 
 Choose **+ Add custom…** at the bottom of the menu. A dialog asks for a state or nested rule to edit under this element; type one and click **Use**:

@@ -1,8 +1,8 @@
 # Jx Markdown Specification
 
-**Version:** 0.1.9-draft
+**Version:** 0.1.10-draft
 **Status:** Partial
-**Updated:** 2026-08-27
+**Updated:** 2026-08-31
 **License:** MIT
 
 ---
@@ -317,7 +317,11 @@ Produces:
 }
 ```
 
-Recognized pseudo-class names: `hover`, `focus`, `active`, `visited`, `disabled`, `checked`, `valid`, `invalid`, `required`, `empty`, `first-child`, `last-child`, `focus-within`, `focus-visible`, `placeholder`, `selection`, `before`, `after`.
+Recognized pseudo-CLASS names: `hover`, `focus`, `active`, `visited`, `disabled`, `checked`, `valid`, `invalid`, `required`, `empty`, `first-child`, `last-child`, `focus-within`, `focus-visible`, `placeholder`, `selection`, `before`, `after`, `popover-open`, `open`, `modal`.
+
+Recognized pseudo-ELEMENT names, which take **two** colons: `backdrop`. A separate set because the prefix differs, not because the concept does; `before` and `after` keep their one-colon spelling, which CSS still accepts and which every existing `.md` component is written with.
+
+An unrecognized name is left unprefixed and is then read as a descendant TYPE selector — `style.popover-open.opacity=1` emitted `#panel popover-open { opacity: 1 }`, a rule matching nothing with nothing to say so. That is why the overlay states had to be named here: without them a popover authored in a `.md` component could not be styled open at all.
 
 ### 7.4 Media Queries in Style Attributes
 
@@ -446,6 +450,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.1.10-draft** (2026-08-31) — popover-open, open and modal are recognized pseudo-classes; backdrop is a pseudo-element taking two colons.
 - **0.1.9-draft** (2026-08-27) — 12.8: roundtrip serialization is lossless where expressible, not total.
 - **0.1.8-draft** (2026-08-15) — Number the sections so they are addressable, and add §13 Standards Alignment.
 - **0.1.7-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).

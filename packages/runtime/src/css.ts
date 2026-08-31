@@ -60,6 +60,85 @@ export function resolveAtQuery(atKey: string, mediaQueries: Record<string, strin
   return null;
 }
 
+/**
+ * At-rules whose body is a list of DECLARATIONS rather than a list of rules.
+ *
+ * Every other `@`-key in a `style` object wraps selectors — `@media`, `@supports`,
+ * `@starting-style` — so both emitters assume a selector child and write `@key { <selector> { … }
+ * }`. These four have no selector: `@position-try --flip { inset-block-start: auto }` IS the body,
+ * and wrapping it in one produces a block the parser discards without a word.
+ *
+ * That is why an anchored dropdown had no custom fallback to declare. `position-try-fallbacks` can
+ * name `flip-block` and friends without this, but a bespoke fallback position — the thing you need
+ * when the built-in flips do not fit — could not be expressed at all.
+ *
+ * The name is part of the key (`@position-try --flip`), so this is a PREFIX match. `@keyframes` is
+ * deliberately absent: its body is neither declarations nor selectors but percentage stops, which
+ * is a third shape and a separate design.
+ *
+ * @param {string} atKey - An `@`-prefixed style key
+ * @returns {boolean} True when the block is emitted verbatim, with no selector inside
+ * @docs framework/concepts/styling
+ */
+export function isDeclarationAtRule(atKey: string): boolean {
+  return (
+    atKey.startsWith("@position-try") ||
+    atKey.startsWith("@property") ||
+    atKey.startsWith("@font-face") ||
+    atKey.startsWith("@counter-style")
+  );
+}
+
+/**
+ * Resolve one nested style key against its parent selector.
+ *
+ * `&` splices, `:`/`.`/`[` concatenate, anything else is a descendant. Extracted because the same
+ * four-branch decision was written THREE times in `applyStyle` — the top-level nested loop,
+ * `emitNested`'s recursion and `emitMediaNested` — and three copies of one decision is three
+ * chances for a selector to mean different things depending on how deeply it was nested.
+ *
+ * @param {string} scope - The parent selector
+ * @param {string} key - The nested key, e.g. `":hover"`, `"& > li"`, `".child"`
+ * @returns {string} The resolved selector
+ */
+export function resolveNestedSelector(scope: string, key: string): string {
+  if (key.startsWith("&")) {
+    return key.replace("&", scope);
+  }
+  if (key.startsWith("[") || key.startsWith(":") || key.startsWith(".")) {
+    return `${scope}${key}`;
+  }
+  return `${scope} ${key}`;
+}
+
+/**
+ * Studio-canvas popover selector transposition — the style half of `setCanvasDelinkPopovers`.
+ *
+ * The canvas renames `popover` to `data-jx-popover` so an open panel leaves the TOP LAYER and
+ * becomes an ordinary positioned element the editor can measure, select and grow the artboard for.
+ * The moment it does, `:popover-open` matches nothing — so an authored open state would simply not
+ * apply, and the author would be styling a rule they could never see.
+ *
+ * `[data-jx-popover-open]` is the stand-in, and the substitution is exact in the way that matters:
+ * a pseudo-class and an attribute selector are both specificity (0,1,0), so a `:popover-open` block
+ * still wins and loses against the same neighbours it does on the shipped page.
+ *
+ * `null` means "do not emit this rule at all", and `::backdrop` is the one thing it is returned
+ * for. There is no backdrop pseudo-element outside the top layer; synthesising one would paint a
+ * full-canvas scrim over the document being edited, and emitting an inert rule would mark the
+ * selector as "styled" in the Style panel while doing nothing. Preview renders it natively.
+ *
+ * @param {string} selector - A fully resolved selector, canvas-side
+ * @returns {string | null} The selector to emit, or null to emit nothing
+ * @docs framework/concepts/overlays
+ */
+export function transposeCanvasPopoverSelector(selector: string): string | null {
+  if (selector.includes("::backdrop")) {
+    return null;
+  }
+  return selector.replaceAll(":popover-open", "[data-jx-popover-open]");
+}
+
 // ─── Color Schemes ────────────────────────────────────────────────────────────
 
 /**

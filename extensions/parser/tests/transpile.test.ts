@@ -975,3 +975,37 @@ describe("slugifyHeading", () => {
     }
   });
 });
+
+describe("overlay style keys — the states a popover in a .md component needs", () => {
+  test("popover-open, open and modal become pseudo-classes", () => {
+    expect(applyStyleKeyMapping({ "popover-open": { display: "flex" } })).toEqual({
+      ":popover-open": { display: "flex" },
+    });
+    expect(applyStyleKeyMapping({ open: { color: "red" } })).toEqual({ ":open": { color: "red" } });
+    expect(applyStyleKeyMapping({ modal: { inset: "0" } })).toEqual({ ":modal": { inset: "0" } });
+  });
+
+  test("backdrop becomes a pseudo-ELEMENT, with two colons", () => {
+    expect(applyStyleKeyMapping({ backdrop: { opacity: "1" } })).toEqual({
+      "::backdrop": { opacity: "1" },
+    });
+  });
+
+  test("both round-trip through collapseStylePaths", () => {
+    const style = { "::backdrop": { opacity: "1" }, ":popover-open": { display: "flex" } };
+    expect(collapseStylePaths(style)).toEqual({
+      "backdrop.opacity": "1",
+      "popover-open.display": "flex",
+    });
+    const roundTripped = expandDotPaths(collapseStylePaths(style));
+    expect(applyStyleKeyMapping(roundTripped)).toEqual(style);
+  });
+
+  test("an unmapped key stays bare — which is why the mapping had to exist", () => {
+    // Before these names were known, `collectStyles` read the bare key as a descendant TYPE
+    // Selector and emitted `#panel popover-open { … }`: a rule matching nothing, silently.
+    expect(applyStyleKeyMapping({ "not-a-pseudo": { x: "1" } })).toEqual({
+      "not-a-pseudo": { x: "1" },
+    });
+  });
+});

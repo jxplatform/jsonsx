@@ -22,15 +22,12 @@ import {
 } from "./canvas-surface";
 import type { CanvasSurface } from "./canvas-surface";
 import { activeTab, workspace } from "../workspace/workspace";
-import {
-  findCanvasElement,
-  getActivePanel,
-  panelMediaToActiveMedia,
-  panelOfSurface,
-} from "./canvas-helpers";
+import { panelMediaToActiveMedia, panelOfSurface } from "./canvas-helpers";
 import { rectOf } from "../utils/geometry";
 import { EDIT_WIDTH_MIN, clearEditWidth, setEditWidth } from "./edit-width";
+import { activeDocumentHasPopover, popoverPathFor } from "./popover-path";
 import { getEffectiveLocales, getEffectiveMedia } from "../site-context";
+import type { JxPath } from "../state";
 import { dynamicRouteParams } from "../page-params";
 import {
   argsSchema,
@@ -706,15 +703,6 @@ function revealBy(surface: CanvasSurface, offsetY: number, smooth: boolean): voi
 }
 
 /**
- * Smoothly pan/scroll the canvas vertically to center the given DOM element.
- *
- * @param {HTMLElement} el
- */
-function _panToEl(surface: CanvasSurface, el: HTMLElement) {
-  revealBy(surface, centeringOffset(surface, rectOf(el)), true);
-}
-
-/**
  * Centre a PARENT-VIEWPORT rect in the pane — for callers whose target lives inside an iframe (no
  * parent DOM element to measure; the host converts the measured iframe rect and passes it here).
  *
@@ -745,24 +733,6 @@ function animatePanBy(surface: CanvasSurface, offsetY: number) {
     }
   };
   requestAnimationFrame(step);
-}
-
-/**
- * Pan the canvas vertically so the element at `path` is centered in the viewport.
- *
- * @param {(string | number)[]} path
- */
-export function panToElement(path: (string | number)[]) {
-  const surface = activeCanvasSurface();
-  const panel = getActivePanel();
-  if (!panel?.canvas) {
-    return;
-  }
-  const el = findCanvasElement(path, panel.canvas);
-  if (!el) {
-    return;
-  }
-  _panToEl(surface, el);
 }
 
 // ─── Commands ─────────────────────────────────────────────────────────────────
@@ -898,6 +868,7 @@ export function setCanvasView<T extends ViewableTab>(
 }
 
 /** What the canvas view verbs need that this module does not own. */
+
 export interface CanvasCommandDeps {
   /** The effective mode, `ui.preview` already composed in — `studio.ts`'s `getCanvasMode`. */
   getCanvasMode: () => string;
@@ -914,6 +885,13 @@ export interface CanvasCommandDeps {
    * side pane's tab and repainted the primary, leaving the stage it changed showing the old width.
    */
   renderPane: (paneId: string) => void;
+  /**
+   * Write a tab's open popover and tell its frames — `canvas/popover-state.ts`'s `setOpenPopover`.
+   *
+   * Injected for the same reason `renderPane` is: that module imports `iframe-host`, which imports
+   * this one, so reaching for it directly would close a cycle.
+   */
+  setOpenPopover: (tab: Tab, path: JxPath | null) => void;
 }
 
 /** A document is open in a pane — every verb here writes that pane's own view state. */
@@ -1333,6 +1311,60 @@ export function canvasViewCommands(deps: CanvasCommandDeps): AnyCommand[] {
         repaint(args);
       },
       title: "Show Layout Elements",
+    },
+    {
+      /**
+       * Draw a popover open on the canvas so it can be selected, edited and styled.
+       *
+       * ONE record covers open, close and switch. `open` defaults to true, and `open: false` with
+       * no path closes whatever is open — because a `toggle` cannot say which state it ends in,
+       * which `scripts/check-shot-contract.ts` rejects outright (`/\.toggle[A-Z]/`) and
+       * `services/automation.ts` throws on. A documentation screenshot of an open popover is only
+       * possible through an idempotent setter.
+       *
+       * A VIEW state: `undo: "none"`, because it writes `session.ui` and never the document.
+       */
+      args: argsSchema({
+        ...paneArg,
+        open: booleanProperty("True to draw the popover open, false to close it."),
+        path: {
+          description:
+            "Document path of the popover. Defaults to the popover the selection is in or at.",
+          items: { type: ["string", "number"] },
+          type: "array",
+        },
+      }),
+      category: "View",
+      enablement: () => activeDocumentHasPopover(),
+      group: "3_canvas",
+      id: "canvas.setPopoverOpen",
+      level: "document",
+      menus: ["palette"],
+      requires: "a popover in the open document",
+      run: (_commandCtx, args) => {
+        const tab = contextTab("canvas.setPopoverOpen", args);
+        const raw = (args ?? {}) as { open?: unknown; path?: JxPath };
+        const open =
+          raw.open === undefined ? true : booleanArg("canvas.setPopoverOpen", args, "open");
+        if (!open && raw.path === undefined) {
+          deps.setOpenPopover(tab, null);
+          return;
+        }
+        const path = popoverPathFor(tab, raw.path);
+        /* REFUSES a path that is not a popover rather than opening nothing — the rule
+           `canvas.setBreakpoint` applies to a breakpoint key. A <dialog> is refused with it: its UA
+           rules key off `open`, not `popover`, so de-popovering one falls back to a different rule
+           with a different name and the canvas would draw it wrong. */
+        if (path === null) {
+          throw new RangeError(
+            'command "canvas.setPopoverOpen" argument "path": names no popover in this document — ' +
+              "a popover is an element with a `popover` attribute, and <dialog> is not one",
+          );
+        }
+        deps.setOpenPopover(tab, open ? path : null);
+      },
+      title: "Show Popover",
+      when: documentOpen,
     },
     {
       args: {

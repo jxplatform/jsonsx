@@ -46,6 +46,10 @@ Below the basics, Studio shows only the attributes that apply to the selected el
 
 Links get special treatment. On an `a` element, the **Link** row pairs a kind picker (**Internal Page**, **External URL**, **Anchor**, **Email**, **Phone**) with the matching input; choosing **Internal Page** lists your site's pages so you pick a destination instead of typing a path. The **Open in** attribute becomes a dropdown of the standard targets.
 
+Buttons and inputs get an **Interactive** section holding the two [popover](/docs/framework/concepts/overlays) invoker attributes. **Opens popover** is a picker over the popovers this document declares, not a text field. An id that names nothing does nothing, an id that names the wrong panel is worse, and neither says anything when you get it wrong. A popover declared in another file is not in the list, so the picker keeps whatever value is already there and offers **Type an id…** for the rest. **Action** chooses `toggle`, `show` or `hide`.
+
+`popover` itself is a global attribute and lives in **Identity**, beside `hidden`. Its value is one of `auto`, `manual` or `hint`. `auto` is the one you almost always want, and the only one that closes on Escape and on a click outside. Whether the popover is currently _open on the canvas_ is a view control, not a value in the file: see [The canvas](/docs/studio/interface/canvas).
+
 Anything not covered lives in the **Custom** section: click **+ Add attribute** to add any attribute by name, edit its value inline, or remove it with **✕**.
 
 ## Make any value dynamic

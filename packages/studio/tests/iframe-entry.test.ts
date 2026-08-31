@@ -13,7 +13,12 @@ const WIRE_CTX: WireMapperCtx = {
   pageContentPrefix: null,
 };
 
-function renderMsg(gen: number, doc: unknown, shadowDoc: unknown = doc): ParentToIframe {
+function renderMsg(
+  gen: number,
+  doc: unknown,
+  shadowDoc: unknown = doc,
+  extra: Partial<ParentToIframe & { mode: string }> = {},
+): ParentToIframe {
   return {
     colorScheme: null,
     doc,
@@ -24,7 +29,19 @@ function renderMsg(gen: number, doc: unknown, shadowDoc: unknown = doc): ParentT
     mode: "design",
     shadowDoc,
     siteStyle: null,
-  };
+    ...extra,
+  } as ParentToIframe;
+}
+
+/** A document whose only child is a popover panel, as the runtime de-popovers it in the canvas. */
+const POPOVER_DOC = {
+  children: [{ attributes: { popover: "auto" }, children: ["Menu"], tagName: "nav" }],
+  tagName: "div",
+};
+
+/** The panel element in the rendered container, whatever the container is. */
+function panel(): HTMLElement | null {
+  return document.querySelector("[data-jx-popover]");
 }
 
 let teardown: (() => void) | undefined;
@@ -1601,5 +1618,65 @@ describe("startCanvasIframe — layout chrome clicks", () => {
     container.querySelector("h1")!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     pair.flush();
     expect(acks.some((m) => m.kind === "layoutHit")).toBe(false);
+  });
+});
+
+describe("startCanvasIframe — setPopoverOpen", () => {
+  /** Mount a frame showing POPOVER_DOC in `mode` and return the channel pair. */
+  async function mounted(mode = "design") {
+    const pair = fakeChannelPair<ParentToIframe, IframeToParent>();
+    const container = document.createElement("div");
+    document.body.append(container);
+    teardown = startCanvasIframe({ channel: pair.iframe, container });
+    pair.parent.post(renderMsg(1, POPOVER_DOC, POPOVER_DOC, { mode }));
+    pair.flush();
+    await flush();
+    pair.flush();
+    return pair;
+  }
+
+  test("the render de-popovers the panel, so it leaves the top layer", async () => {
+    await mounted();
+    expect(panel()).not.toBeNull();
+    expect(panel()!.getAttribute("popover")).toBeNull();
+  });
+
+  test("opening flips one attribute and needs no re-render", async () => {
+    const pair = await mounted();
+    const acks: IframeToParent[] = [];
+    pair.parent.onMessage((m) => acks.push(m));
+    pair.parent.post({ kind: "setPopoverOpen", path: ["children", 0] });
+    pair.flush();
+    expect(panel()!.dataset.jxPopoverOpen).toBe("");
+    expect(acks.some((m) => m.kind === "renderComplete")).toBe(false);
+  });
+
+  test("null closes it again", async () => {
+    const pair = await mounted();
+    pair.parent.post({ kind: "setPopoverOpen", path: ["children", 0] });
+    pair.flush();
+    pair.parent.post({ kind: "setPopoverOpen", path: null });
+    pair.flush();
+    expect(panel()!.dataset.jxPopoverOpen).toBeUndefined();
+  });
+
+  test("preview refuses it in the FRAME as well as in the host", async () => {
+    // Both realms enforce every editing gate (§4.2): the canvas bundle ships prebuilt, so neither
+    // Side may assume the other's build is current.
+    const pair = await mounted("preview");
+    pair.parent.post({ kind: "setPopoverOpen", path: ["children", 0] });
+    pair.flush();
+    expect(document.querySelector("[data-jx-popover-open]")).toBeNull();
+  });
+
+  test("a render restores the open panel, because a render replaces the DOM", async () => {
+    const pair = await mounted();
+    pair.parent.post(
+      renderMsg(2, POPOVER_DOC, POPOVER_DOC, { popoverOpen: ["children", 0] } as never),
+    );
+    pair.flush();
+    await flush();
+    pair.flush();
+    expect(panel()!.dataset.jxPopoverOpen).toBe("");
   });
 });

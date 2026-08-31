@@ -26,7 +26,6 @@ import {
   observeCenterUntilStable,
   PAN_ZOOM_MAX,
   PAN_ZOOM_MIN,
-  panToElement,
   panToParentRect,
   requestEditZoom,
   resetFits,
@@ -744,64 +743,6 @@ function makeRenderedPanel(opts: { scrollContainer?: HTMLElement | null } = {}) 
   return { canvas, panel, target };
 }
 
-describe("panToElement", () => {
-  test("no-op when there is no active panel", () => {
-    surfaceForPane("primary").panY = 7;
-    panToElement(["children", 0]);
-    expect(surfaceForPane("primary").panY).toBe(7);
-  });
-
-  test("no-op when the panel has no canvas", () => {
-    canvasPanels.push({ canvas: null, mediaName: "base" } as never);
-    surfaceForPane("primary").panY = 7;
-    panToElement(["children", 0]);
-    expect(surfaceForPane("primary").panY).toBe(7);
-  });
-
-  test("no-op when the element is not found", () => {
-    makeRenderedPanel();
-    surfaceForPane("primary").panY = 7;
-    panToElement(["children", 99]);
-    expect(surfaceForPane("primary").panY).toBe(7);
-  });
-
-  test("scrolls the scroll container smoothly in content mode", () => {
-    const scrollContainer = document.createElement("div");
-    scrollContainer.scrollTop = 100;
-    const scrollTo = mock((_opts: ScrollToOptions) => {});
-    (scrollContainer as unknown as { scrollTo: typeof scrollTo }).scrollTo = scrollTo;
-    const { target } = makeRenderedPanel({ scrollContainer });
-
-    stubRect(primary().wrap, { height: 600, top: 0 });
-    stubRect(target, { height: 50, top: 100 });
-    panToElement(["children", 0]);
-
-    // ElCenterY = 125, vpCenterY = 300, offsetY = 175 → top = 100 - 175
-    expect(scrollTo).toHaveBeenCalledWith({ behavior: "smooth", top: -75 });
-  });
-
-  test("animates panY via requestAnimationFrame without a scroll container", () => {
-    const { target } = makeRenderedPanel();
-    makePanzoomWrap();
-    stubRect(primary().wrap, { height: 600, top: 0 });
-    stubRect(target, { height: 0, top: 500 });
-
-    // Drive the animation deterministically: one mid-flight frame, one final frame
-    const frames = [100, 1000];
-    globalThis.requestAnimationFrame = ((cb: FrameRequestCallback) => {
-      const dt = frames.shift() ?? 1000;
-      cb(performance.now() + dt);
-      return 0;
-    }) as typeof requestAnimationFrame;
-
-    surfaceForPane("primary").panY = 0;
-    panToElement(["children", 0]);
-
-    // OffsetY = 300 - 500 = -200; final eased value lands on the target
-    expect(surfaceForPane("primary").panY).toBeCloseTo(-200);
-  });
-});
-
 describe("panToParentRect", () => {
   test("pans by the parent-viewport rect (the stylebook pan-to-card entry point)", () => {
     makePanzoomWrap();
@@ -1220,6 +1161,8 @@ describe("i18n.switchLocale", () => {
         getCanvasMode: () => "design",
         renderPane: (paneId: string) => rendered.push(paneId),
         setCanvasMode: () => {},
+        setOpenPopover: () => {},
+
         setResolvingOpen: () => {},
       }),
     );

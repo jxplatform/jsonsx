@@ -224,7 +224,7 @@
       "$title": "Search Modal",
       "tagName": "div",
       "id": "site-search-modal",
-      "attributes": { "popover": "" },
+      "attributes": { "popover": "auto" },
       "style": {
         "width": "min(640px, 94vw)",
         "margin": "10vh auto auto",
