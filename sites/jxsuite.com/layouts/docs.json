@@ -210,7 +210,7 @@
       "$title": "Docs Mobile Nav Popover",
       "tagName": "nav",
       "id": "docs-mobile-nav",
-      "attributes": { "popover": "", "aria-label": "Docs navigation" },
+      "attributes": { "popover": "auto", "aria-label": "Docs navigation" },
       "style": {
         "inset": "0 auto 0 0",
         "width": "min(300px, 82vw)",
@@ -303,9 +303,7 @@
                       "attributes": {
                         "class": "nav-link",
                         "href": "/docs/${item.path}/",
-                        "aria-current": "${(state.$page.url.endsWith('/') ? state.$page.url.slice(0, -1) : state.$page.url) === '/docs/' + item.path ? 'page' : 'false'}",
-                        "popovertarget": "docs-mobile-nav",
-                        "popovertargetaction": "hide"
+                        "aria-current": "${(state.$page.url.endsWith('/') ? state.$page.url.slice(0, -1) : state.$page.url) === '/docs/' + item.path ? 'page' : 'false'}"
                       },
                       "textContent": "${item.label}"
                     }
@@ -339,9 +337,7 @@
                             "attributes": {
                               "class": "nav-link",
                               "href": "/docs/${item.path}/",
-                              "aria-current": "${(state.$page.url.endsWith('/') ? state.$page.url.slice(0, -1) : state.$page.url) === '/docs/' + item.path ? 'page' : 'false'}",
-                              "popovertarget": "docs-mobile-nav",
-                              "popovertargetaction": "hide"
+                              "aria-current": "${(state.$page.url.endsWith('/') ? state.$page.url.slice(0, -1) : state.$page.url) === '/docs/' + item.path ? 'page' : 'false'}"
                             },
                             "textContent": "${item.label}"
                           }

@@ -228,7 +228,7 @@
           "$title": "Mobile Menu Popover",
           "tagName": "nav",
           "id": "site-mobile-menu",
-          "attributes": { "popover": "", "aria-label": "Site menu" },
+          "attributes": { "popover": "auto", "aria-label": "Site menu" },
           "style": {
             "inset": "0 0 0 auto",
             "width": "min(300px, 80vw)",
@@ -292,9 +292,7 @@
             {
               "tagName": "a",
               "attributes": {
-                "href": "/studio",
-                "popovertarget": "site-mobile-menu",
-                "popovertargetaction": "hide"
+                "href": "/studio"
               },
               "style": {
                 "display": "block",
@@ -310,9 +308,7 @@
             {
               "tagName": "a",
               "attributes": {
-                "href": "/features",
-                "popovertarget": "site-mobile-menu",
-                "popovertargetaction": "hide"
+                "href": "/features"
               },
               "style": {
                 "display": "block",
@@ -328,9 +324,7 @@
             {
               "tagName": "a",
               "attributes": {
-                "href": "/templates",
-                "popovertarget": "site-mobile-menu",
-                "popovertargetaction": "hide"
+                "href": "/templates"
               },
               "style": {
                 "display": "block",
@@ -346,9 +340,7 @@
             {
               "tagName": "a",
               "attributes": {
-                "href": "/compare",
-                "popovertarget": "site-mobile-menu",
-                "popovertargetaction": "hide"
+                "href": "/compare"
               },
               "style": {
                 "display": "block",
@@ -364,9 +356,7 @@
             {
               "tagName": "a",
               "attributes": {
-                "href": "/docs/start/first-project",
-                "popovertarget": "site-mobile-menu",
-                "popovertargetaction": "hide"
+                "href": "/docs/start/first-project"
               },
               "style": {
                 "display": "block",
@@ -380,13 +370,12 @@
               "children": ["Docs"]
             },
             {
+              "$title": "GitHub link — opens a new tab, so the drawer stays open behind it",
               "tagName": "a",
               "attributes": {
                 "href": "https://github.com/jxsuite/jx",
                 "target": "_blank",
-                "rel": "noopener noreferrer",
-                "popovertarget": "site-mobile-menu",
-                "popovertargetaction": "hide"
+                "rel": "noopener noreferrer"
               },
               "style": {
                 "display": "block",
@@ -417,9 +406,7 @@
             {
               "tagName": "a",
               "attributes": {
-                "href": "/download",
-                "popovertarget": "site-mobile-menu",
-                "popovertargetaction": "hide"
+                "href": "/download"
               },
               "style": {
                 "display": "block",
