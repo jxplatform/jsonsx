@@ -24,7 +24,7 @@ The canvas is the center of the workspace, where your page renders live. It is t
 
 ## Resizing the page
 
-In **Edit** the canvas is a single centred column with a drag handle on each side. Dragging either one resizes the page symmetrically, and the [breakpoint](/docs/studio/design/breakpoints) follows the width. Design has no handles — it already draws every breakpoint side by side.
+In **Edit** the canvas is a single centred column with a drag handle on each side. Dragging either one resizes the page symmetrically, and the [breakpoint](/docs/studio/design/breakpoints) follows the width. Design has no handles, because it already draws every breakpoint side by side.
 
 ## Pan and zoom
 
