@@ -132,6 +132,8 @@ const {
 } = await import("../src/canvas/canvas-utils");
 const { registerSelectionSetCommand, selectionCommands } =
   await import("../src/canvas/canvas-render");
+const { EDIT_WIDTH_MIN, editWidthOfPane, resetEditWidths } =
+  await import("../src/canvas/edit-width");
 
 // ─── Context ──────────────────────────────────────────────────────────────────
 
@@ -179,6 +181,7 @@ beforeEach(() => {
   canvasMode = "design";
   setCanvasMode.mockClear();
   resetFits();
+  resetEditWidths();
   renderedPanes.length = 0;
   surfaceForPane("primary").panzoomWrap = null;
   ctx = makeContext({ document: { open: true } });
@@ -200,6 +203,11 @@ describe("the records themselves", () => {
       "canvas.setZoom",
       "canvas.setFit",
       "canvas.setEditZoom",
+      // The addressable form of the Edit column's resize handles. It is a SETTER over a width in
+      // Px, so it names the state it ends in the way its neighbours do; the drag itself bypasses
+      // The registry for the reason `requestEditZoom` bypasses `canvas.setEditZoom` — a repaint
+      // Per pointermove would rebuild the iframe and break the handle's own pointer capture.
+      "canvas.setEditWidth",
       // The rendering context's three axes (§4.2 control ③). The Context popover wrote
       // `session.ui` through `updateUi` directly, so none of the three was a command — not in the
       // Palette, not scriptable, not bindable. Setters, not cycles: a chord carries no argument, so
@@ -409,6 +417,70 @@ describe("canvas.setFit", () => {
   test("refuses when no tab is open", () => {
     closeAllTabs();
     expect(() => registry.run("canvas.setFit", { fit: "page" })).toThrow("needs an open document");
+  });
+});
+
+describe("canvas.setEditWidth", () => {
+  /** A desktop-first document, so the bands below read the way a starter's do. */
+  const withWidths = () => {
+    const tab = openWith(["edit", "design"]);
+    (tab.doc.document as Record<string, unknown>).$media = {
+      "--": "1200px",
+      "--md": "(max-width: 768px)",
+    };
+    return tab;
+  };
+
+  test("records the width, derives the breakpoint, and repaints the pane it wrote", () => {
+    canvasMode = "edit";
+    const tab = withWidths();
+    renderedPanes.length = 0;
+    void registry.run("canvas.setEditWidth", { width: 700 });
+    expect(editWidthOfPane(workspace.activePaneId, tab)).toBe(700);
+    expect(tab.session.ui.activeMedia).toBe("--md");
+    expect(renderedPanes).toEqual([workspace.activePaneId]);
+  });
+
+  test("null gives the column back to the chosen breakpoint", () => {
+    canvasMode = "edit";
+    const tab = withWidths();
+    void registry.run("canvas.setEditWidth", { width: 700 });
+    expect(editWidthOfPane(workspace.activePaneId, tab)).toBe(700);
+    void registry.run("canvas.setEditWidth", { width: null });
+    expect(editWidthOfPane(workspace.activePaneId, tab)).toBeNull();
+  });
+
+  test("addresses the pane it is given, not the focused one", () => {
+    canvasMode = "edit";
+    withWidths();
+    splitRight();
+    focusPane(PRIMARY_PANE);
+    renderedPanes.length = 0;
+    void registry.run("canvas.setEditWidth", { pane: SECONDARY_PANE, width: 700 });
+    expect(renderedPanes).toEqual([SECONDARY_PANE]);
+    expect(workspace.activePaneId).toBe(PRIMARY_PANE);
+  });
+
+  test("is disabled outside edit mode, with a reason", () => {
+    canvasMode = "design";
+    expect(registry.isEnabled("canvas.setEditWidth")).toBe(false);
+    expect(registry.disabledReason("canvas.setEditWidth")).toBe("a document in edit mode");
+  });
+
+  test("refuses a width below the floor", () => {
+    canvasMode = "edit";
+    withWidths();
+    expect(() => registry.run("canvas.setEditWidth", { width: EDIT_WIDTH_MIN - 1 })).toThrow(
+      "outside the supported range",
+    );
+  });
+
+  test("refuses when no tab is open", () => {
+    canvasMode = "edit";
+    closeAllTabs();
+    expect(() => registry.run("canvas.setEditWidth", { width: 700 })).toThrow(
+      "needs an open document",
+    );
   });
 });
 

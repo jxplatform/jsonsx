@@ -366,11 +366,64 @@
   overflow-x: hidden;
   display: flex;
   justify-content: center;
-  padding: 32px 0;
+  /* The side gutter is LOAD-BEARING, not breathing room: the resize handles hang outside the
+     column's own box, and this container clips horizontally, so without it the handles would be
+     unreachable at exactly the width where dragging inward matters most. It must stay at least as
+     wide as `EDIT_CANVAS_GUTTER` in `src/canvas/edit-width.ts`, which is what the drag's own
+     ceiling subtracts. The cost is stated: a document whose base width exceeds the pane now renders
+     32px narrower than it did. */
+  padding: 32px 16px;
 }
 .content-edit-column {
   width: 100%;
   min-height: 100%;
+  /* The containing block for the two resize handles. */
+  position: relative;
+}
+
+/* ─── Edit-mode width handles ──────────────────
+   One on each side of the column, dragged symmetrically about its centre (`canvas/edit-width.ts`).
+   Physical `left`/`right` rather than logical properties, and deliberately: the sign the drag
+   applies is physical too, and Studio's own chrome is never mirrored — the artboard's `dir` is a
+   property of the document INSIDE the iframe. */
+.edit-width-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 9px;
+  /* A component definition hugs its content (`.is-component` below), which can be a hundred pixels
+     tall; the grab target must not shrink with it. */
+  min-height: 120px;
+  cursor: col-resize;
+  z-index: 2;
+}
+.edit-width-handle.start {
+  left: -9px;
+}
+.edit-width-handle.end {
+  right: -9px;
+}
+.edit-width-handle:hover,
+.edit-width-handle.dragging {
+  background: var(--accent, #3b82f6);
+  opacity: 0.5;
+}
+/* The live width readout, shown only while a drag is in flight. `data-edit-width` is written by the
+   same bare style pass that moves the column, so the badge costs no element and no render. */
+.content-edit-column.is-resizing::after {
+  content: attr(data-edit-width);
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--accent, #3b82f6);
+  color: var(--bg-panel, #fff);
+  font-size: var(--spectrum-font-size-75, 12px);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
 }
 /* A content PAGE fills the viewport (a document-like surface you can click into below the
    text). A component DEFINITION is a fragment — flooring its column to the viewport and letting

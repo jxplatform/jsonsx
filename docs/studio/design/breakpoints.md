@@ -2,6 +2,8 @@
 title: "Breakpoints"
 description: "Breakpoints in Jx Studio: one live canvas per screen size, defining breakpoints in Settings, and how base styles cascade into overrides."
 code:
+  - packages/studio/src/canvas/edit-width.ts
+  - packages/studio/src/canvas/edit-width-drag.ts
   - packages/studio/src/settings/contexts-section.ts
   - packages/studio/src/panels/pane-context.ts
   - packages/studio/src/utils/canvas-media.ts
@@ -25,6 +27,22 @@ Styling always targets one breakpoint at a time. Two controls choose it, and the
 Pick **Base** to edit the styles that apply everywhere; pick a breakpoint to edit that screen size's overrides. Whichever you use, the [Style tab](/docs/studio/design/style-inspector)'s Target Line states the answer (`⌖ h1 · @Tablet`), so the breakpoint you're editing is on screen beside the fields you're editing it with.
 
 **In Edit mode the choice resizes the page.** Design shows every breakpoint at once, so there the Size group marks which panel is active. Edit shows one column, and the column becomes as wide as the breakpoint you picked, the same width Design gives that panel. The page is genuinely that narrow, so your own media queries fire and the layout reflows; it isn't a scaled-down picture. Writing at **Sm** and writing at **Base** are two real views of the same document.
+
+## Dragging the page width
+
+Edit's column has a handle on each side. Drag either one and the page resizes from its centre, to any width you like — including the widths _between_ two breakpoints, which is where a responsive layout usually breaks and which the Size buttons can't reach on their own.
+
+**The width picks the breakpoint.** Drag past 768px in a project whose Md is `max-width: 768px` and the pane switches to **Md** on its own: the Context control, the [Style tab](/docs/studio/design/style-inspector)'s Target Line, and the block your next style edit lands in all follow the width you're looking at. It is the same single setting either way — you can choose a size and get a width, or choose a width and get a size.
+
+:::doc-tip
+The drag snaps as it passes a breakpoint's own width, so landing exactly on **Md** takes no precision. Hold :kbd[Alt] while dragging to slide straight past the snaps. Double-click a handle to go back to the width the Size group names.
+:::
+
+A few things worth knowing:
+
+- **It stops at the pane.** The column can't be dragged wider than the space it has to render in. To work at a width wider than your window, pick that size from the Size group instead — the page is laid out at that width and shown as wide as it fits.
+- **The width isn't remembered; the size is.** Dragging is for looking. Switch modes and the column goes back to the breakpoint's own width, and reopening the project later starts there too — at whichever breakpoint you last dragged into.
+- **Preview stays on the breakpoint.** Preview is the fidelity view, so it renders at the declared width rather than at a width in between.
 
 **Preview follows it too**, at that same width, so switching Preview on doesn't jump you back to a full-width page. With no breakpoint chosen, Preview fills the pane.
 

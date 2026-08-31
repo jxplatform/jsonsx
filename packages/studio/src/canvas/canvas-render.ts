@@ -74,6 +74,8 @@ import {
   updateActivePanelHeaders,
 } from "./canvas-utils";
 import { parseMediaEntries } from "../utils/canvas-media";
+import { clearEditWidth, resolveEditColumnWidth } from "./edit-width";
+import { mountEditWidthHandle } from "./edit-width-drag";
 import { getEffectiveMedia, getEffectiveStyle } from "../site-context";
 import {
   adoptCanvasPreviewMode,
@@ -1029,6 +1031,13 @@ function renderCanvasImpl(surface: CanvasSurface) {
      * rendering. Same expression as Edit's column, so the same page at `md` is the same page
      * whichever of the two the toggle is over.
      *
+     * That equality now holds at the BREAKPOINT, not at the pixel, and deliberately. Edit's column
+     * can be dragged to any width between two declared ones (`edit-width.ts`); Preview does not read
+     * that override, because Preview is the fidelity view and a fidelity view of "somewhere between
+     * md and lg" is a width no visitor will ever have. Toggling Preview is a mode change, which is
+     * also what discards the dragged width — so the two surfaces agree again the moment either one
+     * is entered, rather than disagreeing silently.
+     *
      * The HEIGHT is untouched: the frame stays the pane's height and the document scrolls itself,
      * which is what makes sticky, scroll-driven animation and IntersectionObserver fire here.
      */
@@ -1242,10 +1251,14 @@ function renderCanvasImpl(surface: CanvasSurface) {
     if (modeChanged) {
       canvasWrap.style.padding = "0";
       canvasWrap.style.overflow = "hidden";
+      /* A dragged width is an INSPECTION, and it dies with the mode: entering Edit always starts at
+         the breakpoint the switcher names. What survives is the breakpoint the drag landed on,
+         which `activeMedia` already persists — see `canvas/edit-width.ts`. */
+      clearEditWidth(surface.paneId);
     }
 
     /*
-     * THE COLUMN IS AS WIDE AS THE CHOSEN BREAKPOINT.
+     * THE COLUMN IS AS WIDE AS THE CHOSEN BREAKPOINT — OR AS WIDE AS IT HAS BEEN DRAGGED.
      *
      * It was always `baseWidth`, so the Context bar's size switcher did nothing here: it wrote
      * `session.ui.activeMedia`, Design used that to highlight one of the artboards it already draws
@@ -1255,12 +1268,24 @@ function renderCanvasImpl(surface: CanvasSurface) {
      * The width is the artboard width Design would give that breakpoint, so the same page at `md`
      * is the same page in both modes; the iframe is that wide, so the document's own media queries
      * evaluate against it and the content reflows for real rather than being scaled.
+     *
+     * The switcher's answer is now the FALLBACK rather than the whole story: a handle on either
+     * side of the column drags it to any width in between, and the breakpoint follows the width
+     * (`edit-width.ts`). With nothing dragged this is byte-for-byte the expression it replaced.
      */
-    const { baseWidth, sizeBreakpoints: editBreakpoints } = parseMediaEntries(
-      getEffectiveMedia(S.document.$media),
-    );
-    const editMedia = activeMediaOfPane(surface.paneId);
-    const columnWidth = editBreakpoints.find((bp) => bp.name === editMedia)?.width ?? baseWidth;
+    const columnWidth = resolveEditColumnWidth(surface, tab);
+    /*
+     * THE TEMPLATE MUST NOT BIND THIS WIDTH, and that is not a style preference.
+     *
+     * The drag writes `column.style.maxWidth` imperatively, once per pointermove, because a render
+     * per move would rebuild the iframe. lit dirty-checks its own committed value, so a later pass
+     * that computes the SAME width it last committed skips the write — and the imperative value
+     * stays. That is not hypothetical: drag a page down to 330px, open a different document in the
+     * pane, and the new one is 330px wide too, because both passes computed the base width and lit
+     * wrote neither. One writer, applied after the render, is the fix (§9.4 of the UI guidelines);
+     * `applyEditZoom` below already has exactly this shape for exactly this reason.
+     */
+    let editColumn: HTMLElement | null = null;
     const { tpl: panelTpl, panel } = canvasPanelTemplate(null, null, true);
     // A component-definition doc (root tag is a custom element) is a fragment, not a page: it should
     // Hug its content rather than have the column fill+stretch to the viewport (dead scroll space).
@@ -1274,12 +1299,35 @@ function renderCanvasImpl(surface: CanvasSurface) {
           panel.scrollContainer = (el as HTMLElement) || null;
         })}
       >
-        <div class=${columnClass} style="max-width:${columnWidth}px">
+        <div
+          class=${columnClass}
+          ${ref((el: Element | undefined) => {
+            editColumn = (el as HTMLElement) || null;
+          })}
+        >
           ${wantsDocHeader ? docHeaderSlot("in-column", surface.paneId) : nothing}${panelTpl}
+          <!-- LAST, not first. The handles are \`position: absolute\`, so DOM order costs them
+               nothing — but the Document Header card is the column's FIRST child by contract
+               (\`tests/canvas-render.test.ts\`, "Edit puts it INSIDE the document column"), and a
+               handle in front of it would be a layout claim nobody made. -->
+          <div
+            class="edit-width-handle start"
+            title="Drag to resize the page — hold Alt to ignore the breakpoints"
+            ${ref((el) => mountEditWidthHandle(surface, el as HTMLElement | undefined, -1))}
+          ></div>
+          <div
+            class="edit-width-handle end"
+            title="Drag to resize the page — hold Alt to ignore the breakpoints"
+            ${ref((el) => mountEditWidthHandle(surface, el as HTMLElement | undefined, 1))}
+          ></div>
         </div>
       </div>
     `;
     litRender(editTpl, canvasWrap);
+    // The one writer of the column's width — see the note above. `ref` has run by now.
+    if (editColumn) {
+      (editColumn as HTMLElement).style.maxWidth = `${Math.round(columnWidth)}px`;
+    }
     canvasPanels.push(panel as unknown as CanvasPanel);
     renderCanvasIntoPanel(surface, panel as unknown as CanvasPanel, S.ui.featureToggles);
     // The column must exist in the DOM before the zoom's live width measurement — so the zoom is

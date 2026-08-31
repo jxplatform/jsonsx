@@ -2,9 +2,9 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.10.3-draft
+**Version:** 0.10.4-draft
 **Status:** Partial
-**Updated:** 2026-08-30
+**Updated:** 2026-08-31
 **License:** MIT
 
 ---
@@ -325,6 +325,11 @@ own; a stage with none to give — every mode named above, and a trackpad pinch 
 this event — blocks it like the rest of the chrome rather than scaling the whole window around a
 form. Preview blocks it in the FRAME: a cross-origin canvas frame's wheel never reaches the host,
 and preview is the one mode that forwards nothing, so the block has to be where the gesture lands.
+
+**Edit has no pan and no zoom of that kind, and now has a gesture of its own.** Its stage is a
+centred column, not a transformed surface, so what a drag on its edge changes is the page's real
+width (§6.2) rather than a scale — the two are not merged, and `ui.editZoom` keeps its own
+browser-page-zoom meaning beside it.
 
 **Entering a pan/zoom mode fits the artboard.** Design and Stylebook apply a fit on the mode
 transition, capped at 100% so a narrow artboard is never magnified, and skipped when the pane has no
@@ -702,6 +707,28 @@ base width rather than sizing the column from a query that does not exist.
 A control that selects a rendering context has to change the rendering. It wrote
 `session.ui.activeMedia`, Design used it, and Edit ignored it — so in the mode where the switcher is
 most useful it was a control over a label.
+
+**And the width chooses the size, not only the other way round.** Edit's column carries a drag
+handle on each side, symmetric about its centre, so the page can be resized to any width — including
+the widths between two declared breakpoints, which is where a responsive layout actually breaks and
+which the switcher's radio group could never reach. As the drag crosses a band the pane's active
+size follows it: one axis, one field, so the Context bar, the Target Line above and the block a
+style edit lands in all describe the width on screen. Of the sizes matching the current width, the
+one whose declared width is CLOSEST is the one named, ties going to the narrower — which reads as
+"the narrowest matching" for a desktop-first project and "the widest matching" for a mobile-first
+one, and is well defined for a project mixing the two.
+
+The drag is magnetic within a few pixels of a declared width, so landing exactly on `md` costs no
+precision, and **Alt** passes through the magnets. It clamps at the pane's own width rather than
+scrolling or scaling: the column is as wide as it can be shown, and a size wider than the pane is
+chosen from the popover, which sizes it and lets CSS clamp it. Double-clicking a handle restores the
+chosen breakpoint's own width.
+
+**The width is an inspection; the size it lands on is the decision.** Nothing persists the dragged
+width — it is discarded whenever the canvas mode changes, so entering Edit always starts at the
+breakpoint the switcher names. `activeMedia` persists as it always has, so a relaunch reopens the
+document at that breakpoint's declared width. Preview does not read the dragged width either: it is
+the fidelity view, and "somewhere between `md` and `lg`" is a width no visitor will ever have.
 
 #### resolving with
 
@@ -2854,6 +2881,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.10.4-draft** (2026-08-31) — Edit's canvas column is drag-resizable, and the active breakpoint is derived from its width.
 - **0.10.3-draft** (2026-08-30) — 15: a brokered credential row reads from the broker, and carries reconnect, account choice and a disconnect that reaches it.
 - **0.10.2-draft** (2026-08-29) — A format declaring rewrite rather than serialize has its references repaired by the rename refactor, so it is no longer a reported remainder.
 - **0.10.1-draft** (2026-08-28) — studioShellHtml() now links a favicon for hosts whose window chrome has no native icon of its own.
@@ -2966,4 +2994,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/studio` Specification v0.10.3-draft_
+_`@jxsuite/studio` Specification v0.10.4-draft_

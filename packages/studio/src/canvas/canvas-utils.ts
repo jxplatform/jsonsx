@@ -29,6 +29,7 @@ import {
   panelOfSurface,
 } from "./canvas-helpers";
 import { rectOf } from "../utils/geometry";
+import { EDIT_WIDTH_MIN, clearEditWidth, setEditWidth } from "./edit-width";
 import { getEffectiveLocales, getEffectiveMedia } from "../site-context";
 import { dynamicRouteParams } from "../page-params";
 import {
@@ -993,8 +994,13 @@ export function canvasViewCommands(deps: CanvasCommandDeps): AnyCommand[] {
    * resolutions disagree exactly when it matters.
    */
   function repaint(args: CommandArgValues): void {
+    deps.renderPane(paneOfArgs(args));
+  }
+
+  /** The pane a rendering-context verb addresses, named or focused. {@link repaint}'s own rule. */
+  function paneOfArgs(args: CommandArgValues): string {
     const { pane } = args as { pane?: unknown };
-    deps.renderPane(typeof pane === "string" ? pane : workspace.activePaneId);
+    return typeof pane === "string" ? pane : workspace.activePaneId;
   }
 
   return [
@@ -1117,6 +1123,59 @@ export function canvasViewCommands(deps: CanvasCommandDeps): AnyCommand[] {
         );
       },
       title: "Set Edit Zoom",
+    },
+    {
+      args: {
+        additionalProperties: false,
+        properties: {
+          ...paneArg,
+          width: {
+            description:
+              "How wide the Edit column should render, in CSS pixels, or null to go back to the " +
+              "chosen breakpoint's own width.",
+            type: ["number", "null"],
+          },
+        },
+        required: ["width"],
+        type: "object",
+      },
+      category: "View",
+      id: "canvas.setEditWidth",
+      level: "document",
+      menus: ["palette"],
+      group: "3_canvas",
+      requires: "a document in edit mode",
+      when: documentOpen,
+      enablement: () => deps.getCanvasMode() === "edit",
+      /*
+       * The addressable form of the drag (`canvas/edit-width-drag.ts`).
+       *
+       * The gesture does NOT come through here — it writes the store directly, once per pointermove,
+       * because this verb ends in `repaint`, and a full canvas pass per move would rebuild the
+       * iframe and break the handle's own pointer capture along with it. That is the same division
+       * `canvas.setEditZoom` already has with `requestEditZoom`: the command is the name, the
+       * gesture is the hot path.
+       *
+       * A width WIDER than the pane is not refused. The column is `width: 100%` under a `max-width`,
+       * so it simply renders at the pane's width — which is the same clamp the drag applies, arrived
+       * at by CSS instead of by arithmetic. Refusing would make the verb depend on the window size.
+       */
+      run: (_commandCtx, args) => {
+        const tab = contextTab("canvas.setEditWidth", args);
+        const { width } = args as { width?: unknown };
+        if (width === null) {
+          clearEditWidth(paneOfArgs(args));
+          repaint(args);
+          return;
+        }
+        setEditWidth(
+          paneOfArgs(args),
+          tab,
+          boundedNumberArg("canvas.setEditWidth", args, "width", EDIT_WIDTH_MIN, 10_000),
+        );
+        repaint(args);
+      },
+      title: "Set Edit Width",
     },
     /*
      * ── The rendering context (§4.2's control ③) ──────────────────────────────────────────────

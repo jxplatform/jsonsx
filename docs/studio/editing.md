@@ -16,6 +16,8 @@ Edit is for writing. Open a content page and the canvas becomes the page itself.
 
 Markdown pages open in Edit automatically. For anything else, pick **Edit** in the **View** control on the context bar; see **[Modes and views](/docs/studio/interface/modes)**.
 
+The column isn't a fixed width. Drag the handle on either side and the page resizes from its centre, with the [breakpoint](/docs/studio/design/breakpoints) following the width — so you can write at any size your readers might have, not only the ones the project declares.
+
 ## What lives here
 
 - **[Writing and formatting](/docs/studio/editing/writing)**: typing on the page, paragraphs, the inline formatting toolbar, links, pasting, and editing text inside components.
