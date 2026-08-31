@@ -24,7 +24,8 @@ describe("resolveDefaultPlatform", () => {
     g.__jxCloud = { project: { owner: "acme", repo: "site", branch: "main" } };
     const platform = resolveDefaultPlatform();
     expect(platform.id).toBe("cloud");
-    expect(platform.projectRoot).toBe("acme/site");
+    // The root key, branch included — the identity Recent and the catalogue both address a project by.
+    expect(platform.projectRoot).toBe("acme/site@main");
   });
 
   test("returns the cloud adapter for the project-less hub (null project)", () => {
