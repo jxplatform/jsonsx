@@ -75,9 +75,12 @@ import {
 } from "../services/references";
 import { getPlatform } from "../platform";
 import htmlMeta from "../../data/html-meta.json";
+import { popoverIdsIn } from "@jxsuite/schema/overlays";
+import { showPromptDialog } from "../ui/layers";
 
 import type {
   JxAttributeValue,
+  JxElement,
   JxMutableNode,
   JxPrototypeDef,
   JxStateDefinition,
@@ -85,6 +88,9 @@ import type {
 } from "@jxsuite/schema/types";
 import type { SignalOption } from "../ui/dynamic-slot";
 import type { JxPath } from "../state";
+
+/** The picker's escape hatch: a popover declared in another file, typed by hand. */
+const POPOVER_TARGET_OTHER = "jx:other";
 
 interface HtmlMetaEntry {
   $section: string;
@@ -527,6 +533,52 @@ export function invalidatePageRouteCache() {
  * @param {JxMutableNode} node
  * @param {JxPath} path
  */
+/**
+ * The `popovertarget` field: a picker over the popovers THIS document declares.
+ *
+ * A free-text field is what let Burntrock ship six invokers naming the wrong panel — an id that
+ * matches nothing is silent, and an id that matches the wrong thing is worse. The list makes the
+ * right answers the easy ones.
+ *
+ * It stays typeable, because the list can never be complete: a `popovertarget` resolves in the
+ * RENDERED DOM, and a page composes components whose internals this document cannot see. So the
+ * current value is offered even when it is not in the list (the `knownValue` trick
+ * {@link renderLinkTargetField} already uses for a cross-file route), and a trailing item opens a
+ * prompt. That same limit is why `@jxsuite/schema/overlays`'s `target-missing` rule only fires in a
+ * document that declares at least one popover of its own.
+ *
+ * @param value The current attribute value.
+ * @param commit Writes the attribute, or clears it when given undefined.
+ */
+function renderPopoverTargetField(value: unknown, commit: (v?: JsonValue) => void) {
+  const current = typeof value === "string" ? value : "";
+  const ids = popoverIdsIn((activeTab.value?.doc.document ?? {}) as JxElement);
+  const unlisted = current !== "" && !ids.includes(current);
+  return html`
+    <sp-picker
+      class="popover-target-value"
+      size="s"
+      .value=${live(current)}
+      @change=${(e: Event) => {
+        const next = (e.target as HTMLInputElement).value;
+        if (next === POPOVER_TARGET_OTHER) {
+          void showPromptDialog("Popover id", {
+            confirmLabel: "Use",
+            message: "The id of a popover in another file.",
+            placeholder: "site-mobile-menu",
+          }).then((typed) => commit(typed?.trim() || undefined));
+          return;
+        }
+        commit(next || undefined);
+      }}
+    >
+      ${unlisted ? html`<sp-menu-item value=${current}>${current}</sp-menu-item>` : nothing}
+      ${ids.map((id) => html`<sp-menu-item value=${id}>${id}</sp-menu-item>`)}
+      <sp-menu-item value=${POPOVER_TARGET_OTHER}>Type an id…</sp-menu-item>
+    </sp-picker>
+  `;
+}
+
 function renderLinkTargetField(node: JxMutableNode, path: JxPath) {
   const raw = typeof node.attributes?.href === "string" ? node.attributes.href : "";
   const { kind, value } = classifyHref(raw);
@@ -938,6 +990,24 @@ export function renderPropertiesPanelTemplate(ctx: {
       if (attr === "target") {
         return renderTargetField(node, path, entry);
       }
+    }
+
+    /* Same gate as the anchor fields above: a BOUND value falls through to the raw widget so it
+       stays editable as an expression rather than being flattened into a picker. */
+    if (entry.$input === "popover-target" && !isBoundAttrValue(value)) {
+      return renderFieldRow({
+        hasValue: hasVal,
+        label: attrLabel(entry, attr),
+        prop: attr,
+        provenance: attributeProvenance(
+          attr,
+          value,
+          hasVal,
+          () => commitAttr(),
+          mixedAcrossSelection(doc, targets, (n) => (n?.attributes ?? {})[attr] ?? null),
+        ),
+        widget: renderPopoverTargetField(value, commitAttr),
+      });
     }
 
     const attrSlot = (staticWidget: unknown) =>

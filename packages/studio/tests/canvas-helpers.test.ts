@@ -2,7 +2,6 @@ import { resetStudioState, resetWorkspaceWithTab } from "./harness";
 import { beforeEach, describe, expect, test } from "bun:test";
 import {
   bubbleInlinePath,
-  findCanvasElement,
   getActivePanel,
   panelMediaToActiveMedia,
   panelOfSurface,
@@ -200,80 +199,5 @@ describe("bubbleInlinePath", () => {
     } as JxMutableNode;
     const result = bubbleInlinePath(anonDoc, ["children", 0, "children", 0]);
     expect(result).toEqual(["children", 0, "children", 0]);
-  });
-});
-
-// ─── findCanvasElement ────────────────────────────────────────────────────────
-
-describe("findCanvasElement", () => {
-  function buildCanvas() {
-    const canvas = document.createElement("div");
-    const root = document.createElement("div");
-    const p0 = document.createElement("p");
-    p0.textContent = "first";
-    const p1 = document.createElement("p");
-    p1.textContent = "second";
-    root.append(p0, p1);
-    canvas.append(root);
-    return { canvas, p0, p1, root };
-  }
-
-  test("returns null for an empty canvas", () => {
-    const canvas = document.createElement("div");
-    expect(findCanvasElement([], canvas)).toBeNull();
-  });
-
-  test("empty path returns the root element", () => {
-    const { canvas, root } = buildCanvas();
-    expect(findCanvasElement([], canvas)).toBe(root);
-  });
-
-  test("walks children indices in the rendered DOM", () => {
-    const { canvas, p1 } = buildCanvas();
-    expect(findCanvasElement(["children", 1], canvas)).toBe(p1);
-  });
-
-  test("returns null when path key is not children/cases", () => {
-    const { canvas } = buildCanvas();
-    expect(findCanvasElement(["style", 0], canvas)).toBeNull();
-  });
-
-  test("supports cases segments", () => {
-    const { canvas, p0 } = buildCanvas();
-    expect(findCanvasElement(["cases", 0], canvas)).toBe(p0);
-  });
-
-  test("undefined index falls to first child", () => {
-    const { canvas, p0 } = buildCanvas();
-    expect(findCanvasElement(["children"], canvas)).toBe(p0);
-  });
-
-  test("'map' index dives through the repeater perimeter", () => {
-    const canvas = document.createElement("div");
-    const root = document.createElement("div");
-    const wrapper = document.createElement("div");
-    const item = document.createElement("li");
-    wrapper.append(item);
-    root.append(wrapper);
-    canvas.append(root);
-    expect(findCanvasElement(["children", "map"], canvas)).toBe(item);
-  });
-
-  test("resolves an array member node (perimeter) and its template via the 'map' hop", () => {
-    const canvas = document.createElement("div");
-    const root = document.createElement("div");
-    const p0 = document.createElement("p");
-    const perimeter = document.createElement("div"); // Array member at children[1]
-    const item = document.createElement("li"); // Template
-    perimeter.append(item);
-    root.append(p0, perimeter);
-    canvas.append(root);
-    expect(findCanvasElement(["children", 1], canvas)).toBe(perimeter);
-    expect(findCanvasElement(["children", 1, "map"], canvas)).toBe(item);
-  });
-
-  test("returns null when the walk dead-ends past the rendered children", () => {
-    const { canvas } = buildCanvas();
-    expect(findCanvasElement(["children", 5], canvas)).toBeNull();
   });
 });

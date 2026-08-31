@@ -20,7 +20,6 @@ import { getNestedStyle } from "@jxsuite/schema/guards";
 import { live } from "lit-html/directives/live.js";
 import { ifDefined } from "lit-html/directives/if-defined.js";
 import {
-  COMMON_SELECTORS,
   debouncedStyleCommit,
   getNodeAtPath,
   isNestedSelector,
@@ -31,6 +30,7 @@ import { activeTab } from "../workspace/workspace";
 import { primarySelection, unifyValues } from "../tabs/selection";
 import { shell } from "../shell";
 import { activeRegistry } from "../commands/active-registry";
+import { selectorsForNode } from "../utils/element-selectors";
 import { selectStylebookTag } from "./stylebook-panel";
 import {
   mutateUpdateMediaNestedStyle,
@@ -895,9 +895,13 @@ function styleSidebarTemplate(
     ? (style[`@${editMedia}`] as Record<string, unknown>) || {}
     : style;
   const declaredSelectors = new Set(Object.keys(contextStyle).filter((s) => isNestedSelector(s)));
+  /* Element-aware, not the flat global list: `:popover-open` on a `<p>` is a rule that can never
+     match, and a menu that offers unmatchable states is a menu people stop reading. What the
+     element already DECLARES and the active selector are unioned in after, so nothing an author has
+     written can drop out of it. */
   const selectorOptions = [
     ...new Set([
-      ...COMMON_SELECTORS,
+      ...selectorsForNode(node),
       ...declaredSelectors,
       ...(activeSelector ? [activeSelector] : []),
     ]),
@@ -918,6 +922,14 @@ function styleSidebarTemplate(
       declared: declaredSelectors,
       onSelect: (value) => {
         activeTab.value!.session.ui.activeSelector = value;
+        /* §6.2's own rule: a control that selects a rendering context has to change the rendering,
+           or it is a control over a label. `:hover` gets away with not doing this because you can
+           hover the element; `:popover-open` cannot, because a closed popover is not on the screen
+           to be put into that state by hand. This is the ONE state the canvas simulates — extending
+           it to `:hover` and `:focus` is a larger decision and is deliberately not taken here. */
+        if (value?.startsWith(":popover-open")) {
+          runCommand("canvas.setPopoverOpen", { open: true });
+        }
       },
       onAddCustom: () => {
         // One flow, through `ui/layers.ts` — the imperative `<input>` this replaces was appended to

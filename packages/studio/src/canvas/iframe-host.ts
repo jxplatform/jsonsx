@@ -38,6 +38,7 @@ import {
   tabOfContainer,
 } from "./canvas-surface";
 import { cloneSelection, primarySelection, toggleSelected } from "../tabs/selection";
+import { activeRegistry } from "../commands/active-registry";
 import { getNodeAtPath } from "../state";
 import type { JxPath } from "../state";
 import { setLayoutSelection, shell } from "../shell";
@@ -121,6 +122,20 @@ interface HostState {
   contentHeight: number | null;
   /** Whether the last measured content was a component-definition fragment (drops the 480px floor). */
   contentFragment: boolean;
+  /**
+   * The popover this host is drawing open, as posted. Kept so `mountIframeCanvas` can seed it onto
+   * the `render` message — a render replaces the DOM, so a re-mount would otherwise lose it.
+   */
+  popoverOpen: JxPath | null;
+  /**
+   * Paths the frame resolved but could not measure, as serialized keys.
+   *
+   * Not a rect and not an absence: a node that IS in the document and IS in the DOM but is not
+   * rendered. The Outline draws these rows with a "not rendered in the canvas" mark, which is the
+   * honest answer for a selection that draws no box — the alternative was a 0×0 marker in the
+   * artboard's corner, which read as a bug in the editor rather than a fact about the document.
+   */
+  hiddenPaths: Set<string>;
   /** Whether an inline-edit session is live in this host's iframe (drives the format toolbar). */
   editing: boolean;
   /** The prop a live plain session edits (prop-bound text) — null for rich sessions/none. */
@@ -1162,6 +1177,33 @@ export function setIframePatchEscalation(fn: (paneId: string) => void): void {
 }
 
 /**
+ * Tell every frame showing `tab` which popover to draw open.
+ *
+ * Fans out by `tabId` for the same reason `postPatchToHosts` does: two panes can show the same
+ * document, and both must agree about which panel is open — it is the same element in both. A
+ * PREVIEW host is skipped, and the frame refuses the message as well, because preview renders
+ * popovers natively and the canvas attribute does not exist there.
+ *
+ * Also recorded on the host, so a re-mount can seed it onto the `render` message. A render replaces
+ * the DOM and would otherwise close the panel the author was editing.
+ *
+ * @param tab The tab whose canvas is affected.
+ * @param path The popover's document path, or null to close whatever is open.
+ */
+export function postPopoverOpen(tab: { id: string }, path: JxPath | null): void {
+  for (const host of liveHosts) {
+    if (!host.iframe.isConnected) {
+      liveHosts.delete(host);
+      continue;
+    }
+    if (host.ready && host.tabId === tab.id && !host.preview) {
+      host.popoverOpen = path;
+      host.channel.post({ kind: "setPopoverOpen", path });
+    }
+  }
+}
+
+/**
  * Post a surgical patch (value-carrying forward ops) to every ready live iframe host rendering
  * `tabId`'s document — a still-connected host showing another tab's doc must never fold a foreign
  * edit into its shadow doc. Returns how many hosts received it; the caller escalates to a full
@@ -1729,6 +1771,8 @@ function ensureHost(canvasEl: HTMLElement): HostState {
     channel,
     contentFragment: false,
     contentHeight: null,
+    hiddenPaths: new Set<string>(),
+    popoverOpen: null,
     editing: false,
     editingProp: null,
     iframe,
@@ -1905,6 +1949,28 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       // Author is back on the surface it belongs to. Harmless in preview, where the bar draws
       // Nothing anyway.
       canvasPointerDownHandler?.();
+      return;
+    }
+    case "popoverTargetClick": {
+      /* The click's OTHER half — the `hit` beside it still selects the button. Routed through the
+         command rather than written here, so the trigger, the palette, the Style tab's selector and
+         the assistant are four renderings of one record (§13) rather than four writers.
+
+         `show`/`hide`/`toggle` collapse to a state because the record is a setter: the frame knows
+         which panel is open only through the host, so `toggle` is resolved HERE, where the model
+         is, and never inside the frame. Refused in preview by the host's own gate below. */
+      const tab = hostTab(state);
+      if (!tab || state.preview) {
+        return;
+      }
+      const open =
+        msg.action === "show" ||
+        (msg.action === "toggle" &&
+          JSON.stringify(tab.session.ui.openPopover) !== JSON.stringify(msg.targetPath));
+      void activeRegistry()?.run("canvas.setPopoverOpen", {
+        open,
+        path: msg.targetPath,
+      });
       return;
     }
     case "hit": {
@@ -2096,9 +2162,13 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
         const sbTag = state.stylebook ? shell.stylebook.selection : null;
         state.overlay.setSelection(rect, sbTag ? `<${sbTag}>` : null);
         state.overlay.setCoSelection(co);
-        if (rect) {
-          state.lastSelectionRect = rect;
-        }
+        /* Unconditional. `if (rect)` never CLEARED it, so a selection the frame could not measure —
+           now including any node it reports under `hidden` — left the previous rect standing, and
+           `getEditBarAnchorRect` went on returning it. The block action bar stayed anchored to a box
+           that was no longer on screen. `repositionBlockActionBar` already hides the bar on a null
+           anchor, so nothing else has to change. */
+        state.lastSelectionRect = rect;
+        state.hiddenPaths = new Set((msg.hidden ?? []).map((p) => JSON.stringify(p)));
       }
       return;
     }
@@ -2850,7 +2920,11 @@ export async function mountIframeCanvas(
     colorScheme: schemeWireFor(viewTab),
     gen,
     kind: "render",
+    // Read at POST time for the same reason `colorScheme` is: a render replaces the DOM, so a panel
+    // The author opened before this pass would close under them without it.
+    popoverOpen: viewTab?.session.ui.openPopover ?? null,
   };
+  state.popoverOpen = message.popoverOpen ?? null;
   // Preview is the fidelity view: no editing messages are honoured from it, no overlay is painted
   // Over it, and the frame stays viewport-sized so it scrolls for real. A mode switch to preview
   // Mid-split must likewise not start an edit session in the preview render. The flag and the frame

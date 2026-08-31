@@ -37,6 +37,8 @@ const deps = {
   getCanvasMode: () => "design",
   renderPane: (paneId: string) => renderedPanes.push(paneId),
   setCanvasMode: () => {},
+  setOpenPopover: () => {},
+
   setResolvingOpen: () => {},
 };
 

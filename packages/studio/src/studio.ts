@@ -230,7 +230,9 @@ import { openNewProjectModal, registerNewProjectCommands } from "./new-project/n
 import { invalidatePageRouteCache, registerInspectorCommands } from "./panels/properties-panel";
 import { liveElementCommands, setContextMenuNavigate } from "./editor/context-menu";
 import { registerSeoCommands, renderSeoModal } from "./panels/seo-modal";
+import { ensurePopoverRevealWatch, setOpenPopover } from "./canvas/popover-state";
 import { registerA11yCommands } from "./services/a11y-report";
+import { registerPopoverCommands } from "./services/popover-report";
 import { registerStyleCommands } from "./panels/style-panel";
 import { registerGridCommands } from "./grid/grid-open";
 import { registerSettingsCommands } from "./settings/settings-document";
@@ -1484,14 +1486,19 @@ registerCanvasViewCommands(commandRegistry, {
   getCanvasMode,
   renderPane: renderCanvas,
   setCanvasMode,
+  setOpenPopover,
   setResolvingOpen: paneContext.setResolvingOpen,
 });
+/* The one rule that opens a popover when the selection lands in one, from whichever surface made
+   the selection. Started here because it is app-lifetime state, like the canvas's own watches. */
+ensurePopoverRevealWatch();
 registerSelectionSetCommand(commandRegistry);
 registerInspectorCommands(commandRegistry);
 /* Search appearance, behind one record with two buttons: the Document Header card's and the Page
    panel's. A surface that IS the capability is one the palette cannot reach. */
 registerSeoCommands(commandRegistry);
 registerA11yCommands(commandRegistry);
+registerPopoverCommands(commandRegistry);
 /* The element menu's eight verbs, in the APP registry rather than only in the popover's own. They
    have always declared `menus: ["context/element", "palette"]`; the palette has never listed one,
    because the only registry holding them was the one `editor/context-menu.ts` builds for itself.
