@@ -95,6 +95,13 @@ const mockHandleServerFunction = mock(
   async (_req: Request, _root: string) => new Response('{"error":"boom"}', { status: 500 }),
 );
 
+const mockBuildCatalog = mock(async () => [
+  { installed: true, name: "@jxsuite/feed", sections: [{ key: "feed" }], source: "first-party" },
+]);
+void mock.module("@jxsuite/server/extension-catalog", () => ({
+  buildExtensionCatalog: mockBuildCatalog,
+}));
+
 void mock.module("@jxsuite/server/resolve", () => ({
   handleResolve: mockHandleResolve,
   handleServerFunction: mockHandleServerFunction,
@@ -107,6 +114,7 @@ const {
   setProjectRoot,
   listFormats,
   listExtensions,
+  listExtensionCatalog,
   fetchProjectSchemas,
   formatAction,
   jxResolve,
@@ -222,6 +230,45 @@ describe("listFormats", () => {
       const formats = await listFormats();
       expect(formats).toEqual([]);
     } finally {
+      cleanup();
+    }
+  });
+});
+
+// ─── listExtensionCatalog ────────────────────────────────────────────────────
+
+describe("listExtensionCatalog", () => {
+  test("builds the catalogue for the bound project root", async () => {
+    setup();
+    try {
+      const catalog = (await listExtensionCatalog()) as { name: string }[];
+      expect(catalog[0]?.name).toBe("@jxsuite/feed");
+      expect(mockBuildCatalog).toHaveBeenCalledWith(FIXTURES);
+    } finally {
+      cleanup();
+    }
+  });
+
+  test("returns [] quietly on a welcome window with no project", async () => {
+    // `installed` and `bundled` are answered against a project root; with none there is nothing
+    // To probe, so the offer is withheld rather than guessed at.
+    setProjectRoot(null);
+    mockBuildCatalog.mockClear();
+    expect(await listExtensionCatalog()).toEqual([]);
+    expect(mockBuildCatalog).not.toHaveBeenCalled();
+  });
+
+  test("returns [] and logs when the builder throws", async () => {
+    setup();
+    const errorSpy = spyOn(console, "error").mockImplementation(() => {});
+    mockBuildCatalog.mockImplementationOnce(async () => {
+      throw new Error("catalogue exploded");
+    });
+    try {
+      expect(await listExtensionCatalog()).toEqual([]);
+      expect(errorSpy).toHaveBeenCalled();
+    } finally {
+      errorSpy.mockRestore();
       cleanup();
     }
   });

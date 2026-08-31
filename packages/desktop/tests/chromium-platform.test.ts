@@ -44,6 +44,9 @@ const responses: Record<string, unknown> = {
   // Format-host proxies (descriptor-contributed settings + Monaco schema registration)
   fetchProjectSchemas: { document: { $ref: "doc/v1" }, project: { $ref: "project/v2" } },
   listExtensions: [{ name: "@jxsuite/parser", specifier: "@jxsuite/parser" }],
+  listExtensionCatalog: [
+    { installed: true, name: "@jxsuite/feed", sections: [{ key: "feed" }], source: "first-party" },
+  ],
   listFormats: [{ extensions: [".md"], mediaType: "text/markdown", name: "Markdown" }],
   listPackages: [{ name: "lodash", version: "^4.0.0" }],
   dependenciesNeedInstall: true,
@@ -593,6 +596,18 @@ describe("chromium desktop platform", () => {
     expect(formats).toEqual([
       { extensions: [".md"], mediaType: "text/markdown", name: "Markdown" },
     ]);
+  });
+
+  test("listExtensionCatalog returns what this backend can offer", async () => {
+    const catalog = await platform.listExtensionCatalog!();
+    expect(catalog).toEqual([
+      {
+        installed: true,
+        name: "@jxsuite/feed",
+        sections: [{ key: "feed" }],
+        source: "first-party",
+      },
+    ] as never);
   });
 
   test("listExtensions returns the extensions payload", async () => {
