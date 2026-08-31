@@ -2,7 +2,7 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.10.4-draft
+**Version:** 0.10.5-draft
 **Status:** Partial
 **Updated:** 2026-08-31
 **License:** MIT
@@ -203,6 +203,7 @@ Resolution is render-only in either space: the tab's source document keeps the a
 | Stylebook | Design token management and component gallery                       |
 | Preview   | Clean preview without editing chrome — a TOGGLE, not a peer (below) |
 | Source    | Raw JSON/code view                                                  |
+| Diff      | A comparison of the document against HEAD (§21)                     |
 | Media     | An image, video, audio file, font or PDF, shown rather than edited  |
 
 **Media is a mode because a media file is not a document.** Every other mode above draws a document
@@ -215,6 +216,13 @@ kind and dimensions, the site URL a document would reference it by — `public/h
 `/hero.jpg`, a string sharing no segment with the file — and which documents use it. It is read-only:
 rename, delete and reveal belong to the file tree, and a second set of them here would be a second
 place to keep right. `.svg` keeps a Source alternate, being the one media format that is also text.
+
+**Diff is a mode because a comparison is not one document but two.** Every other mode above draws a
+single tree; a comparison draws the committed text beside the working copy, so the mode's subject is
+a pair rather than a document — which is also why it is the one mode a file with no document at all
+can still offer (§21.4). It is read-only in both halves: the artboards route no mutation and the code
+editor holds two read-only models, because one of them is a git object with no place on disk to be
+written back to.
 
 Design and Content are both **editable modes** and behave identically for text: the canvas carries a
 live caret (§8.2). They differ only in what the document is — Content mode opens a format-backed
@@ -500,6 +508,19 @@ Git-integrated source control panel providing commit, staging, branch management
 
 #### File Rows
 
+**Every row opens a comparison, and it opens the file it names.** Both halves of that sentence
+replaced a defect. The row used to refuse silently twice — once for any status that was not `M` or
+`A`, and again for any path that was neither `.json` nor claimed by a format class — so a changed
+`.ts`, `.css` or `.yaml`, and every deleted or untracked file, did nothing at all when clicked.
+Renderability now decides which VIEW opens (§21.3), never whether the row responds. And the mode is
+set on the tab keyed by the CLICKED path rather than on whatever tab happened to be focused: the
+former wrote `activeTab`, so opening one file's comparison flipped another file's tab into Diff and
+drew the wrong document under the right name, which is §14.1's identity rule broken from the panel.
+
+Two refusals remain, and both are stated rather than silent. A **rename** carries only its new path,
+so the old name is not in hand and there is nothing to compare against. A **binary file** has no text
+on either side; an image comparison is a real feature and a different one.
+
 Each file row displays:
 
 - **File name** — basename of the changed file
@@ -534,16 +555,29 @@ The branch picker lists all local branches and includes a "+ New branch..." opti
 | `/__studio/git/fetch`         | POST   | Fetch from remote                |
 | `/__studio/git/checkout`      | POST   | Switch branch                    |
 | `/__studio/git/create-branch` | POST   | Create and checkout new branch   |
-| `/__studio/git/diff`          | GET    | File diff                        |
+| `/__studio/git/diff`          | GET    | File diff (unused — see below)   |
 | `/__studio/git/discard`       | POST   | Discard unstaged changes         |
 
 #### Auto-refresh
 
 Status is fetched on tab activation and after every git operation. A 30-second polling interval refreshes status while the tab is active.
 
+**An open comparison follows the working tree.** A comparison is two texts read once, so nothing
+about it notices a save or a commit — invisible while the artboards merely drew two documents, and a
+lie the moment change marks are drawn on them (§21). Every refresh bumps a revision that re-issues a
+Diff lens's read and re-reads the panel's own comparison; a save does the same for the file it wrote.
+A file that is no longer changed loses its comparison rather than keeping a stale one, and a read
+that fails leaves the last clean comparison on screen rather than blanking a review in progress.
+
 #### PAL Methods
 
 All git operations are exposed as PAL methods (`gitStatus()`, `gitCommit(message)`, `gitPush()`, etc.) so the desktop platform can implement them via native RPC instead of HTTP.
+
+**`gitDiff` is deliberately uncalled**, and the row above says so because the name invites reuse. It
+runs `git diff -- <path>`, which compares the working tree against the INDEX and answers the empty
+string for a file that has been staged. A comparison here is against HEAD, so the pair of texts comes
+from `gitShow({ path, ref: "HEAD" })` and `readFile(path)` instead; the code view computes its own
+line diff from those two.
 
 ---
 
@@ -2480,6 +2514,11 @@ dock would be a downgrade. What it lacked was a pane to open into, and §18 ship
 reservation whose capability arrived somewhere better is not a reservation — it is an id in
 `view.setBottomTab`'s enum that can only ever select a hidden tab.
 
+The slot is still free, and change review did not take it. A comparison's own chrome — the change
+count, the stepper, the Visual/Code switch (§21.2) — is stage chrome, drawn over the artboards it
+describes and scoped to the pane that owns them. A dock tab would be one copy of it for two panes
+that can be comparing two different files.
+
 `view.setBottomDock {open}` and `view.setBottomTab {tab}` are the idempotent setters; the toggle is
 defined in terms of them. The region id `dock.bottom` resolves **only while the dock is open**, so
 keyboard region cycling never lands in a collapsed dock and a capture can never crop one.
@@ -2742,6 +2781,12 @@ now reach one document. That is preserved by four exclusions stated once: a deri
 dedupe target, never a reopen record, never a collaboration key, and never counted among the
 documents a close-all would lose.
 
+**A projection's own view state belongs to the PANE, not to the tab it borrows.** A Diff lens
+carries its Visual/Code position and its place in the change list, and neither may be written onto
+`session.ui`: that session belongs to the pane beside it, and a control that flips the document
+somebody else is editing is the defect the whole lens/tab split exists to refuse. It is the same
+rule the per-pane zoom already follows, applied to the two axes a comparison adds.
+
 **A pane may hold a derivation or tabs of its own, never both.** A projection borrows the pane, so a
 gesture that puts a document there — a split, a compare, a drill-in — releases the rule rather than
 stacking on it. The author asked for a document to be somewhere; the projection had nothing to lose.
@@ -2865,6 +2910,108 @@ needed.
 
 ---
 
+## 21. Change Review
+
+> **Status: Implemented.** The two-sided change map, the marks on both artboards, the change
+> stepper, the Visual/Code axis, the code comparison, and the revalidation that keeps all of it
+> honest after a save.
+
+A comparison is the working tree against HEAD, and nothing else. Staged-versus-unstaged is a
+different question with a different answer, and no ref picker is offered: the range is the one an
+author is about to commit.
+
+### 21.1 The change map is two-sided, and that is not a detail
+
+The artboards render documents, so "what changed" has to be answered in document paths — the same
+coordinate space `data-jx-path` is stamped in. A structural walk aligns the two trees through the
+same LCS matcher the collaboration bridge uses, and carries BOTH sides' paths down at once: a removal
+is addressed in the original, an addition in the current, and a modification in each.
+
+**A replay script cannot answer this.** The op list that turns one document into the other is
+addressed in the destination, and its removals name indices the very next splice invalidates. It is
+the right shape for applying a change and the wrong one for pointing at it, so the two callers share
+the matcher and not the output.
+
+Three rules follow from what the canvas can actually stamp, and each is a limit rather than a
+preference:
+
+1. A change to a node's own keys marks that node once, however many keys moved. `textContent` is a
+   key, so the ordinary "someone edited this paragraph" case marks the paragraph.
+2. A bare string child is never a stamped element, so a change to one is attributed to its parent. A
+   mark addressed to a text node is a change the count promises and the artboard never shows.
+3. A root-level key — `state`, `$head` — is reported in words and never tinted. The root's element is
+   the whole page, and tinting it says everything changed.
+
+**A reorder of identical siblings is a removal plus an addition, not a move.** The matcher cannot
+distinguish a move from a delete-and-insert of an equal value, so a "moved" mark would be a claim the
+data does not support. It is also what `git diff` prints for a moved block.
+
+**Not every mark reaches an element.** A component's internals are created by its own
+`connectedCallback` and never pass through the stamper; under a repeater, only the first expanded row
+carries the template's collapsed path. Such a mark climbs to the nearest stamped ancestor and lands
+there as "something inside here changed", and the count says how many of its changes are drawn. A
+count that silently shrank to what happened to be paintable would be the worse answer, and it is the
+standing argument for the code view being a peer rather than a fallback.
+
+Alignment is bounded rather than unbounded: a sibling group too large to pair up degrades to plain
+removals and additions, and the stage says so. A comparison that cannot be built at all leaves the
+artboards exactly as they were before any of this existed.
+
+### 21.2 The stage's own chrome
+
+Drawn over the artboards and scoped to the pane that owns them, never in a dock (§16.3):
+
+- **The count**, which reads as a total until the author begins stepping and as a position after.
+- **The stepper**, bound to :kbd[F7] and :kbd[⇧F7] — VSCode's own chords, and free here. It stops at
+  each end rather than wrapping: a tab strip is a ring, a change list is a document read top to
+  bottom, and wrapping returns a reviewer to part of the page they have already cleared.
+- **The Visual/Code axis** (§21.3).
+
+Both artboards share one pan surface, so one move serves both. A step pans to the UNION of the two
+sides' rectangles, because a change sitting at a different height on each side is only readable if
+the move accounts for both; a one-sided change pans to the side that has it. Each step announces
+where it landed and names the kind in words, which is also the last of the three non-colour cues.
+
+**Colour is never the only encoding.** Each kind carries its own border style and its own gutter
+glyph in the ordinary render, not only under forced colours — the artboard is drawn in the author's
+own palette on a permanently light surface, so the chrome tints are unavailable to it and a
+red/green pair alone would fail a reader who cannot separate them.
+
+### 21.3 Renderability chooses the view, never whether there is one
+
+A document the canvas can draw offers both halves behind a Visual/Code switch: the marks answer
+"what moved on the page", the code comparison answers "what changed in the file", and neither
+pretends to the other's resolution — one marks nodes, the other marks lines. A file the canvas
+cannot draw offers the code half alone, and the switch is drawn as a label rather than as a control
+that cannot move.
+
+The code half is a read-only diff editor over the two texts already in hand. Its models take a
+reserved URI namespace, per pane and per side, because a source editor, a Code lens and a comparison
+can all want one path at once and two models on one URI is an error; disjoint URIs make the
+collision impossible rather than refused. It never takes the collaboration lock: that lock freezes
+structural editing for every peer in the room, and taking it to show somebody a read-only comparison
+would freeze a live session on a gesture nobody made.
+
+### 21.4 A comparison for a file that is not a document
+
+A changed `.ts`, `.css` or `.gitignore` has no document tree, and the tab model wants one. Such a
+file opens a real tab keyed by its path with a stub document the stage never reads — the same shape a
+media file already uses, and set by the opener rather than by `inferModes`, which answers for
+documents. One path is still one tab, so §14.1 holds unchanged.
+
+**This door is the Source Control panel's alone.** Opening the same file from the file tree still
+says the Studio has no editor for it, which is the truth about opening it as a document; the panel
+asks a narrower question and gets a narrower answer.
+
+### 21.5 A comparison follows the working tree
+
+Two texts read once notice nothing. Every git operation and every save bumps a revision that both
+holders of a comparison watch, so the marks describe the file as it is rather than as it was when the
+review began. The author's position in the change list is CLAMPED across that re-read rather than
+reset: landing back at the first change after every save is what makes a review loop get abandoned.
+
+---
+
 ## 19. Standards Alignment
 
 External standards this specification binds itself to. Vocabulary and cell grammar: [`standards.md`](./standards.md). Detailed accessibility conventions live in [`studio-ui-guidelines.md`](./studio-ui-guidelines.md) §14; this section cites what the Studio _shell_ binds.
@@ -2881,6 +3028,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.10.5-draft** (2026-08-31) — Change review: node-level diff marks on both artboards, a change stepper, a code comparison for every changed file, and revalidation after a save.
 - **0.10.4-draft** (2026-08-31) — Edit's canvas column is drag-resizable, and the active breakpoint is derived from its width.
 - **0.10.3-draft** (2026-08-30) — 15: a brokered credential row reads from the broker, and carries reconnect, account choice and a disconnect that reaches it.
 - **0.10.2-draft** (2026-08-29) — A format declaring rewrite rather than serialize has its references repaired by the rename refactor, so it is no longer a reported remainder.
@@ -2994,4 +3142,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/studio` Specification v0.10.4-draft_
+_`@jxsuite/studio` Specification v0.10.5-draft_

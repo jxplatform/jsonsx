@@ -36,6 +36,7 @@ import { createCommandRegistry } from "./registry";
 import { emptyContext } from "./context";
 import { DEFAULT_INSPECTOR_TAB, shellViewCommands } from "../shell";
 import { canvasViewCommands } from "../canvas/canvas-utils";
+import { diffCommands } from "../canvas/diff-toolbar";
 import { selectionCommands } from "../canvas/canvas-render";
 import { inspectorCommands } from "../panels/properties-panel";
 import { dataExplorerCommands } from "../panels/data-explorer";
@@ -121,6 +122,7 @@ export function appCommandSet(): AnyCommand[] {
       setCanvasMode: NO_OP,
       setResolvingOpen: NO_OP,
     }),
+    ...diffCommands(),
     ...selectionCommands(),
     ...inspectorCommands(),
     ...seoCommands(),

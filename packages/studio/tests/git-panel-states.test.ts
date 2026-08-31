@@ -14,6 +14,11 @@ void mock.module("../src/platform.js", () => ({
 
 void mock.module("../src/workspace/workspace.js", () => ({
   activeTab: { value: null },
+  /* Reached through `panels/git-diff-open.ts`: a changed file the canvas cannot render opens a
+     path-keyed stub tab, the way a media file does, and an already-open one is re-activated. A
+     partial mock of a module the graph reaches is a LOAD error rather than a missing stub at call
+     time, so these are here whether or not a given test clicks a row. */
+  activateTab: () => {},
   closeTab: () => {},
   openTab: () => {},
   // `store.ts` registers the primary pane's canvas stage at `initShellRefs`, and
@@ -30,7 +35,8 @@ void mock.module("../src/workspace/workspace.js", () => ({
   // `shell.ts` reads the project root from this store to load that project's named layouts, so
   // The stand-in has to carry it — an absent export is a module-resolution error, not a null.
   // `panes`/`activePaneId` are here for the same reason: a canvas surface addresses a pane.
-  workspace: { activePaneId: "primary", panes: [], projectRoot: null },
+  // `tabs` joins them for `git-diff-open.ts`, which looks a comparison's tab up by path.
+  workspace: { activePaneId: "primary", panes: [], projectRoot: null, tabs: new Map() },
 }));
 
 void mock.module("../src/ui/layers.js", () => ({

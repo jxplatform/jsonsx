@@ -704,3 +704,56 @@
   border-radius: var(--radius);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
 }
+
+/* ── The diff stage's toolbar ──────────────────────────────────────────────
+   Absolutely positioned over the stage rather than in flow: the artboards live on a pan/zoom
+   surface whose origin the transform maths depends on, and a flow sibling would move it. */
+.diff-toolbar {
+  position: absolute;
+  z-index: 2;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.diff-toolbar-inner {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  box-shadow: var(--spectrum-drop-shadow-emphasized);
+}
+/* The Visual/Code radio pair. Spacing only: the segmented look is Spectrum's own. */
+.diff-view {
+  flex-shrink: 0;
+}
+.diff-view-static,
+.diff-step-count,
+.diff-note {
+  color: var(--fg);
+  font-size: var(--spectrum-font-size-50);
+  white-space: nowrap;
+}
+/* Tabular figures so the counter does not jitter its neighbours as it steps. */
+.diff-step-count {
+  font-variant-numeric: tabular-nums;
+}
+.diff-note {
+  color: var(--fg-dim);
+}
+
+/* The Code half of a comparison: one Monaco diff editor filling the stage, no artboards and no
+   pan/zoom. It follows the CHROME theme rather than the canvas ramp, because a code editor is
+   chrome; the artboards beside it in Visual are the author's document and always render light. */
+.diff-code-wrap {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding-top: 40px;
+}
+.diff-code-editor {
+  flex: 1;
+  min-height: 0;
+}

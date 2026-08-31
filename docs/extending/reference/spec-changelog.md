@@ -482,6 +482,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `studio.md`
 
+- **0.10.5-draft** (2026-08-31) — Change review: node-level diff marks on both artboards, a change stepper, a code comparison for every changed file, and revalidation after a save.
 - **0.10.4-draft** (2026-08-31) — Edit's canvas column is drag-resizable, and the active breakpoint is derived from its width.
 - **0.10.3-draft** (2026-08-30) — 15: a brokered credential row reads from the broker, and carries reconnect, account choice and a disconnect that reaches it.
 - **0.10.2-draft** (2026-08-29) — A format declaring rewrite rather than serialize has its references repaired by the rename refactor, so it is no longer a reported remainder.

@@ -21,7 +21,7 @@ The editor loads the first time you open a code surface, not when Studio starts,
 
 Both surfaces below follow the chrome theme you chose in **[Preferences → Appearance](/docs/studio/interface/preferences#appearance)**, and switching it repaints an open editor where it stands.
 
-There are two distinct code surfaces, for two different jobs.
+There are two distinct code surfaces for writing code, and a third for reading a change.
 
 ## The function editor
 
@@ -61,6 +61,10 @@ You never have to generate those files yourself: Studio refreshes them whenever 
 Your project's configuration is a document like any other, so it has a Code editor too. In **[Project settings](/docs/studio/projects/settings)**, the **Raw JSON** section shows the whole of `project.json` as it is saved, and **Edit as code** opens that same document in Code: one undo stack, one unsaved dot, so a hand edit in the source and a change made in a settings form can never disagree about what the file says. It is schema-checked as you type like any other JSON.
 
 `project.json` is also the one document co-editing leaves alone: it configures _your_ editor, so it is never shared with a collaborator. See **[Real-time collaboration](/docs/studio/publish/collaboration)**.
+
+## Reading a change as code
+
+The **Diff** editor's **Code** half is the same editor again, showing your working copy beside your last commit with changed lines highlighted. It is read-only on both sides: one of them is a committed version with nowhere on disk to be written back to. A file with no visual form, such as a stylesheet or a script, is only ever read this way. See **[Source control](/docs/studio/publish/source-control#read-a-change)**.
 
 ## When to drop down
 

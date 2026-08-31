@@ -32,6 +32,11 @@ void mock.module("../src/platform.js", () => ({
 
 void mock.module("../src/workspace/workspace.js", () => ({
   activeTab: activeTabRef,
+  /* Reached through `panels/git-diff-open.ts`: a changed file that the canvas cannot render opens
+     a path-keyed stub tab, the way a media file does, and an already-open one is re-activated. A
+     partial mock of a module the graph reaches is a LOAD error rather than a missing stub at call
+     time, so these are here whether or not a given test clicks a row. */
+  activateTab: () => {},
   closeAllTabs: () => {},
   closeTab: () => {},
   openTab: () => {},
@@ -48,7 +53,21 @@ void mock.module("../src/workspace/workspace.js", () => ({
   // `shell.ts` reads the project root from this store to load that project's named layouts, so
   // The stand-in has to carry it — an absent export is a module-resolution error, not a null.
   // `panes`/`activePaneId` are here for the same reason: a canvas surface addresses a pane.
-  workspace: { activePaneId: "primary", panes: [], projectRoot: null },
+  // `tabs` joins them for `git-diff-open.ts`, which looks a comparison's tab up by path.
+  workspace: { activePaneId: "primary", panes: [], projectRoot: null, tabs: new Map() },
+}));
+
+/* The panel's job is: read the comparison, store it, and put the pane the file's OWN tab is in
+   into git-diff. WHICH tab that is belongs to `git-diff-open.ts` and is tested there — stubbed
+   here so these tests fail for the panel's reasons rather than the opener's. */
+const openedComparisons: string[] = [];
+void mock.module("../src/panels/git-diff-open.js", () => ({
+  comparisonRefusal: (path: string, status: string) =>
+    status === "R" ? "renamed" : path.endsWith(".png") ? "media" : null,
+  openComparisonTab: (path: string) => {
+    openedComparisons.push(path);
+    return Promise.resolve({ documentPath: path, id: path });
+  },
 }));
 
 void mock.module("../src/ui/layers.js", () => ({
@@ -110,8 +129,14 @@ void mock.module("../src/packages/pull-package-sync.js", () => ({
 
 const { setProjectState } = (await import("../src/state.js")) as any;
 const { resetProjectShell, shell } = await import("../src/shell.js");
-const { cleanupGitPanel, cloneRepository, loadDiffForLens, refreshGitStatus, renderGitPanel } =
-  await import("../src/panels/git-panel.js");
+const {
+  cleanupGitPanel,
+  cloneRepository,
+  loadDiffForLens,
+  noteFileSaved,
+  refreshGitStatus,
+  renderGitPanel,
+} = await import("../src/panels/git-panel.js");
 
 // Source control is project state now; `shell.git` is where the panel reads and writes it.
 const git = shell.git as unknown as Record<string, any>;
@@ -658,8 +683,9 @@ describe("file rows", () => {
     const modes: string[] = [];
     const diffs: any[] = [];
     const div = renderPanel({
-      // The Source Control panel is drawn ONCE for the shell, so it passes `activeTab.value` — the
-      // Mode it writes is the focused pane's, which is what "show me this diff" means from here.
+      // The mode is written on the tab the COMPARISON is in, which is the tab keyed by the clicked
+      // File's path. It used to be `activeTab.value` — so clicking one file flipped whatever
+      // Document happened to be focused into git-diff and drew the other file's comparison on it.
       setCanvasMode: (_tab: unknown, m: string) => modes.push(m),
       setGitDiffState: (s: any) => diffs.push(s),
     });
@@ -674,6 +700,7 @@ describe("file rows", () => {
       originalContent: "ORIGINAL",
     });
     expect(modes).toEqual(["git-diff"]);
+    expect(openedComparisons).toEqual(["src/page.json"]);
     expect(diffs.length).toBe(1);
     expect(git.loading).toBe(false);
   });
@@ -696,14 +723,31 @@ describe("file rows", () => {
     expect(git.diffState.filePath).toBe("src/page.json");
   });
 
-  test("deleted files and non-format files are ignored on click", async () => {
+  test("a deleted file compares its last committed version against nothing", async () => {
+    /* It used to be ignored on click, justified by "no pair of texts to put side by side". One side
+       is the empty string, which is exactly what an ADDED file had always done. */
     seedRepoUi();
     const div = renderPanel({});
     click(div.querySelector('.git-file-name[title="src/gone.json"]'));
+    await flush();
+    expect(calls).toContainEqual(["gitShow", { path: "src/gone.json", ref: "HEAD" }]);
+    // Never `readFile` on a path that is gone — it would throw.
+    expect(callNames()).not.toContain("readFile");
+    expect(git.diffState.currentContent).toBe("");
+    expect(git.diffState.originalContent).toBe("ORIGINAL");
+  });
+
+  test("a media file is refused with a sentence rather than ignored", async () => {
+    // The boundary said out loud: a comparison of an image is not text, and handing Monaco bytes
+    // Would render mojibake. The row responds; it just responds by explaining.
+    seedRepoUi();
+    const div = renderPanel({});
     click(div.querySelector('.git-file-name[title="assets/logo.png"]'));
     await flush();
     expect(callNames()).not.toContain("gitShow");
     expect(callNames()).not.toContain("readFile");
+    expect(String(git.error)).toContain("media");
+    expect(openedComparisons).not.toContain("assets/logo.png");
   });
 
   test("diff load failure records a friendly error", async () => {
@@ -953,5 +997,154 @@ describe("poll timer", () => {
     renderPanel(); // Arms the timer
     cleanupGitPanel();
     cleanupGitPanel(); // Second call hits the no-timer branch
+  });
+});
+
+describe("keeping an open comparison fresh", () => {
+  /* A comparison is two texts read ONCE, so nothing about it notices a save or a commit. That was
+     invisible while the artboards merely drew two documents side by side; with change marks on
+     them, a stale comparison means the tint and the count are lying about a file the author is
+     editing while they look at it. */
+
+  test("a save of the compared file re-reads it, and bumps the revision", async () => {
+    seedRepoUi();
+    git.diffState = {
+      currentContent: "OLD",
+      filePath: "src/page.json",
+      fileStatus: "M",
+      originalContent: "ORIGINAL",
+    };
+    const before = git.rev;
+    mockPlatform.readFile = log("readFile", async () => "SAVED");
+    await noteFileSaved("src/page.json");
+    expect(git.diffState.currentContent).toBe("SAVED");
+    expect(git.rev).toBeGreaterThan(before);
+  });
+
+  test("a save of some OTHER file bumps the revision and re-reads nothing", async () => {
+    seedRepoUi();
+    git.diffState = {
+      currentContent: "OLD",
+      filePath: "src/page.json",
+      fileStatus: "M",
+      originalContent: "ORIGINAL",
+    };
+    calls.length = 0;
+    await noteFileSaved("src/elsewhere.json");
+    // The revision still moves: a Diff LENS may be following that other file.
+    expect(git.rev).toBeGreaterThan(0);
+    expect(callNames()).not.toContain("readFile");
+    expect(git.diffState.currentContent).toBe("OLD");
+  });
+
+  test("a save with no comparison open is harmless", async () => {
+    seedRepoUi();
+    git.diffState = null;
+    await noteFileSaved("src/page.json");
+    expect(git.diffState).toBeNull();
+  });
+
+  test("a read that fails leaves the comparison that last read cleanly", async () => {
+    seedRepoUi();
+    git.diffState = {
+      currentContent: "OLD",
+      filePath: "src/page.json",
+      fileStatus: "M",
+      originalContent: "ORIGINAL",
+    };
+    mockPlatform.readFile = log("readFile", async () => {
+      throw new Error("disk gone");
+    });
+    await noteFileSaved("src/page.json");
+    // A momentary failure is not a reason to blank a review someone is in the middle of.
+    expect(git.diffState.currentContent).toBe("OLD");
+  });
+
+  test("a refresh re-reads the open comparison against the status it just fetched", async () => {
+    seedRepoUi();
+    git.diffState = {
+      currentContent: "OLD",
+      filePath: "src/page.json",
+      fileStatus: "M",
+      originalContent: "OLD-HEAD",
+    };
+    mockPlatform.gitShow = log("gitShow", async () => "NEW-HEAD");
+    mockPlatform.readFile = log("readFile", async () => "NEW");
+    await refreshGitStatus();
+    expect(git.diffState.originalContent).toBe("NEW-HEAD");
+    expect(git.diffState.currentContent).toBe("NEW");
+  });
+
+  test("a file that is no longer changed loses its comparison rather than keeping a stale one", async () => {
+    // What the author's own commit just made true: there is nothing left to compare.
+    seedRepoUi();
+    git.diffState = {
+      currentContent: "X",
+      filePath: "src/committed.json",
+      fileStatus: "M",
+      originalContent: "Y",
+    };
+    await refreshGitStatus();
+    expect(git.diffState).toBeNull();
+  });
+
+  test("every refresh bumps the revision, which is what re-issues a lens's read", async () => {
+    seedRepoUi();
+    const before = git.rev;
+    await refreshGitStatus();
+    expect(git.rev).toBeGreaterThan(before);
+  });
+});
+
+describe("the changed-file row is a real control", () => {
+  test("carries a button role, a tab stop, and a label naming the file and its status", () => {
+    // It was a bare span with a cursor and a title: the panel's primary verb was mouse-only, and
+    // The status was a single letter and a colour with nothing to read aloud.
+    seedRepoUi();
+    const div = renderPanel({});
+    const row = div
+      .querySelector('.git-file-name[title="src/page.json"]')
+      ?.closest(".git-file-info");
+    expect(row?.getAttribute("role")).toBe("button");
+    expect(row?.getAttribute("tabindex")).toBe("0");
+    expect(row?.getAttribute("aria-label")).toBe("src/page.json, modified");
+  });
+
+  test("names a deleted file's status in words too", () => {
+    seedRepoUi();
+    const div = renderPanel({});
+    const row = div
+      .querySelector('.git-file-name[title="src/gone.json"]')
+      ?.closest(".git-file-info");
+    expect(row?.getAttribute("aria-label")).toBe("src/gone.json, deleted");
+  });
+
+  test("opens on Enter and on Space, not only on a click", async () => {
+    seedRepoUi();
+    const div = renderPanel({});
+    const row = div
+      .querySelector('.git-file-name[title="src/page.json"]')
+      ?.closest(".git-file-info");
+    row!.dispatchEvent(
+      new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "Enter" }),
+    );
+    await flush();
+    expect(git.diffState.filePath).toBe("src/page.json");
+
+    git.diffState = null;
+    row!.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: " " }));
+    await flush();
+    expect(git.diffState.filePath).toBe("src/page.json");
+  });
+
+  test("other keys pass through", async () => {
+    seedRepoUi();
+    const div = renderPanel({});
+    const row = div
+      .querySelector('.git-file-name[title="src/page.json"]')
+      ?.closest(".git-file-info");
+    row!.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "a" }));
+    await flush();
+    expect(git.diffState).toBeNull();
   });
 });

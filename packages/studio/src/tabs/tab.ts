@@ -239,7 +239,15 @@ function createDefaultUi(canvasMode: string, preview = false) {
   };
 }
 
-const ALL_MODES = ["edit", "design", "preview", "source", "stylebook"];
+/*
+ * `git-diff` is here because a comparison is a MODE of a document, and until now nothing said so.
+ * The Source Control panel reached it through the injected `setCanvasMode`, which performs no
+ * capability check — so the mode worked while `editorKindsOf` could never report `diff`, the Editor
+ * picker could never offer it, and `canvas.setMode { mode: "git-diff" }` threw for every document in
+ * the project. Declaring it makes the palette, the assistant and the screenshot runner able to open
+ * a comparison by name, and puts Diff on the Editor axis where §18.4 already says it belongs.
+ */
+const ALL_MODES = ["edit", "design", "preview", "source", "stylebook", "git-diff"];
 
 /**
  * Create a new tab with reactive doc/session/history trees, owned by an effectScope.

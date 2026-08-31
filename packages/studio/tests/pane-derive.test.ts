@@ -884,6 +884,36 @@ describe("applyDerivation", () => {
     ]);
   });
 
+  test("the working tree moving re-issues the read, so the comparison cannot go stale", async () => {
+    /* "Once per path" was a cache with no invalidation: a lens asked when it opened and never
+       again, so it went on showing the comparison it read then for as long as it stayed open. That
+       was invisible while the artboards merely drew two documents; with change marks on them, the
+       tint and the count lie about a file the author is editing while they look at it.
+       `shell.git.rev` is the other half of the key — bumped by every save and by every refresh
+       that follows a commit, discard, checkout or pull. */
+    twoPanes();
+    gitStatusFor("pages/index.json");
+    nextDiff = { currentContent: "b", fileStatus: "M", originalContent: "a" } as GitDiffState;
+    const derivation = lensOn("diff");
+    derivation.diff = null;
+
+    applyDerivation(SECONDARY_PANE, deps);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(diffsAsked).toHaveLength(1);
+
+    // Still idempotent while nothing has moved.
+    applyDerivation(SECONDARY_PANE, deps);
+    expect(diffsAsked).toHaveLength(1);
+
+    shell.git.rev += 1;
+    applyDerivation(SECONDARY_PANE, deps);
+    expect(diffsAsked).toEqual([
+      { fileStatus: "M", path: "pages/index.json" },
+      { fileStatus: "M", path: "pages/index.json" },
+    ]);
+  });
+
   /* FINDING 1, and it is round one's finding 4 still live behind a comment claiming it was fixed.
      `derivedTarget` learned to TARGET the source document; nothing ever cleared the comparison the
      lens was holding, and `canvas/canvas-render.ts`'s `if (!gitDiffState)` reads that field. So the

@@ -167,8 +167,25 @@ export async function openFile() {
  * The warning half became a PROBLEM. A component whose slots do not line up is a thing to fix, and
  * it was previously shown for six seconds in the same grey as the word "Saved".
  */
+/**
+ * Who else wants to know that a document reached disk.
+ *
+ * **By injection**, the idiom `setSurfaceTeardown` and `setDiffRepaint` already use. The one
+ * listener today is source control: a comparison is two texts read once, so it does not notice a
+ * save on its own, and the file an author is most likely to save is the one they are reviewing. A
+ * direct import would put `panels/git-panel.ts` into this module's graph, which is a load error for
+ * every suite that mocks the canvas host out from under it.
+ */
+let _onDocumentSaved: (path: string | null) => void = () => {};
+
+/** Register the save listener. Called once, from the bootstrap. */
+export function setDocumentSavedListener(listener: (path: string | null) => void): void {
+  _onDocumentSaved = listener;
+}
+
 function reportSaved(tab: Tab) {
   noteDocumentSaved(tab.documentPath);
+  _onDocumentSaved(tab.documentPath);
   const doc = tab.doc.document;
   const warning =
     typeof doc.tagName === "string" && doc.tagName.includes("-")

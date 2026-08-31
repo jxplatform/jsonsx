@@ -291,7 +291,14 @@ function lensTarget(
         status: "unavailable",
       };
     }
-    if (derived.diff?.filePath === path) {
+    /* …AND IT MUST STILL BE CURRENT. Matching the path alone made this a cache with no
+       invalidation: a save moves the working tree under the comparison, and the artboards would go
+       on tinting the text as it was when the lens opened. `diffRev` is stamped by the loader, so an
+       injected comparison (which has none) is left alone rather than judged stale. */
+    if (
+      derived.diff?.filePath === path &&
+      (derived.diffRev === undefined || derived.diffRev === shell.git.rev)
+    ) {
       return { ...base, reason: "", status: "ready" };
     }
     /* A read that came back EMPTY is an answer, and it has to survive the next frame. The failure
@@ -332,10 +339,18 @@ function lensTarget(
 /**
  * The source-control entry for `path`, when it has changes a comparison can be built from.
  *
- * `M` and `A` and nothing else — the same two `panels/git-panel.ts` opens a diff for, because an
- * untracked or deleted file has no pair of texts to put side by side. `shell.git.status` is the
- * project's whole answer to "what has changed", so a diff lens can be offered for a page the author
- * has never clicked in the Git panel, which is the common case and was the refused one.
+ * `M`, `A` and `U`. `shell.git.status` is the project's whole answer to "what has changed", so a
+ * diff lens can be offered for a page the author has never clicked in the Git panel, which is the
+ * common case and was the refused one.
+ *
+ * The old rule was `M`/`A` alone, justified by "an untracked or deleted file has no pair of texts
+ * to put side by side". That was never true — one side is the empty string, which is exactly what
+ * `A` had always done — and it refused a comparison for a brand-new page the author had just
+ * written.
+ *
+ * `D` is still absent, and deliberately: a LENS draws the document its source pane is showing, and
+ * a deleted file cannot be open in a pane. An arm for it would be unreachable, which is a claim no
+ * test could check. The Source Control panel opens deleted files instead, through its own tab.
  *
  * A `null` path needs no guard of its own: no entry in `files` has a null path, so the search
  * simply finds nothing, and a guard whose true branch returns what the false branch already returns
@@ -347,7 +362,8 @@ function lensTarget(
 function gitChangeFor(path: string | null): GitFileStatus | null {
   return (
     shell.git.status?.files.find(
-      (file) => file.path === path && (file.status === "M" || file.status === "A"),
+      (file) =>
+        file.path === path && (file.status === "M" || file.status === "A" || file.status === "U"),
     ) ?? null
   );
 }
@@ -696,7 +712,7 @@ function selectInPane(paneId: string, target: DerivedTarget): void {
  * the pane went back to saying "Loading this file's changes…" permanently. A terminal answer has to
  * live where {@link lensTarget} — which composes every other answer — can see it.
  */
-const _diffLoads = new Map<string, { path: string; failed: boolean }>();
+const _diffLoads = new Map<string, { path: string; rev: number; failed: boolean }>();
 
 /**
  * Fetch the comparison a diff lens is missing, once.
@@ -708,10 +724,17 @@ const _diffLoads = new Map<string, { path: string; failed: boolean }>();
 function loadDiffFor(paneId: string, target: DerivedTarget, deps: DerivationDeps): void {
   const path = target.diffPath;
   const change = gitChangeFor(path);
-  if (path === null || !change || _diffLoads.get(paneId)?.path === path) {
+  /* THE REVISION IS HALF THE KEY, and without it this memo is a cache with no invalidation: it
+     asked once per PATH and never again, so a lens went on showing the comparison it read when it
+     opened for as long as it stayed open. Reading `shell.git.rev` here also makes it a tracked
+     input of the effect that calls this, so a save re-issues rather than waiting for something else
+     to repaint. */
+  const { rev } = shell.git;
+  const asked = _diffLoads.get(paneId);
+  if (path === null || !change || (asked?.path === path && asked.rev === rev)) {
     return;
   }
-  _diffLoads.set(paneId, { failed: false, path });
+  _diffLoads.set(paneId, { failed: false, path, rev });
   deps
     .loadDiff(path, change.status)
     .then((state) => {
@@ -725,8 +748,9 @@ function loadDiffFor(paneId: string, target: DerivedTarget, deps: DerivationDeps
       }
       if (state) {
         live.diff = state;
+        live.diffRev = rev;
       } else {
-        _diffLoads.set(paneId, { failed: true, path });
+        _diffLoads.set(paneId, { failed: true, path, rev });
       }
       /* Re-resolve rather than writing a status here: `ready` with the comparison in hand,
          `unavailable` with {@link DIFF_UNREADABLE} when the read came back empty — composed in the

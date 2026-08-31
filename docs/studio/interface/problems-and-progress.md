@@ -87,7 +87,7 @@ Being a dock tab rather than a full-screen surface is the whole point: **the pag
 - The dock reveals itself **once per thing you open**. Close the dock over an open formula and it stays closed until you open another.
 
 :::doc-note
-There is no **Diff** tab here. Reviewing a change is a **Diff** editor on a document at full pane size. See [Source control](/docs/studio/publish/source-control).
+There is no **Diff** tab here. Reviewing a change is a **Diff** editor on a document at full pane size, and its change count and stepper are drawn over the comparison itself. Two panes can be comparing two different files, which a single dock tab could not show. See [Source control](/docs/studio/publish/source-control).
 :::
 
 ## Activity

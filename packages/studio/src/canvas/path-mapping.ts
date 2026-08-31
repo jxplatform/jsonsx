@@ -102,9 +102,14 @@ export function classifyRenderNode(path: JxPath, def: unknown, ctx: PathMapCtx):
     }
   }
 
-  // Collapse repeater-perimeter template hops: for an array document path P, a render path of
-  // `[...P, "children", 0, ...rest]` maps to `[...P, "map", ...rest]`. Loop for nested repeaters.
-  if ((ctx.canvasMode === "design" || ctx.canvasMode === "edit") && ctx.arrayPaths.size > 0) {
+  /* Collapse repeater-perimeter template hops: for an array document path P, a render path of
+     `[...P, "children", 0, ...rest]` maps to `[...P, "map", ...rest]`. Loop for nested repeaters.
+
+     `arrayPaths` IS the mode test, and naming modes here as well was a second copy of it that
+     disagreed. Only the caller knows whether `prepareForEditMode` ran, and it says so by filling
+     this set; a non-empty set in a mode this list did not name meant the perimeters existed and the
+     collapse did not, so the stamped path pointed at a node the document has no address for. */
+  if (ctx.arrayPaths.size > 0) {
     let changed = true;
     while (changed) {
       changed = false;

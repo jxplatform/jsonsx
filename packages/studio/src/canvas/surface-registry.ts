@@ -25,7 +25,7 @@
  */
 
 import type { CanvasPanel } from "../types";
-import type { MonacoSurface } from "../view";
+import type { DiffSurface, MonacoSurface } from "../view";
 
 /**
  * The class name every pane's stage element carries.
@@ -72,6 +72,14 @@ export interface CanvasSurface {
   panY: number;
   /** The source view's Monaco, mounted into THIS stage. Two Code panes are two models. */
   monacoEditor: MonacoSurface | null;
+  /**
+   * The Code view of a comparison, mounted into THIS stage.
+   *
+   * Its own slot rather than a widening of {@link monacoEditor}, for the reason {@link DiffSurface}
+   * gives: it is a different Monaco type with no buffer to commit, and sharing the slot would put
+   * it in front of every code-editor API that reads from there.
+   */
+  monacoDiffEditor: DiffSurface | null;
   /**
    * The Stylebook filter and Customized flag THIS stage's catalogue was last built for.
    *
@@ -141,6 +149,7 @@ export function surfaceForPane(paneId: string): CanvasSurface {
 function freshSurface(paneId: string): CanvasSurface {
   return {
     centerObserver: null,
+    monacoDiffEditor: null,
     monacoEditor: null,
     needsCenter: true,
     panX: 0,

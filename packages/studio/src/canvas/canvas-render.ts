@@ -7,6 +7,7 @@
 import { html, render as litRender, nothing } from "lit-html";
 import { ref } from "lit-html/directives/ref.js";
 import type * as monaco from "monaco-editor";
+import type { WireDiffMarks } from "./iframe-protocol";
 import type * as Y from "yjs";
 import { loadedMonaco, loadMonaco, mountStillWanted } from "../services/monaco-lazy";
 
@@ -33,6 +34,10 @@ import {
   stringProperty,
 } from "../commands/command-args";
 import { collabSourceContext } from "../collab/collab-session";
+import { buildChangeMap } from "./diff-marks";
+import type { ChangeMap } from "./diff-marks";
+import { clearDiffView, diffViewOf, setDiffChangeMap } from "./diff-view";
+import { renderDiffToolbar, setDiffRepaint, setDiffToolbarHost } from "./diff-toolbar";
 import { attachCursorStyles } from "../collab/monaco-cursors";
 import type { AwarenessLike } from "../collab/monaco-cursors";
 import type { BindingAwareness } from "../collab/monaco-binding";
@@ -56,7 +61,7 @@ import {
   bufferWrites,
   commitBufferWrites,
 } from "../services/monaco-buffer";
-import { modelUriFor } from "../services/model-uri";
+import { diffModelUrisFor, modelUriFor, monacoLangForPath } from "../services/model-uri";
 import { renderWelcome } from "../panels/welcome-screen";
 import { renderEmptyState } from "../panels/empty-state";
 import {
@@ -368,6 +373,98 @@ function disposeSourceEditor(surface: CanvasSurface): void {
   surface.monacoEditor = null;
 }
 
+/**
+ * Tear down a comparison's Code view.
+ *
+ * **Both models, explicitly.** Monaco never disposes models a caller created, and a leaked model
+ * keeps its URI claimed — which is the same throw one mount later, on a stage that looks empty
+ * rather than broken.
+ *
+ * **No `commitBufferWrites`.** `disposeSourceEditor` calls it because a source buffer can hold
+ * unsaved text; a comparison holds two read-only texts, one of which is a git object with no place
+ * on disk to be written back to. There is nothing to flush, which is the same reason this editor is
+ * deliberately absent from `buffersForTab`.
+ */
+function disposeDiffEditor(surface: CanvasSurface): void {
+  const editor = surface.monacoDiffEditor;
+  if (!editor) {
+    return;
+  }
+  const model = editor.getModel();
+  editor.setModel(null);
+  model?.original.dispose();
+  model?.modified.dispose();
+  editor.dispose();
+  surface.monacoDiffEditor = null;
+}
+
+/**
+ * Mount the comparison's Monaco diff editor: HEAD on the left, the working copy on the right.
+ *
+ * This is {@link mountSourceEditor} minus everything about writing — no change handler, no
+ * debounce, no collab binding. **The collab lock in particular is never entered**: `enter()` flips
+ * the room's canonical lock to "source" and freezes structural editing for every peer, and doing
+ * that to show somebody a read-only comparison would freeze a live co-editing session on a gesture
+ * nobody made.
+ *
+ * The post-await guard is the one `mountSourceEditor`'s comment explains at length, and it is not
+ * belt-and-braces here either: `renderCanvasImpl` writes `surface.prevCanvasMode` BEFORE this runs,
+ * so a second synchronous render inside the 12.6 MB cold load sees `modeChanged === false` and a
+ * still-null slot, falls through, and mounts again — and the second `createModel` claims a URI the
+ * first registered, which real Monaco throws on. Asked before `createModel`, for that reason.
+ *
+ * A RETARGET is the second, independent race, and `mountStillWanted` cannot catch it: it answers
+ * false when the slot is already filled, so a comparison switching to a different file would keep
+ * the old editor and its claimed URIs. That one is disposed synchronously, before the await.
+ */
+async function mountDiffEditor(
+  surface: CanvasSurface,
+  container: Element,
+  state: GitDiffState,
+): Promise<void> {
+  const { paneId } = surface;
+  const key = state.filePath;
+  if (surface.monacoDiffEditor && surface.monacoDiffEditor._diffKey !== key) {
+    disposeDiffEditor(surface);
+  }
+  const monaco = await loadMonaco();
+  if (
+    !mountStillWanted(
+      container,
+      surface.monacoDiffEditor,
+      () => canvasModeOfPane(paneId) === "git-diff" && diffViewOf(paneId) === "code",
+    )
+  ) {
+    return;
+  }
+  const uris = diffModelUrisFor(paneId, key || "document.json");
+  const lang = monacoLangForPath(key || "document.json");
+  const original = monaco.editor.createModel(
+    state.originalContent || "",
+    lang,
+    monaco.Uri.parse(uris.head),
+  );
+  const modified = monaco.editor.createModel(
+    state.currentContent || "",
+    lang,
+    monaco.Uri.parse(uris.work),
+  );
+  const editor = monaco.editor.createDiffEditor(container as HTMLElement, {
+    automaticLayout: true,
+    fontFamily: "'JetBrains Mono', 'SF Mono', 'Fira Code', 'Consolas', monospace",
+    fontSize: 12,
+    minimap: { enabled: false },
+    originalEditable: false,
+    readOnly: true,
+    renderSideBySide: true,
+    scrollBeyondLastLine: false,
+    theme: monacoTheme(),
+  }) as NonNullable<CanvasSurface["monacoDiffEditor"]>;
+  editor.setModel({ modified, original });
+  editor._diffKey = key;
+  surface.monacoDiffEditor = editor;
+}
+
 function resetCanvasView(surface: CanvasSurface) {
   const canvasWrap = surface.wrap;
   const { paneId } = surface;
@@ -378,6 +475,7 @@ function resetCanvasView(surface: CanvasSurface) {
   detachSettingsPane(paneId);
   disposeSourceCollab(surface);
   disposeSourceEditor(surface);
+  disposeDiffEditor(surface);
   if (surface.centerObserver) {
     surface.centerObserver.disconnect();
     surface.centerObserver = null;
@@ -1160,6 +1258,43 @@ function renderCanvasImpl(surface: CanvasSurface) {
       canvasWrap.style.overflow = "hidden";
     }
 
+    /* THE CODE HALF, and it is the whole branch rather than an extra artboard.
+       A comparison read as text has no artboards, no pan/zoom and no marks: Monaco computes its own
+       line diff from the two texts `readGitDiff` already holds, and draws its own red and green.
+       This is the ONLY view for a file the canvas cannot render — a .ts, a .css, a .gitignore — and
+       an alternate one for a document it can. */
+    if (diffViewOf(surface.paneId) === "code") {
+      disposeSourceEditor(surface);
+      let toolbarEl: HTMLElement | null = null;
+      let editorEl: HTMLElement | null = null;
+      litRender(
+        html`
+          <div
+            class="diff-toolbar"
+            ${ref((el) => {
+              toolbarEl = (el as HTMLElement | undefined) ?? null;
+              setDiffToolbarHost(surface.paneId, toolbarEl);
+            })}
+          ></div>
+          <div class="diff-code-wrap">
+            <div
+              class="diff-code-editor"
+              ${ref((el) => {
+                editorEl = (el as HTMLElement | undefined) ?? null;
+              })}
+            ></div>
+          </div>
+        `,
+        canvasWrap,
+      );
+      renderDiffToolbar(surface.paneId);
+      if (editorEl) {
+        void mountDiffEditor(surface, editorEl, gitDiffState);
+      }
+      return;
+    }
+    disposeDiffEditor(surface);
+
     const panelWidth = 800;
 
     const { tpl: origTpl, panel: origPanel } = canvasPanelTemplate(
@@ -1177,6 +1312,15 @@ function renderCanvasImpl(surface: CanvasSurface) {
 
     litRender(
       html`
+        <!-- Absolutely positioned, and a SIBLING: a child of the wrap would be panned and scaled
+             with the artboards, and a flow sibling would move the origin the pan transform and the
+             centering observer both compute against. -->
+        <div
+          class="diff-toolbar"
+          ${ref((el) => {
+            setDiffToolbarHost(surface.paneId, (el as HTMLElement | undefined) ?? null);
+          })}
+        ></div>
         <div
           class="panzoom-wrap"
           style="transform-origin:0 0"
@@ -1220,12 +1364,28 @@ function renderCanvasImpl(surface: CanvasSurface) {
       parseContent(gitDiffState.originalContent || ""),
       parseContent(gitDiffState.currentContent || ""),
     ]).then(([originalDoc, currentDoc]) => {
+      /* THE COMPARISON, computed once for both artboards and split by side.
+         Structural rather than textual: the artboards render documents, so "what changed" has to be
+         answered in document paths that `data-jx-path` can resolve. A failure here must not cost
+         the author the comparison itself — an unparseable side already renders as a "Failed to
+         parse" stub, and a stub aligns to zero changes rather than throwing — so the marks degrade
+         to none and the two artboards draw exactly as they did before any of this existed. */
+      let changeMap: ChangeMap | null = null;
+      try {
+        changeMap = buildChangeMap(originalDoc, currentDoc);
+      } catch (error) {
+        // Highlighting is an affordance over a comparison that is still on screen and still
+        // Readable, so this degrades rather than surfacing: no toast, no empty stage.
+        console.warn("buildChangeMap:", error);
+      }
+      setDiffChangeMap(surface.paneId, changeMap);
+      renderDiffToolbar(surface.paneId);
       renderCanvasIntoPanel(
         surface,
         origPanel as unknown as CanvasPanel,
         featureToggles,
         originalDoc,
-        gitDiffState,
+        changeMap?.original ?? null,
         diffGen,
       );
       renderCanvasIntoPanel(
@@ -1233,7 +1393,7 @@ function renderCanvasImpl(surface: CanvasSurface) {
         currPanel as unknown as CanvasPanel,
         featureToggles,
         currentDoc,
-        gitDiffState,
+        changeMap?.current ?? null,
         diffGen,
       );
     });
@@ -1499,8 +1659,10 @@ function renderCanvasImpl(surface: CanvasSurface) {
  *   render needs no structural-preview fallback); unused.
  * @param {JxMutableNode | null} [docOverride] - Optional document to render (for diff mode). Uses
  *   active tab doc if not provided.
- * @param {GitDiffState | null} [_gitDiffState] - Accepted for call-site symmetry; the iframe path
- *   does not apply parent-side diff highlighting.
+ * @param {WireDiffMarks | null} [diffMarks] - This artboard's change marks, in ITS OWN document's
+ *   coordinates. The slot used to hold a `GitDiffState` "accepted for call-site symmetry" and
+ *   unread, which is what "the iframe path does not apply diff highlighting" meant; it does now,
+ *   and the marks are per-SIDE, so the whole comparison was never the right thing to pass.
  * @param {number | null} [passGen] - The generation of the render pass this panel belongs to.
  *   Passed explicitly by a DEFERRED mount, whose callback would otherwise read whatever generation
  *   is current when the timer fires — a later pass's number, stamped on an earlier pass's
@@ -1511,7 +1673,7 @@ function renderCanvasIntoPanel(
   panel: CanvasPanel,
   _featureToggles: Record<string, boolean>,
   docOverride: JxMutableNode | null = null,
-  _gitDiffState: GitDiffState | null = null,
+  diffMarks: WireDiffMarks | null = null,
   passGen: number | null = null,
 ) {
   const gen = passGen ?? surface.renderGeneration;
@@ -1538,9 +1700,17 @@ function renderCanvasIntoPanel(
       panel._width,
       docOverride ? null : (tab?.id ?? null),
       // The VIEW tab, which an override does not null out: a git-diff frame routes no mutations
-      // But is still a view of this pane's document, and its docBase, layout toggle and mode are
-      // That tab's. Explicit rather than left to the default, because this line already knows.
+      // But is still a view of this pane's document, and its docBase and layout toggle are that
+      // Tab's. Explicit rather than left to the default, because this line already knows.
       tab,
+      /* …but NOT its mode, which is the one thing the view tab cannot answer for a lens. A lens
+         draws the source pane's document in a mode of its own that is never written onto the tab,
+         so resolving from `tab` gave a Diff lens's artboards the SOURCE pane's mode — an editable
+         `design` frame for a comparison, with repeater paths collapsed on one entry point to the
+         diff and not the other. `canvasModeOfPane` degrades to exactly the old answer for every
+         pane that is not a lens, so this is unconditional rather than a git-diff special case. */
+      canvasModeOfPane(surface.paneId),
+      diffMarks,
     ),
   )
     .then(() => {
@@ -1573,7 +1743,14 @@ function renderCanvasIntoPanel(
  * Same idiom as `setIframePatchEscalation`. Without it a pane removed from the grid would drop its
  * record while its Monaco, its collab lock and its centering observer stayed alive.
  */
+/* The diff toolbar's Visual/Code switch rebuilds the stage, and it cannot import this module to
+   do it — this one imports IT. Same injection as the teardown below. */
+setDiffRepaint(renderCanvas);
+
 setSurfaceTeardown((surface) => {
+  disposeDiffEditor(surface);
+  clearDiffView(surface.paneId);
+  setDiffToolbarHost(surface.paneId, null);
   detachGridPanel(surface.paneId);
   detachLibraryPane(surface.paneId);
   detachEntryPane(surface.paneId);

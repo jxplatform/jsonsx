@@ -52,6 +52,16 @@ Code shows the file as raw source in a full code editor with syntax highlighting
 
 Switching away from Code, to another editor or another view or another document, carries your last keystrokes with you rather than leaving them behind in a buffer you can no longer see. See **[Code editing](/docs/studio/logic/code#the-code-editor-the-whole-file-as-source)**.
 
+## Diff
+
+Diff compares the open file against your last commit. You reach it from the [Source Control](/docs/studio/publish/source-control) panel by clicking a changed file, or from the **Editor** control on a file that has changes.
+
+It has two halves and a switch above them. **Visual** draws the page twice, side by side, with added blocks marked in green, removed blocks in red, and edited ones marked on both sides. **Code** shows the file's text with changed lines highlighted instead. A file with no visual form, such as a stylesheet or a script, offers only Code.
+
+**Next change** and **Previous change**, or :kbd[F7] and :kbd[⇧F7], walk the changes in order, and both sides move together so the block you are reading stays lined up.
+
+The full guide is **[Source control](/docs/studio/publish/source-control#read-a-change)**.
+
 ## Project Styles
 
 Project Styles is the catalog of your project's element defaults: every heading, button, and link rendered with its base style, so you set the look of each element type once for the whole site. Selecting it switches the Inspector to the **Style** tab automatically. See **[Design mode](/docs/studio/design)** for how it fits into styling.
@@ -78,6 +88,8 @@ Every file opens in its natural editor and view, and the two controls offer only
 | Images, video, audio, fonts, PDFs  | **Media**          | —                            | —                       |
 | Vector images (`.svg`)             | **Media**          | **Code**                     | —                       |
 | The project file (`project.json`)  | **Project Styles** | **Code**                     | —                       |
+
+Any file with uncommitted changes also offers **Diff**, including files that have no other editor at all. Opening one of those from the Files tree still says Studio has no editor for it; Source Control asks the narrower question of what changed, and answers it.
 
 Opening `project.json` from the Files tree lands on **Project Styles**; **Open Project Settings** puts that same document into its settings editor, and **Open Project Styles** puts it back. All three are in the **Settings** menu at the foot of the rail.
 

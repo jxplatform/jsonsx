@@ -264,6 +264,16 @@ export interface ShellGit {
   loading: boolean;
   error: string | null;
   diffState: GitDiffState | null;
+  /**
+   * Bumped whenever the working tree may have moved under an open comparison.
+   *
+   * A comparison is two texts read once, so nothing about it notices a save. That was invisible
+   * while the artboards merely drew two documents; with change marks on them, the tint and the
+   * count go stale the moment the author edits the file they are reviewing — and a review loop
+   * whose marks lie is worse than one with no marks. This is the one input both holders of a
+   * comparison watch: the panel's `diffState` re-reads, and a Diff lens's memo re-issues.
+   */
+  rev: number;
   logEntries: GitLogEntry[] | null;
   /** "changes" | "history" — the panel's sub-tab. */
   subTab: string;
@@ -488,6 +498,7 @@ function freshGit(): ShellGit {
     lastUpdated: null,
     loading: false,
     logEntries: null,
+    rev: 0,
     status: null,
     subTab: "changes",
   };

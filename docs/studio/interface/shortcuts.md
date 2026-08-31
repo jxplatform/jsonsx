@@ -60,6 +60,7 @@ Every row is also a command: press :kbd[⌘K] and type the name to run it withou
 | `⌃⇧Tab` | `Ctrl+Shift+Tab` | Previous Tab           | `document.previousTab`       |
 | `⌃Tab`  | `Ctrl+Tab`       | Next Tab               | `document.nextTab`           |
 | `F6`    | `F6`             | Focus Next Region      | `view.cycleRegion`           |
+| `F7`    | `F7`             | Next Change            | `diff.nextChange`            |
 | `⌘,`    | `Ctrl+,`         | Preferences…           | `app.preferences`            |
 | `⌘.`    | `Ctrl+.`         | Zen Mode               | `view.zen`                   |
 | `⌘\`    | `Ctrl+\`         | Split Right            | `pane.splitRight`            |
@@ -97,6 +98,7 @@ Every row is also a command: press :kbd[⌘K] and type the name to run it withou
 | `⌘Y`    | `Ctrl+Y`         | Redo                   | `edit.redo`                  |
 | `⌘Z`    | `Ctrl+Z`         | Undo                   | `edit.undo`                  |
 | `⇧F6`   | `Shift+F6`       | Focus Previous Region  | `view.cycleRegionBack`       |
+| `⇧F7`   | `Shift+F7`       | Previous Change        | `diff.previousChange`        |
 
 ## Related
 

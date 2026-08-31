@@ -87,6 +87,16 @@ export type PaneDerivation =
       /** `diff` only: this pane's OWN diff, never `shell.git.diffState`. */
       diff: GitDiffState | null;
       /**
+       * The `shell.git.rev` {@link diff} was read at, or absent when it was not read by the loader.
+       *
+       * What makes the comparison revalidate. Without it the lens asked once per PATH and never
+       * again, so it went on showing the texts it read when it opened — and change marks over a
+       * stale comparison describe a file the author has since edited. Absent means "not from the
+       * loader", and such a comparison is left alone rather than judged stale on a rev it never
+       * had.
+       */
+      diffRev?: number;
+      /**
        * This pane's own scale. `session.ui.zoom` is per-TAB, so under a lens the mobile view and
        * the desktop view it is a lens OF would zoom together.
        */

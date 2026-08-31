@@ -14,7 +14,7 @@ import { getPlatform } from "../platform";
 import { now } from "../services/clock";
 import { formatForPath } from "../format/format-host";
 import { projectState, renderOnly } from "../store";
-import { activeTab } from "../workspace/workspace";
+import { comparisonRefusal, openComparisonTab } from "./git-diff-open";
 import type { Tab } from "../tabs/tab";
 import { shell } from "../shell";
 import type { GitLogEntry } from "../shell";
@@ -62,10 +62,64 @@ export async function refreshGitStatus() {
       git.error = errorMessage(failure);
     }
     git.lastUpdated = now();
+    /* THE COMPARISON FOLLOWS THE TREE. Every git verb that can move the working tree ends here —
+       commit, discard, checkout, pull, fetch — and so does the 30s poll that notices a change made
+       outside Studio. Bumping the revision is what re-issues a Diff lens's read; the panel's own
+       slot is re-read below, because nothing else owns it. */
+    git.rev += 1;
+    await rereadOpenComparison();
   } catch (error) {
     git.error = errorMessage(error);
   } finally {
     git.loading = false;
+  }
+}
+
+/**
+ * Re-read the comparison the Source Control panel has open, against the status just fetched.
+ *
+ * A file that is no longer changed loses its comparison rather than keeping a stale one: the stage
+ * then draws "Nothing to compare", which is the truth and is what the author's own commit just made
+ * true. A read that fails leaves the previous comparison up — a momentary git error is not a reason
+ * to blank a review someone is in the middle of.
+ */
+async function rereadOpenComparison(): Promise<void> {
+  const state = shell.git.diffState;
+  if (!state) {
+    return;
+  }
+  const change = shell.git.status?.files.find((file) => file.path === state.filePath);
+  if (!change || !isDiffableStatus(change.status)) {
+    shell.git.diffState = null;
+    return;
+  }
+  try {
+    shell.git.diffState = await readGitDiff(state.filePath, change.status);
+  } catch {
+    // Intentionally ignored: the comparison on screen is still the last one that read cleanly.
+  }
+}
+
+/**
+ * Re-read an open comparison because THIS file was just saved.
+ *
+ * Separate from the git-status path, and deliberately: a save does not refresh `git.status`, so the
+ * entry there may not exist yet for a file whose first edit this is. The status the comparison was
+ * opened with is the right one to re-read against — the file has not changed its relationship to
+ * HEAD by being written, only its contents.
+ *
+ * @param {string | null} path - The project-relative path just written.
+ */
+export async function noteFileSaved(path: string | null): Promise<void> {
+  shell.git.rev += 1;
+  const state = shell.git.diffState;
+  if (!path || state?.filePath !== path) {
+    return;
+  }
+  try {
+    shell.git.diffState = await readGitDiff(path, state.fileStatus);
+  } catch {
+    // Intentionally ignored: see rereadOpenComparison.
   }
 }
 
@@ -123,18 +177,53 @@ export function platformSupportsClone() {
  * copy of these five lines is how the panel and the lens would come to disagree about what "the
  * diff of this file" means, which is the rule {@link initRepository} is written under too.
  *
- * `A` (added) has no `HEAD` copy, so its original is the empty string rather than a `gitShow` that
- * would throw. Callers narrow to `M`/`A` before asking.
+ * **Each side is read only where it exists**, and every status is one of the four combinations:
+ *
+ * - `M` (modified) — both sides read.
+ * - `A` (added) and `U` (untracked) — no `HEAD` copy, so the original is the empty string rather than
+ *   a `gitShow` that would throw. The two differ only in whether the new file has been staged,
+ *   which is not a fact a comparison cares about.
+ * - `D` (deleted) — the mirror, and the one this function used to be unable to express: there is no
+ *   working copy, so `readFile` would throw on a path that is gone, and the current side is empty.
+ *
+ * `gitChangeFor`'s docstring used to give "an untracked or deleted file has no pair of texts to put
+ * side by side" as the REASON for narrowing to `M`/`A`. It was never true: one side is the empty
+ * string, which is exactly what `A` had always done.
  *
  * @param {string} path
  * @param {string} fileStatus
  * @returns {Promise<GitDiffState>}
  */
+/** How each status reads aloud. The badge is one letter and a colour, which a label cannot be. */
+const STATUS_WORDS: Record<string, string> = {
+  A: "added",
+  D: "deleted",
+  M: "modified",
+  R: "renamed",
+  U: "untracked",
+};
+
+/** The statuses a comparison can be built for. `R` is absent — see {@link DIFFABLE_STATUSES}. */
+export const DIFFABLE_STATUSES = new Set(["M", "A", "U", "D"]);
+
+/**
+ * Whether this file's change can be opened as a comparison at all.
+ *
+ * `R` (renamed) is the one that cannot: `GitFileStatus` carries a single `path`, so the old name is
+ * not in hand and there is nothing to compare the new one against. Better refused by name than
+ * shown as a whole-file rewrite.
+ */
+export function isDiffableStatus(fileStatus: string): boolean {
+  return DIFFABLE_STATUSES.has(fileStatus);
+}
+
 export async function readGitDiff(path: string, fileStatus: string): Promise<GitDiffState> {
   const plat = getPlatform();
+  const inHead = fileStatus !== "A" && fileStatus !== "U";
+  const onDisk = fileStatus !== "D";
   const [originalContent, currentContent] = await Promise.all([
-    fileStatus === "A" ? Promise.resolve("") : plat.gitShow({ path, ref: "HEAD" }),
-    plat.readFile(path),
+    inHead ? plat.gitShow({ path, ref: "HEAD" }) : Promise.resolve(""),
+    onDisk ? plat.readFile(path) : Promise.resolve(""),
   ]);
   return { currentContent, filePath: path, fileStatus, originalContent };
 }
@@ -622,26 +711,43 @@ export function renderGitPanel(ctx: {
     const name = parts.pop();
     const dir = parts.join("/");
 
+    /*
+     * EVERY changed row opens something, and it opens the file it names.
+     *
+     * Two silent returns used to live here, and between them they made most of this panel inert: a
+     * status that was not `M`/`A` returned, and then a path that was not `.json` and had no format
+     * class returned again. So a changed `.ts`, `.css` or `.yaml` row did nothing at all when
+     * clicked, and neither did any deleted or untracked file. Renderability now decides which VIEW
+     * opens, not whether the row responds; only `R` is refused, and it is refused out loud.
+     *
+     * **And it opens the file's OWN tab.** This used to end in
+     * `ctx.setCanvasMode(activeTab.value, "git-diff")` — the focused tab, whatever it was. Clicking
+     * `components/card.json` while `pages/index.md` was open flipped the index.md TAB into git-diff
+     * and drew card.json's comparison on it: the strip named one file and the stage drew another,
+     * which is the §14.1 identity defect this repository has paid off three times elsewhere.
+     */
     const onFileClick = async () => {
-      if (file.status !== "M" && file.status !== "A") {
+      const refusal = isDiffableStatus(file.status)
+        ? comparisonRefusal(file.path, file.status)
+        : `"${file.path}" has no change this view can open.`;
+      if (refusal) {
+        shell.git.error = refusal;
         return;
       }
-      if (!file.path.endsWith(".json") && !formatForPath(file.path)) {
-        return;
-      }
-
       try {
         shell.git.loading = true;
-
         const diffState = await readGitDiff(file.path, file.status);
-
         shell.git.diffState = diffState;
-
-        if (ctx?.setCanvasMode) {
-          if (ctx.setGitDiffState) {
-            ctx.setGitDiffState(diffState);
-          }
-          ctx.setCanvasMode(activeTab.value, "git-diff");
+        /* The tab this comparison belongs to. A renderable document opens (or re-activates) the
+           ordinary path-keyed tab it would have had anyway; anything else gets a stub tab keyed by
+           the same path, the way a media file does. Either way the id is the path, so the strip and
+           the stage agree. */
+        const tab = await openComparisonTab(file.path);
+        if (ctx?.setGitDiffState) {
+          ctx.setGitDiffState(diffState);
+        }
+        if (tab) {
+          ctx?.setCanvasMode?.(tab, "git-diff");
         }
       } catch (error) {
         shell.git.error = `Failed to load diff: ${errorMessage(error)}`;
@@ -652,11 +758,23 @@ export function renderGitPanel(ctx: {
 
     return html`
       <div class="git-file-row">
+        <!-- A REAL CONTROL, because it does something. It was a bare span with a cursor and a title:
+             not focusable, no role, and Enter did nothing — so the panel's primary verb was
+             mouse-only. The label carries the path and the status in words, since the badge beside
+             it is a single letter and colour. -->
         <span
           class="git-file-info"
-          style="cursor: pointer; flex: 1;"
-          title="Click to view diff"
+          role="button"
+          tabindex="0"
+          aria-label=${`${file.path}, ${STATUS_WORDS[file.status] ?? "changed"}`}
+          title="Open this file's comparison"
           @click=${onFileClick}
+          @keydown=${(event: KeyboardEvent) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              void onFileClick();
+            }
+          }}
         >
           <span class="git-file-name" title=${file.path}>${name}</span>
           ${dir ? html`<span class="git-file-dir">${dir}</span>` : nothing}

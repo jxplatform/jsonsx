@@ -107,15 +107,30 @@ describe("classifyRenderNode", () => {
     });
   });
 
-  test("repeater remap only applies in design/edit mode", () => {
-    const ctx: PathMapCtx = {
-      ...plain,
-      canvasMode: "preview",
-      arrayPaths: new Set(["children/2"]),
-    };
+  test("preview does not remap, because preview populates no arrayPaths", () => {
+    // The empty set IS preview's answer. `canvas-live-render.ts` fills `arrayPaths` only where it
+    // Also ran `prepareForEditMode`, so a preview ctx carrying repeater paths is unconstructible
+    // Outside a test — which is why this asserts the reachable state rather than the old mode check.
+    const ctx: PathMapCtx = { ...plain, canvasMode: "preview", arrayPaths: new Set() };
     expect(classifyRenderNode(["children", 2, "children", 0], {}, ctx)).toEqual({
       kind: "path",
       path: ["children", 2, "children", 0],
+    });
+  });
+
+  test("remaps in git-diff, where the perimeters exist and the collapse used to be skipped", () => {
+    // The regression this pair exists for: `prepareForEditMode` builds repeater perimeters for
+    // Every non-preview mode, so a git-diff artboard HAS them. Naming only design and edit here
+    // Stamped every node under a repeater with a render path the document cannot address, and a
+    // Diff mark addressed in document space would then resolve to nothing or to the wrong element.
+    const ctx: PathMapCtx = {
+      ...plain,
+      canvasMode: "git-diff",
+      arrayPaths: new Set(["children/2"]),
+    };
+    expect(classifyRenderNode(["children", 2, "children", 0, "children", 1], {}, ctx)).toEqual({
+      kind: "path",
+      path: ["children", 2, "map", "children", 1],
     });
   });
 });

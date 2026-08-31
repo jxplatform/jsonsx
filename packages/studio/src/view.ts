@@ -27,6 +27,21 @@ import type { Tab } from "./tabs/tab";
  * timer survived three disposal sites and stayed able to replace a page with an empty parse.
  * `services/monaco-buffer.ts` owns the rule; this is the storage it needs.
  */
+/**
+ * A comparison's Monaco diff editor.
+ *
+ * Deliberately NOT a {@link MonacoSurface}: an `IStandaloneDiffEditor` is a different type, and
+ * widening the code-editor slot to a union would put a non-code editor into `buffersForTab`'s
+ * array, where `bufferIsLive`, `getValue` and `_writes` are all code-editor APIs. It carries none
+ * of that state because it has nothing to commit: both its models are read-only, and one of them is
+ * a git object that does not exist on disk.
+ *
+ * `_diffKey` is the comparison it was mounted for, so a retarget to a different file disposes it
+ * before claiming the next pair of URIs rather than throwing on a URI the previous mount still
+ * holds.
+ */
+export type DiffSurface = editor.IStandaloneDiffEditor & { _diffKey?: string };
+
 export type MonacoSurface = editor.IStandaloneCodeEditor & {
   _ignoreNextChange?: boolean;
   /** The debounced work armed over this buffer, with this editor's exact lifetime. */

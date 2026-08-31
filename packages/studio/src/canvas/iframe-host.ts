@@ -56,6 +56,7 @@ import type {
   IframeToParent,
   InsertZone,
   NodeHit,
+  WireDiffMarks,
   ParentToIframe,
   SelectionSnapshot,
   SerializableRect,
@@ -775,9 +776,25 @@ export async function revealCanvasPath(
   path: readonly (string | number)[],
 ): Promise<CanvasPoint | null> {
   const host = hostForPath();
-  if (!host) {
-    return null;
-  }
+  return host ? revealCanvasPathIn(host, path) : null;
+}
+
+/**
+ * {@link revealCanvasPath}, against an artboard the caller has already resolved.
+ *
+ * **A diff artboard cannot be found by `hostForPath`.** That resolver prefers the host rendering
+ * the focused tab and otherwise takes any ready page host — and BOTH git-diff artboards mount with
+ * `tabId: null` (it is what stops them routing mutations anywhere), so neither can match the
+ * focused tab and the fallback returns an arbitrary one of the two. A change stepper asking for
+ * "the node at this path" would measure and pan whichever it happened to get, on either side, in
+ * either pane.
+ *
+ * Callers with a panel in hand reach their host through {@link hostForCanvas} and come here.
+ */
+export async function revealCanvasPathIn(
+  host: HostState,
+  path: readonly (string | number)[],
+): Promise<CanvasPoint | null> {
   const before = await measureIn(host, path);
   if (!before) {
     return null;
@@ -791,6 +808,22 @@ export async function revealCanvasPath(
   panToParentRect({ height: before.height, top: before.top }, surface);
   await panSettled(host);
   return measureIn(host, path);
+}
+
+/**
+ * Measure one node in one artboard, without moving anything.
+ *
+ * The stepper needs BOTH sides' rects before it pans, because it pans to their union — the two
+ * artboards share one `.panzoom-wrap` and therefore one vertical position, and a change sitting at
+ * different heights on the two boards is only fully on screen if the move accounts for both.
+ * {@link revealCanvasPathIn} measures and moves in one go, which is the wrong shape for that.
+ */
+export function measureInCanvas(
+  canvasEl: HTMLElement,
+  path: readonly (string | number)[],
+): Promise<CanvasPoint | null> {
+  const host = hostForCanvas(canvasEl);
+  return host ? measureIn(host, path) : Promise.resolve(null);
 }
 
 /**
@@ -2665,7 +2698,12 @@ type PreparedRender = Omit<
 /** One render pass's prepared payloads, by document IDENTITY. */
 type PreparedDocs = Map<
   JxMutableNode,
-  { tabId: string | null; viewTabId: string | null; payload: Promise<PreparedRender> }
+  {
+    tabId: string | null;
+    viewTabId: string | null;
+    mode: string | null;
+    payload: Promise<PreparedRender>;
+  }
 >;
 
 /**
@@ -2703,6 +2741,11 @@ const PREPARED_PASS_LIMIT = 4;
  * THAT — the document path, the layout toggle, the preview params and the mode. A mismatch in
  * either re-prepares rather than reusing. `tabId` alone would not do: an override render nulls it,
  * so two git-diff documents would agree on `null` while being views of different tabs.
+ *
+ * The pane's MODE is the third part of the key, because it is now an input to the resolution rather
+ * than something derived from `viewTabId` inside it. Two views of one document in different modes
+ * are two different renders — a Diff lens and the pane it follows are exactly that — and without
+ * this they would agree on both ids and share a payload resolved for whichever asked first.
  */
 const preparedPasses = new Map<number, PreparedDocs>();
 
@@ -2746,11 +2789,17 @@ function preparePassRender(
   tabId: string | null,
   viewTab: Tab | null,
   paneId: string,
+  modeOverride: string | null = null,
 ): Promise<PreparedRender> {
   const byDoc = preparedDocsFor(gen);
   const viewTabId = viewTab?.id ?? null;
   const cached = byDoc.get(doc);
-  if (cached && cached.tabId === tabId && cached.viewTabId === viewTabId) {
+  if (
+    cached &&
+    cached.tabId === tabId &&
+    cached.viewTabId === viewTabId &&
+    cached.mode === modeOverride
+  ) {
     return cached.payload;
   }
   // One-shot per PANE's pass, not per host and not globally. `allowAutoRequestsOnNextRender` arms
@@ -2762,7 +2811,7 @@ function preparePassRender(
   const allowAutoRequests = consumeAllowAutoRequests(paneId);
   const payload = timeSpanAsync(SPAN_PREPARE_RENDER, async (): Promise<PreparedRender> => {
     canvasPerf.renderPreparations += 1;
-    const resolved = await resolveCanvasDocument(doc, viewTab);
+    const resolved = await resolveCanvasDocument(doc, viewTab, modeOverride);
     // The doc must be structured-cloneable to cross postMessage. A Jx document is JSON by contract,
     // So a JSON round-trip (NOT structuredClone, which would throw) drops residual functions /
     // Reactive proxy artifacts that would otherwise raise DataCloneError and silently drop the
@@ -2786,6 +2835,10 @@ function preparePassRender(
       doc: cloneableDoc,
       docBase: resolved.docBase ?? `${canvasBaseOrigin()}/`,
       mapperCtx: resolved.mapperCtx,
+      /* Still a cast, but no longer a lie: `WireMapperCtx.canvasMode` is typed `string` (it mirrors
+         `PathMapCtx`, which carries the mode for `isEditableMode` and takes `CanvasMode | string`),
+         so this narrows a string to the union. It used to narrow it to a union that did not list
+         `git-diff` while git-diff renders went through here every day. */
       mode: resolved.mapperCtx.canvasMode as CanvasMode,
       shadowDoc: cloneableShadow,
       siteStyle: resolved.siteStyle,
@@ -2793,7 +2846,7 @@ function preparePassRender(
       ...(allowAutoRequests ? { allowAutoRequests: true } : {}),
     };
   });
-  byDoc.set(doc, { payload, tabId, viewTabId });
+  byDoc.set(doc, { mode: modeOverride, payload, tabId, viewTabId });
   return payload;
 }
 
@@ -2823,6 +2876,11 @@ function preparePassRender(
  * `paneOfContainer` does everywhere else stage content is handed a host and nothing else; the one
  * production caller (`canvas-render.ts`) passes `tabOfPane(surface.paneId)` explicitly, because it
  * has already resolved it to pick the document.
+ *
+ * `modeOverride` is the third question in the same family, and it exists because `viewTab` cannot
+ * answer it: a lens draws the source pane's document in a mode that is never written onto that tab,
+ * so resolving the mode from `viewTab` gave a Diff lens's artboards the SOURCE pane's mode. See
+ * {@link resolveCanvasDocument}. Null derives it from `viewTab` as before.
  */
 export async function mountIframeCanvas(
   gen: number,
@@ -2831,6 +2889,8 @@ export async function mountIframeCanvas(
   widthPx?: number | null,
   tabId: string | null = null,
   viewTab: Tab | null = tabOfContainer(canvasEl),
+  modeOverride: string | null = null,
+  diffMarks: WireDiffMarks | null = null,
 ): Promise<void> {
   const state = ensureHost(canvasEl);
   state.pendingTabIds.set(gen, tabId);
@@ -2841,13 +2901,26 @@ export async function mountIframeCanvas(
   // Own `latestGen`), so the parent must NOT gate on `view.renderGeneration`: during boot many
   // Renders fire and the generation is usually stale by the time resolution finishes, which would
   // Otherwise drop every post.
-  const prepared = await preparePassRender(gen, doc, tabId, viewTab, paneOfContainer(canvasEl));
+  const prepared = await preparePassRender(
+    gen,
+    doc,
+    tabId,
+    viewTab,
+    paneOfContainer(canvasEl),
+    modeOverride,
+  );
   const message: ParentToIframe = {
     ...prepared,
     // Per-TAB, and read at POST time so a scheme flip that raced the shared resolution is not
     // Baked into the payload every host shares. `viewTab` is this artboard's tab — defaulted from
     // `tabOfContainer(canvasEl)`, the same route the rest of this mount takes.
     colorScheme: schemeWireFor(viewTab),
+    /* Per-ARTBOARD, and post-time for a sharper version of the same reason. `preparePassRender`
+       memoizes on the document and hands the SAME payload object to every host in the pass, and a
+       git-diff pass has two hosts holding two documents — but marks are a function of BOTH sides,
+       not of the document this host draws, so they are not derivable from that cache key at all.
+       Baking them in would make the two artboards race for whose marks the pass kept. */
+    ...(diffMarks ? { diffMarks } : {}),
     gen,
     kind: "render",
   };
