@@ -23,7 +23,15 @@ import {
   ref,
   toRaw,
 } from "@vue/reactivity";
-import { camelToKebab, pureSchemeOf, resolveAtQuery, schemeSelectors } from "./css.ts";
+import {
+  camelToKebab,
+  isDeclarationAtRule,
+  pureSchemeOf,
+  resolveAtQuery,
+  resolveNestedSelector,
+  schemeSelectors,
+  transposeCanvasPopoverSelector,
+} from "./css.ts";
 import { evaluateExpression, evaluateOperand, isMutating } from "./expression.ts";
 import { readPath } from "./pointer.ts";
 import type { DynamicClass, JxEventHandler, JxPath, JxRenderOptions, JxScope } from "./types.ts";
@@ -329,10 +337,60 @@ export function setCanvasDelinkAnchors(on: boolean) {
   _canvasDelinkAnchors = on;
 }
 
+/**
+ * Studio-canvas popover de-linking — `setCanvasDelinkAnchors`'s rule applied to `popover`.
+ *
+ * An OPEN popover is in the top layer, and CSS Position 4 §3.1 gives a top-layer element the
+ * VIEWPORT as its containing block whatever its ancestors say. In the editor canvas that viewport
+ * is a fiction: the frame is sized to its own content height, so a drawer pinned with `inset: 0`
+ * lands halfway down a 6000px page, and a panel taller than a short component frame is clipped by
+ * the `overflow: hidden` the canvas document needs. Worse, a top-layer box contributes nothing to
+ * any ancestor's scrollable overflow, so the artboard can never grow to fit one.
+ *
+ * When this is on, the runtime stamps `popover` on `data-jx-popover` for nodes the studio can
+ * ADDRESS — those carrying a stamped `data-jx-path`. That drops every `[popover]` UA rule at once,
+ * and the one that matters most is `position: fixed`: with it gone the panel lays out in NORMAL
+ * FLOW at its document position, which is what makes it contribute to `#jx-canvas-root`'s
+ * scrollHeight so the host can grow the artboard to fit it. Leaving the top layer is necessary but
+ * not sufficient — a fixed box contributes nothing to an ancestor's overflow either.
+ *
+ * It is worth saying what does NOT rescue this, because it is the intuitive answer and it is wrong:
+ * `container-type: size` on the canvas's query container does NOT make it a containing block for
+ * fixed descendants. Measured in Chrome 151 — `getComputedStyle(container).contain` is `none`, and
+ * a `position: fixed` child inside it measures the WINDOW, not the container. So a panel that stays
+ * fixed stays laid out against the frame's own viewport, which in an editable mode is the
+ * document's full height. `iframe-render.ts` therefore FORCES `position` on the open panel rather
+ * than relying on any containment.
+ *
+ * The studio re-supplies the one UA rule that matters — `display: none` while closed — inside a
+ * cascade LAYER, so author declarations still beat it exactly as they beat the real UA rule on the
+ * shipped page. That is deliberate: a popover whose base rule sets `display` is broken in
+ * production, and the canvas has to show that rather than paper over it.
+ *
+ * The gate on `data-jx-path` is what keeps this out of documents the studio does not own: a popover
+ * rendered inside a component's own template is never stamped, so it keeps its native behaviour.
+ *
+ * It also drives {@link transposeCanvasPopoverSelector}. The two are one transform — an attribute
+ * renamed without its selectors transposed is a popover that can never be styled open.
+ *
+ * @docs framework/concepts/overlays
+ */
+let _canvasDelinkPopovers = false;
+export function setCanvasDelinkPopovers(on: boolean) {
+  _canvasDelinkPopovers = on;
+}
+
 /** The attribute name to stamp `key` on `el` under — `href` → `data-jx-href` on de-linked anchors. */
 function canvasAttrName(el: HTMLElement, key: string): string {
   if (_canvasDelinkAnchors && key === "href" && (el.tagName === "A" || el.tagName === "AREA")) {
     return "data-jx-href";
+  }
+  /* `dataset.jxPath` is already stamped here: `onNodeCreated` fires before `applyAttributes` in
+     `renderNode`, and the studio's stamper writes the attribute synchronously inside it. That
+     ordering is an unwritten contract between two packages, so `runtime-canvas.test.ts` asserts it
+     directly rather than trusting it. */
+  if (_canvasDelinkPopovers && key === "popover" && el.dataset.jxPath !== undefined) {
+    return "data-jx-popover";
   }
   return key;
 }
@@ -1317,10 +1375,18 @@ export function applyStyle(
     css += `[data-jx="${uid}"] { ${baseCSS} }\n`;
   }
 
+  /* One gate for the whole call, so `reapplyStyle` and every recursion answer alike. Off in
+     production and in preview, where the selector is written exactly as authored. */
+  const transpose = _canvasDelinkPopovers && el.dataset.jxPath !== undefined;
+  /** The selector to emit for `scope`, or null when this rule must not be emitted at all. */
+  const emittable = (scope: string): string | null =>
+    transpose ? transposeCanvasPopoverSelector(scope) : scope;
+
   function emitNested(scope: string, rules: JxStyle) {
+    const selector = emittable(scope);
     const props = toCSSText(rules);
-    if (props) {
-      css += `${scope} { ${props} }\n`;
+    if (selector !== null && props) {
+      css += `${selector} { ${props} }\n`;
     }
     for (const [sel, sub] of Object.entries(rules)) {
       if (sub === null || typeof sub !== "object" || Array.isArray(sub)) {
@@ -1329,26 +1395,12 @@ export function applyStyle(
       if (sel.startsWith("@")) {
         continue;
       }
-      const resolved = sel.startsWith("&")
-        ? sel.replace("&", scope)
-        : sel.startsWith("[")
-          ? `${scope}${sel}`
-          : sel.startsWith(":") || sel.startsWith(".")
-            ? `${scope}${sel}`
-            : `${scope} ${sel}`;
-      emitNested(resolved, sub);
+      emitNested(resolveNestedSelector(scope, sel), sub);
     }
   }
 
   for (const [sel, rules] of Object.entries(nested)) {
-    const resolved = sel.startsWith("&")
-      ? sel.replace("&", `[data-jx="${uid}"]`)
-      : sel.startsWith("[")
-        ? `[data-jx="${uid}"]${sel}`
-        : sel.startsWith(":") || sel.startsWith(".")
-          ? `[data-jx="${uid}"]${sel}`
-          : `[data-jx="${uid}"] ${sel}`;
-    emitNested(resolved, rules);
+    emitNested(resolveNestedSelector(`[data-jx="${uid}"]`, sel), rules);
   }
 
   function emitMediaNested(atRule: string, parentSel: string, obj: JxStyle) {
@@ -1359,16 +1411,11 @@ export function applyStyle(
       if (sel.startsWith("@")) {
         continue;
       }
-      const resolved = sel.startsWith("&")
-        ? sel.replace("&", parentSel)
-        : sel.startsWith("[")
-          ? `${parentSel}${sel}`
-          : sel.startsWith(":") || sel.startsWith(".")
-            ? `${parentSel}${sel}`
-            : `${parentSel} ${sel}`;
+      const resolved = resolveNestedSelector(parentSel, sel);
+      const selector = emittable(resolved);
       const props = toCSSText(sub);
-      if (props) {
-        css += `${atRule} { ${resolved} { ${props} } }\n`;
+      if (selector !== null && props) {
+        css += `${atRule} { ${selector} { ${props} } }\n`;
       }
       emitMediaNested(atRule, resolved, sub);
     }
@@ -1378,6 +1425,17 @@ export function applyStyle(
     if (key === "@--") {
       continue;
     } // Base canvas width, not a real media query
+    /* A declaration-body at-rule has no selector to scope: `@position-try --flip { … }` IS the
+       body. Emitted verbatim and NOT scoped to this element, because the name it declares is
+       document-global — which is also why it is written where it is used rather than somewhere
+       central, exactly as an author writes one in a plain stylesheet. */
+    if (isDeclarationAtRule(key)) {
+      const decls = toCSSText(rules);
+      if (decls) {
+        css += `${key} { ${decls} }\n`;
+      }
+      continue;
+    }
     const query = resolveAtQuery(key, mediaQueries);
     const atRule = query === null ? key : `@media ${query}`;
     const scope = `[data-jx="${uid}"]`;
@@ -1445,9 +1503,37 @@ export function reapplyStyle(
  * `contenteditable` means "inherit from the parent" rather than `false`. Every `aria-*` is in this
  * family — ARIA has no presence attributes at all — along with the three HTML attributes below.
  *
+ * **`popover` is enumerated and is deliberately NOT in this set**, which looks like an oversight
+ * and is not. Its keywords are `auto`, `manual` and `hint`; its MISSING-value default is `auto`, so
+ * a bare `popover` and `popover=""` are both auto popovers — which is what the presence branch
+ * below already produces for `true`, correctly. Its INVALID-value default is `manual`, so moving it
+ * here would emit `popover="true"`, which is not a keyword, and every popover written as a boolean
+ * would silently stop light-dismissing and stop answering Escape. The right answer to a boolean
+ * `popover` is not a different emission, it is not writing one: `@jxsuite/schema/overlays` reports
+ * it as `invalid-mode`, and the house spelling is `"auto"`.
+ *
+ * That also corrects the paragraph above for this one attribute: a presence attribute counts any
+ * value as true, but `popover="false"` is a *manual* popover rather than a true-ish one, because it
+ * is enumerated even though it is emitted through the presence branch.
+ *
  * @docs framework/concepts/elements
  */
 const ENUMERATED_ATTRS = new Set(["contenteditable", "draggable", "spellcheck"]);
+
+/**
+ * The enumerated-attribute names, for a code generator that cannot import this module.
+ *
+ * The compiler's element and client targets emit standalone ES modules that a built site loads
+ * without `@jxsuite/runtime`, so they inline the boolean decision instead of calling it. They
+ * serialize THIS array into that inlined helper, and `compile-element.test.ts` asserts the emitted
+ * literal still equals it — which is what keeps the four writers of the rule one decision rather
+ * than four, in the one place a shared function could not reach.
+ *
+ * @returns {string[]} The names, sorted, so the emitted output is stable.
+ */
+export function enumeratedAttrNames(): string[] {
+  return [...ENUMERATED_ATTRS].toSorted();
+}
 
 /**
  * The text an attribute's boolean value must be written with, or `null` when saying it means
@@ -2569,9 +2655,12 @@ export {
   camelToKebab,
   COLOR_SCHEME_ATTR,
   COLOR_SCHEME_STORAGE_KEY,
+  isDeclarationAtRule,
   pureSchemeOf,
   resolveAtQuery,
+  resolveNestedSelector,
   schemeSelectors,
+  transposeCanvasPopoverSelector,
 } from "./css.ts";
 
 /**
