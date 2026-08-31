@@ -2,15 +2,15 @@
  * Covers `scripts/check-release-integrity.ts` — the gate that would have caught, on the day it
  * happened, `packages/starters` being versioned to 1.3.0 in the manifest and never released.
  *
- * The probes are injected, so the assertions below never touch GitHub or the npm registry: what is
- * tested is the tag arithmetic (which must track `release-please-config.json`, not a hardcoded
- * shape), the gap logic, and that the report tells you what to run.
+ * The release probe is injected, so the assertions below never touch GitHub: what is tested is the
+ * tag arithmetic (which must track `release-please-config.json`, not a hardcoded shape), the gap
+ * logic, and that the report names the cause.
  */
 
 import { describe, expect, test } from "bun:test";
 
 import { findGaps, readTargets, report, tagFor } from "./check-release-integrity.ts";
-import type { Probes, ReleaseTarget } from "./check-release-integrity.ts";
+import type { ReleaseTarget } from "./check-release-integrity.ts";
 
 const CONFIG = {
   "include-v-in-tag": true,
@@ -28,15 +28,14 @@ const target = (over: Partial<ReleaseTarget> = {}): ReleaseTarget => ({
   path: "packages/starters",
   tag: "starters-v1.5.0",
   version: "1.5.0",
-  npmName: "@jxsuite/starters",
   ...over,
 });
 
-const probes = (present: { releases?: string[]; npm?: string[] }): Probes => ({
-  releaseExists: (tag) => Promise.resolve((present.releases ?? []).includes(tag)),
-  npmHasVersion: (name, version) =>
-    Promise.resolve((present.npm ?? []).includes(`${name}@${version}`)),
-});
+/** GitHub with exactly `releases` present. */
+const released =
+  (...releases: string[]) =>
+  (tag: string) =>
+    Promise.resolve(releases.includes(tag));
 
 describe("tagFor", () => {
   test("matches the tags release-please actually created", () => {
@@ -63,63 +62,47 @@ describe("readTargets", () => {
     }
   });
 
-  test("desktop is a component npm never receives, so it carries no npm name", async () => {
+  test("every manifest entry is judged, including the ones npm never receives", async () => {
     const targets = await readTargets();
-    const desktop = targets.find((t) => t.path === "packages/desktop");
-    expect(desktop?.npmName).toBeNull();
-  });
-
-  test("a publishable component carries the name npm must have", async () => {
-    const targets = await readTargets();
-    expect(targets.find((t) => t.path === "packages/starters")?.npmName).toBe("@jxsuite/starters");
+    // The desktop component ships as installers rather than to npm and still owes a release.
+    // That is where the bundlers attach, and how desktop-v2.2.0 shipped with no installers.
+    expect(targets.find((t) => t.path === "packages/desktop")).toBeDefined();
+    expect(targets.find((t) => t.path === "packages/starters")).toBeDefined();
   });
 });
 
 describe("findGaps", () => {
-  test("a fully shipped component is not a gap", async () => {
-    const gaps = await findGaps(
-      [target()],
-      probes({ npm: ["@jxsuite/starters@1.5.0"], releases: ["starters-v1.5.0"] }),
-    );
-    expect(gaps).toEqual([]);
+  test("a released component is not a gap", async () => {
+    expect(await findGaps([target()], released("starters-v1.5.0"))).toEqual([]);
   });
 
   test("the release-please skip: manifest bumped, nothing released", async () => {
-    const gaps = await findGaps([target()], probes({}));
-    expect(gaps).toEqual([{ ...target(), missingFromNpm: true, missingRelease: true }]);
+    expect(await findGaps([target()], released())).toEqual([target()]);
   });
 
-  test("the crashed-publish case: the release exists but npm never got it", async () => {
-    const gaps = await findGaps([target()], probes({ releases: ["starters-v1.5.0"] }));
-    expect(gaps[0].missingRelease).toBe(false);
-    expect(gaps[0].missingFromNpm).toBe(true);
-  });
-
-  test("a non-npm component is judged on its release alone", async () => {
-    const desktop = target({
-      npmName: null,
-      path: "packages/desktop",
-      tag: "desktop-v2.2.1",
-      version: "2.2.1",
-    });
-    expect(await findGaps([desktop], probes({ releases: ["desktop-v2.2.1"] }))).toEqual([]);
-    const gaps = await findGaps([desktop], probes({}));
-    expect(gaps[0].missingFromNpm).toBe(false);
+  test("judges every target, not just the first", async () => {
+    const many = ["ai", "site", "runtime"].map((c) =>
+      target({ path: `packages/${c}`, tag: `${c}-v1.5.0` }),
+    );
+    const gaps = await findGaps(many, released("ai-v1.5.0", "runtime-v1.5.0"));
+    expect(gaps.map((g) => g.path)).toEqual(["packages/site"]);
   });
 });
 
 describe("report", () => {
-  test("an npm gap comes with the command that backfills it", async () => {
-    const text = report(await findGaps([target()], probes({ releases: ["starters-v1.5.0"] })));
-    expect(text).toContain("@jxsuite/starters@1.5.0");
-    expect(text).toContain("gh workflow run publish.yml");
-    expect(text).toContain('["packages/starters"]');
-  });
-
-  test("a missing release points at the cause instead of at npm", async () => {
-    const text = report(await findGaps([target()], probes({})));
+  test("points at the cause, and at the publish that never ran either", async () => {
+    const text = report(await findGaps([target()], released()));
+    expect(text).toContain("packages/starters");
     expect(text).toContain("starters-v1.5.0");
     expect(text).toContain("but not for component");
     expect(text).toContain("commitlint.config.ts");
+    expect(text).toContain("publish.yml");
+  });
+
+  test("says nothing about npm, which this gate no longer asks and cannot answer for", async () => {
+    const text = report(await findGaps([target()], released()));
+    // The registry probe was 0-for-3 on real failures; see this file's counterpart header.
+    expect(text).not.toContain("npm view");
+    expect(text).not.toContain("not on npm");
   });
 });

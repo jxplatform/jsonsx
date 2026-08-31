@@ -434,14 +434,19 @@ jobs:
   #      and `deploy-site` skip. That is how desktop-v2.2.0 shipped with no installers at all.
   #
   # So this runs on `always()` and is gated on NOTHING: a run that released nothing is exactly the
-  # run that needs checking. `needs: publish` only orders it after the registry has been written.
+  # run that needs checking. It does not `needs: publish` — it asks GitHub, not the registry.
   #
   # It fails the run rather than warning like `verify-desktop-assets` does, because its subject is
   # not cosmetic: `@jxsuite/starters` sat at 1.2.2 on npm while `@jxsuite/create@1.3.2` shipped
   # depending on `^1.5.0`, so `npm install @jxsuite/create` was unresolvable for everyone. Nothing
   # `needs:` this job, so a red X here blocks no other release work.
+  #
+  # It used to assert the npm side too, and that half is GONE rather than merely more patient: the
+  # registry makes an accepted publish readable up to three minutes later, so the probe raced the
+  # write and filed #177, #199 and #264 against releases that were all completely fine — nought for
+  # three, no real catch, three investigations. The script header carries the measurements.
   verify-release-integrity:
-    needs: [release-please, publish]
+    needs: [release-please]
     if: always()
     runs-on: ubuntu-latest
     permissions:
@@ -449,13 +454,13 @@ jobs:
       issues: write
     steps:
       - uses: actions/checkout@v7
-      # `install: false` — the script reads package.json files with node builtins and shells out to
-      # `gh` and `npm`. It has no dependency to install, and a job whose whole purpose is to report
+      # `install: false` — the script reads two JSON files with Bun builtins and shells out to
+      # `gh`. It has no dependency to install, and a job whose whole purpose is to report
       # A broken release must not be able to fail on `--frozen-lockfile` instead.
       - uses: ./.github/actions/setup-bun
         with:
           install: false
-      - name: Every version in the manifest must have a release and be on npm
+      - name: Every version in the manifest must have a GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
