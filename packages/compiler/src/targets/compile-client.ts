@@ -13,6 +13,9 @@
 
 import { RESERVED_KEYS, camelToKebab } from "@jxsuite/runtime";
 import {
+  ATTR_HELPER,
+  attrHelperSource,
+  booleanAttrValue,
   DEFAULT_LIT_HTML_SRC,
   DEFAULT_REACTIVITY_SRC,
   buildAttrs,
@@ -675,10 +678,24 @@ function emitLitMapTemplate(def: JxMutableNode | undefined, preformatted = false
   // Attributes object
   if (def.attributes && typeof def.attributes === "object") {
     for (const [k, v] of Object.entries(def.attributes)) {
-      attrs +=
-        typeof v === "string" && isTemplateString(v)
-          ? ` ${k}="${mapRefsToLit(v)}"`
-          : ` ${k}="${escapeHtml(String(v))}"`;
+      if (typeof v === "string" && isTemplateString(v)) {
+        attrs += ` ${k}="${mapRefsToLit(v)}"`;
+        continue;
+      }
+      /* A boolean is the attribute's PRESENCE or its text depending on the family its NAME puts it
+         in — `booleanAttrValue` owns that judgement, and the static emitter in `shared.ts` and the
+         runtime's `applyAttributes` both defer to it, so a prerendered page cannot change meaning
+         as it hydrates (spec.md §8.3). Stringifying here emitted `open="false"`, which HTML reads
+         by presence and therefore as an OPEN element: the author wrote "closed" and the page
+         rendered open. */
+      if (typeof v === "boolean") {
+        const text = booleanAttrValue(k, v);
+        if (text !== null) {
+          attrs += text === "" ? ` ${k}` : ` ${k}="${escapeHtml(text)}"`;
+        }
+        continue;
+      }
+      attrs += ` ${k}="${escapeHtml(String(v))}"`;
     }
   }
 
@@ -884,7 +901,9 @@ function emitClientModule(
   }
 
   // State — reactive state
-  lines.push("", "const state = reactive({");
+  /* The boolean-attribute rule, inlined because this module loads with `@vue/reactivity` and
+     nothing else — see `attrHelperSource`. The hydration script below is its only caller. */
+  lines.push("", attrHelperSource(), "", "const state = reactive({");
   for (const [key, val] of stateEntries) {
     /*
      * State keys come from the document, so `{"user.name": 1}` is legal input. Pasting one raw as
@@ -960,7 +979,14 @@ function emitClientModule(
   lines.push(
     "          effect(() => { el.style[parts[1]] = bind[key](); });",
     "        } else if (parts[0] === 'attr' && parts.length > 1) {",
-    "          effect(() => { el.setAttribute(parts[1], bind[key]()); });",
+    // A binding that flips back has to take the attribute WITH it: the element is being re-used, so
+    // Anything left behind is the state the page just said it had left. Same decision as the
+    // Runtime's `applyAttributes`, through the same inlined rule — see `attrHelperSource`.
+    "          effect(() => {",
+    `            const _t = ${ATTR_HELPER}(parts[1], bind[key]());`,
+    "            if (_t === null) { el.removeAttribute(parts[1]); }",
+    "            else { el.setAttribute(parts[1], _t); }",
+    "          });",
     "        } else {",
     "          const prop = parts[0].replace(/-([a-z])/g, (_, c) => c.toUpperCase());",
     "          effect(() => { el[prop] = bind[key](); });",

@@ -1083,3 +1083,103 @@ describe("compileClient — $props in a map template", () => {
     expect(result.files[0]!.content).toContain("html`<ls-row></ls-row>`");
   });
 });
+
+describe("compileClient — boolean attributes (spec.md §8.3)", () => {
+  /** The prerendered markup for one element carrying `attributes`. */
+  function markup(attributes: Record<string, unknown>) {
+    return compileClient(
+      asDoc({ children: [{ attributes, tagName: "details" }], state: { unused: 0 } }),
+      { title: "T" },
+    ).html;
+  }
+
+  test("a presence attribute is bare when true and absent when false", () => {
+    expect(markup({ open: true })).toContain("<details open>");
+    const closed = markup({ open: false });
+    expect(closed).toContain("<details>");
+    expect(closed).not.toContain("open");
+  });
+
+  test('open: false emitted open="false" — an OPEN <details> the author had closed', () => {
+    expect(markup({ open: false })).not.toContain('open="false"');
+  });
+
+  test("an enumerated attribute carries its value in its text, both ways", () => {
+    expect(markup({ "aria-hidden": true })).toContain('aria-hidden="true"');
+    expect(markup({ "aria-hidden": false })).toContain('aria-hidden="false"');
+    expect(markup({ contenteditable: false })).toContain('contenteditable="false"');
+  });
+
+  test("a string is never reinterpreted, in either family", () => {
+    expect(markup({ "aria-current": "false" })).toContain('aria-current="false"');
+    expect(markup({ open: "yes" })).toContain('open="yes"');
+  });
+
+  test("popover stays in the presence family, so true means the auto default", () => {
+    // Emitting `popover="true"` would be an INVALID value, whose default is `manual` — no light
+    // Dismiss and no Escape. See the essay above `ENUMERATED_ATTRS` in the runtime.
+    const out = markup({ popover: true });
+    expect(out).toContain("popover>");
+    expect(out).not.toContain('popover="true"');
+  });
+
+  test("the hydration script removes an attribute a binding flips false", () => {
+    const { files } = compileClient(
+      asDoc({
+        children: [{ attributes: { open: "${state.isOpen}" }, tagName: "details" }],
+        state: { isOpen: true },
+      }),
+      { title: "T" },
+    );
+    const js = files[0]!.content;
+    expect(js).toContain("function __jxAttrText(n, v)");
+    expect(js).toContain("el.removeAttribute(parts[1])");
+  });
+});
+
+describe("compileClient — boolean attributes inside a repeater template", () => {
+  /**
+   * The item template is a SECOND attribute emitter (`emitLitMapTemplate`), and it had the same
+   * defect as the page-level one. A repeater is where a bound `open`/`checked`/`selected` is most
+   * likely to appear, so this is not the marginal case it looks like.
+   */
+  test("presence and enumerated attributes are emitted by their own families", () => {
+    const { files } = compileClient(
+      asDoc({
+        children: [
+          {
+            $prototype: "Array",
+            items: { $ref: "#/state/rows" },
+            map: {
+              attributes: { "aria-expanded": false, open: true, title: "row" },
+              tagName: "details",
+            },
+          },
+        ],
+        state: { rows: [1, 2] },
+      }),
+      { title: "T" },
+    );
+    const js = files[0]!.content;
+    expect(js).toContain('aria-expanded="false"');
+    expect(js).toContain('title="row"');
+    expect(js).not.toContain('open="true"');
+  });
+
+  test("a false presence attribute leaves nothing behind", () => {
+    const { files } = compileClient(
+      asDoc({
+        children: [
+          {
+            $prototype: "Array",
+            items: { $ref: "#/state/rows" },
+            map: { attributes: { open: false }, tagName: "details" },
+          },
+        ],
+        state: { rows: [1] },
+      }),
+      { title: "T" },
+    );
+    expect(files[0]!.content).not.toContain("open");
+  });
+});

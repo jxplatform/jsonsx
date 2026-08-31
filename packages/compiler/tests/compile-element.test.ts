@@ -1,3 +1,4 @@
+import { enumeratedAttrNames } from "@jxsuite/runtime";
 import { describe, expect, test } from "bun:test";
 import { compileElement, compileElementPage } from "../src/compiler";
 import { emitElementModule } from "../src/targets/compile-element";
@@ -25,7 +26,10 @@ describe("compileElement", () => {
     expect(file.content).toContain(
       "import { reactive, computed, effect, stop } from '@vue/reactivity'",
     );
-    expect(file.content).toContain("import { render, html } from 'lit-html'");
+    // `nothing` arrives with the boolean-attribute helper: it is the only way a lit template can
+    // Say "remove this attribute", which is what a false presence attribute means.
+    expect(file.content).toContain("import { render, html, nothing } from 'lit-html'");
+    expect(file.content).toContain("function __jxAttrText(n, v)");
   });
 
   test("reactive state from state", async () => {
@@ -751,7 +755,9 @@ describe("compileElement — emitLitNode edge cases", () => {
     });
 
     const { content } = result.files[0]!;
-    expect(content).toContain('data-x="${s.val}"');
+    // A whole-value template can resolve to a boolean, and only the runtime knows — so the binding
+    // Goes through the emitted helper, whose null becomes `nothing` and takes the attribute off.
+    expect(content).toContain("data-x=\"${__jxAttrText('data-x', s.val) ?? nothing}\"");
   });
 
   test("property bindings with template strings on non-reserved keys", async () => {
@@ -1783,5 +1789,65 @@ describe("compileElement — the non-state $ref schemes", () => {
     expect(content).not.toContain("parent#/");
     expect(content).not.toContain("window#/");
     expect(content).not.toContain("document#/");
+  });
+});
+
+describe("compileElement — boolean attributes (spec.md §8.3)", () => {
+  /** The lit template for one element carrying `attributes`. */
+  async function template(attributes: Record<string, unknown>) {
+    const result = await compileElement({
+      children: [{ attributes, tagName: "details" }],
+      state: { unused: 0 },
+      tagName: "test-bool-attrs",
+    } as never);
+    return result.files[0]!.content;
+  }
+
+  test("a presence attribute is bare when true and absent when false", async () => {
+    const open = await template({ open: true });
+    expect(open).toContain("open");
+    expect(open).not.toContain('open="true"');
+    expect(await template({ open: false })).not.toContain("open");
+  });
+
+  test("an enumerated attribute carries its value in its text, both ways", async () => {
+    expect(await template({ "aria-hidden": true })).toContain('aria-hidden="true"');
+    expect(await template({ "aria-hidden": false })).toContain('aria-hidden="false"');
+    expect(await template({ spellcheck: false })).toContain('spellcheck="false"');
+  });
+
+  test('popover stays in the presence family — popover="true" would mean manual', async () => {
+    const out = await template({ popover: true });
+    expect(out).not.toContain('popover="true"');
+  });
+
+  test("a $ref-bound attribute defers the decision to the helper", async () => {
+    const result = await compileElement({
+      children: [{ attributes: { open: { $ref: "#/state/isOpen" } }, tagName: "details" }],
+      state: { isOpen: true },
+      tagName: "test-bound-bool",
+    } as never);
+    expect(result.files[0]!.content).toContain("__jxAttrText('open', s.isOpen) ?? nothing");
+  });
+
+  test("a template with literal text around it is a string, and is not wrapped", async () => {
+    const result = await compileElement({
+      children: [{ attributes: { "data-x": "page ${state.n}" }, tagName: "div" }],
+      state: { n: 1 },
+      tagName: "test-mixed-tpl",
+    } as never);
+    const { content } = result.files[0]!;
+    expect(content).toContain('data-x="page ${s.n}"');
+    expect(content).not.toContain("__jxAttrText('data-x'");
+  });
+
+  test("the inlined enumerated list still equals the runtime's — the drift guard", async () => {
+    // The emitted modules cannot import `@jxsuite/runtime`, so the rule is inlined. This is what
+    // Keeps that copy from becoming a fourth, drifting definition of which family an attribute is
+    // In — the exact failure these two targets shipped for months.
+    const content = await template({ open: true });
+    const emitted = /const __jxEnumAttrs = new Set\((\[[^\]]*])\);/.exec(content);
+    expect(emitted).not.toBeNull();
+    expect(JSON.parse(emitted![1]!)).toEqual(enumeratedAttrNames());
   });
 });
