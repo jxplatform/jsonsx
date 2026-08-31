@@ -48,6 +48,22 @@ That includes the parts of the page that come from its **[layout](/docs/studio/p
 
 You can also move the selection from the keyboard: :kbd[↑] and :kbd[↓] step between siblings, :kbd[→] steps into the first child, and :kbd[←] or :kbd[Esc] steps out to the parent. Pressed on the outermost element, :kbd[Esc] clears the selection instead. With nothing selected at all, :kbd[↑] or :kbd[↓] selects the outermost element, so the first key press always lands somewhere. The full list is in the **[shortcut reference](/docs/studio/interface/shortcuts)**.
 
+## Popovers
+
+A [popover](/docs/framework/concepts/overlays) is hidden until something opens it: a mobile menu, a dropdown, a search palette. On the canvas that stays true, so a closed one is invisible, exactly as on the page.
+
+**Selecting it opens it.** Click the panel in the Outline, jump to a Problem inside it, or click its trigger button on the canvas, and the panel opens and the artboard grows to make room. Its contents are then ordinary elements: click a link inside it and edit the text, drag a block into it, style it in the Inspector.
+
+It opens **in place** rather than floating over the page, marked with a dashed outline and a **POPOVER · SHOWN IN PLACE** label. That is a deliberate trade. On a real page a popover floats above everything in the browser's top layer, and that layer is one the editor cannot measure, cannot grow the canvas for, and cannot reliably put a selection box around. Shown in place, every editing tool works on it normally.
+
+Two things are therefore **Preview only**: the backdrop behind the panel, and the way it stacks above the rest of the page. Switch to Preview to see the popover exactly as a visitor will, animation and all.
+
+Selecting something outside the popover does not close it. Otherwise reaching for a colour in the Inspector would shut the panel you were styling. Close it from the block action bar, or by clicking its trigger again.
+
+:::doc-note
+A popover that lives inside a component stays closed while you are on a page that uses the component. Open the component's own file to edit it, the same rule that makes layout chrome read-only on a page.
+:::
+
 ## The block action bar
 
 A small floating toolbar appears above the selected element:

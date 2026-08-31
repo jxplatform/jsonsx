@@ -2,9 +2,9 @@
 
 ## Static HTML Compiler, Custom Element Emitter, and Island Detector
 
-**Version:** 0.4.1-draft
+**Version:** 0.4.2-draft
 **Status:** Partial
-**Updated:** 2026-08-27
+**Updated:** 2026-08-31
 **License:** MIT
 
 ---
@@ -693,6 +693,11 @@ that declaration is the author saying the data is build-time only.
 
 All static `style` definitions are extracted into a single `<style>` block in `<head>`.
 
+Nested selectors and at-rule groups are emitted per `spec.md` §9.2, including the popover states
+(`:popover-open`, `::backdrop`, `:popover-open::backdrop`) and the DECLARATION-body at-rules
+(`@position-try`, `@property`, `@font-face`, `@counter-style`), whose block carries no selector and
+is not scoped to the element whose `style` object declares it.
+
 Component stylesheets are extracted the same way. A page inlines the CSS of every light-DOM
 component it uses, appended after the page block so the cascade is unchanged, and emits no
 `<link rel="stylesheet">` for them — one render-blocking request per component was a page's entire
@@ -772,6 +777,14 @@ See the [Site Architecture Specification](site-architecture.md) for the full mul
 ### `isSchemaOnly(def)` — Shape 2b detection (pure type definitions)
 
 ### `buildInitialScope(state)` — Static scope for compile-time pre-rendering
+
+### `attrHelperSource()` — the boolean-attribute rule, inlined for a generated module
+
+The element and client targets emit modules that load with `lit-html` and `@vue/reactivity` and
+nothing else, so they cannot call `booleanAttrValue` — they carry a copy whose enumerated-name list
+is serialized from `@jxsuite/runtime`'s `enumeratedAttrNames()`. A test asserts the emitted literal
+still equals that export, which is what keeps the four writers of the rule one decision (spec.md
+§8.3).
 
 ### `compileStyles(def)` — CSS extraction from component tree
 
@@ -908,6 +921,7 @@ neither file.
 
 ## Changelog
 
+- **0.4.2-draft** (2026-08-31) — CSS extraction emits the popover states and the declaration-body at-rules; attrHelperSource inlines the boolean-attribute rule for the generated-module targets.
 - **0.4.1-draft** (2026-08-27) — §12: the client-runtime asset set is derived from the emitted HTML, so every import map a build ships names files it wrote.
 - **0.4.0-draft** (2026-08-26) — Browser bundles are minified (§12); component CSS is inlined rather than linked (§8.2); image sizes derives from the container and variants stop at the configured ceiling (§7.2, §7.2.1).
 - **0.3.3-draft** (2026-08-26) — §8: the boolean-attribute rule is shared with the runtime rather than restated, and covers the enumerated family.
@@ -948,4 +962,4 @@ neither file.
 
 ---
 
-_`@jxsuite/compiler` Specification v0.4.1-draft_
+_`@jxsuite/compiler` Specification v0.4.2-draft_

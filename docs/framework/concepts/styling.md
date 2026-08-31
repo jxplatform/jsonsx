@@ -63,6 +63,22 @@ Inline properties apply directly to the element. Nested rules are emitted as a s
 
 (You'll also see `data-jx-static` and `data-jx-prerendered` in compiled output. Those mark hydration state and are never used as CSS selectors.)
 
+### At-rules that hold declarations
+
+Most `@` keys wrap selectors: a [breakpoint](#named-media-breakpoints), `@supports`, `@starting-style`. Four hold plain declarations instead, and their block is emitted as written, with no selector inside and no scoping to the element that declares it: `@position-try`, `@property`, `@font-face` and `@counter-style`. The name such a rule declares is global to the document, so it is written where it is used, the way you would write it in a stylesheet:
+
+```json
+{
+  "style": {
+    "position-anchor": "--menu-button",
+    "position-try-fallbacks": "--flip-up",
+    "@position-try --flip-up": { "inset-block-start": "auto" }
+  }
+}
+```
+
+`@keyframes` is not one of them: its body is percentage stops, which is a third shape again.
+
 ## Named media breakpoints
 
 Declare breakpoints at root level with `$media`:
