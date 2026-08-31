@@ -125,7 +125,8 @@ describe("the reveal rule", () => {
   async function loadWithDoubles() {
     const posted: { path: unknown }[] = [];
     const revealed: unknown[] = [];
-    mock.module("../src/canvas/iframe-host", () => ({
+    // `void`: mock.module returns a promise, and the type-aware lint rule wants it acknowledged.
+    void mock.module("../src/canvas/iframe-host", () => ({
       postPopoverOpen: (_tab: unknown, path: unknown) => {
         posted.push({ path });
       },
