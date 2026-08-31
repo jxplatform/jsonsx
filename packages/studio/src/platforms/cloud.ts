@@ -61,6 +61,15 @@ interface ProjectInfoWire {
   projectConfig: Record<string, unknown> | null;
 }
 
+/** One row of the platform's project catalogue (`GET /api/v1/projects`). */
+interface ProjectListWire {
+  fullName: string;
+  owner: string;
+  name: string;
+  defaultBranch: string;
+  permission: string;
+}
+
 interface SessionEventWire {
   kind: "fs" | "git";
   events?: FsEvent[];
@@ -305,6 +314,35 @@ export function parseRootKey(root: string): CloudProject | null {
   return { owner, repo, branch };
 }
 
+/** Every project this account can open, straight off the wire; [] when the catalogue is unreachable. */
+async function fetchProjects(): Promise<ProjectListWire[]> {
+  const res = await fetch("/api/v1/projects", { credentials: "include" });
+  return res.ok ? ((await res.json()) as ProjectListWire[]) : [];
+}
+
+/**
+ * The project a root key names, for the two members that navigate by one.
+ *
+ * Tolerates the branchless "owner/repo" keys older studios wrote into Recent: they cannot say which
+ * branch they meant, so the catalogue's default branch answers for them — the same branch that
+ * project's Projects row opens. Null when the key is neither form, or names nothing this account
+ * can reach.
+ */
+export async function resolveRootKey(rootKey: string): Promise<CloudProject | null> {
+  const parsed = parseRootKey(rootKey);
+  if (parsed) {
+    return parsed;
+  }
+  const legacy = /^([^/@]+)\/([^/@]+)$/.exec(rootKey);
+  if (!legacy) {
+    return null;
+  }
+  const [, owner, repo] = legacy;
+  const catalogue = await fetchProjects().catch(() => []);
+  const match = catalogue.find((p) => p.owner === owner && p.name === repo);
+  return match ? { owner: match.owner, repo: match.name, branch: match.defaultBranch } : null;
+}
+
 /**
  * Bound mode (project non-null) drives one repo+branch session; project-less mode (null, the
  * /studio route) exposes only the catalogue surface — listProjects/listStarters/createProject and
@@ -312,7 +350,17 @@ export function parseRootKey(root: string): CloudProject | null {
  */
 export function createCloudPlatform(project: CloudProject | null): StudioPlatform {
   const base = project ? sessionBase(project) : "";
-  const root = project ? `${project.owner}/${project.repo}` : "";
+  /* The ROOT KEY, branch included — not a bare "owner/repo". This value is the project's identity
+     everywhere the shell keeps one: `probeRootProject` hands it to the recent-projects list, and
+     `setWindowProject` reopens a project by parsing it back with `parseRootKey`, which answers null
+     for a branchless key. So every Recent row a bound session had written was a click that did
+     nothing — no navigation, no error, and `deduped: true` telling the caller the open had been
+     handled — while the SAME project opened fine from the Projects catalogue, whose entries carry
+     the branch (`listProjects` below builds them with `projectRootKey`). Agreeing with the catalogue
+     also restores the welcome screen's dedupe (it matches the two lists by root, so the project
+     stopped appearing in both) and gives a branch its own Recent row, which is what a root key that
+     names a branch is for. */
+  const root = project ? projectRootKey(project) : "";
   /**
    * One multiplexed collab socket per session; per-doc handles come from openDoc. Memoized as a
    * promise so concurrent first opens share the connection instead of racing two sockets.
@@ -968,17 +1016,7 @@ export function createCloudPlatform(project: CloudProject | null): StudioPlatfor
     // ─── Project catalogue & navigation (Studio welcome / New Project UI) ──
 
     async listProjects(): Promise<ProjectListEntry[]> {
-      const res = await fetch("/api/v1/projects", { credentials: "include" });
-      if (!res.ok) {
-        return [];
-      }
-      const entries = (await res.json()) as {
-        fullName: string;
-        owner: string;
-        name: string;
-        defaultBranch: string;
-        permission: string;
-      }[];
+      const entries = await fetchProjects();
       return entries.map((p) => ({
         name: p.fullName,
         root: projectRootKey({ owner: p.owner, repo: p.name, branch: p.defaultBranch }),
@@ -996,8 +1034,15 @@ export function createCloudPlatform(project: CloudProject | null): StudioPlatfor
 
     /** Welcome/recents open path: navigate this tab into the project's editor. */
     async setWindowProject(rootKey: string) {
-      const target = parseRootKey(rootKey);
-      if (target && typeof location !== "undefined") {
+      const target = await resolveRootKey(rootKey);
+      /* Throw rather than fall through: `deduped` tells the caller the open was handled, so an
+         unresolvable key answered "done" and left the user looking at the screen they clicked on.
+         The throw reaches `openRecentProject`'s catch, which reports the failure and drops the
+         entry — the right end for a row naming a project this account can no longer open. */
+      if (!target) {
+        throw new Error(`No project to open at ${rootKey}`);
+      }
+      if (typeof location !== "undefined") {
         location.assign(editUrl(target));
       }
       // Navigation unloads the page; deduped stops the caller's follow-up work.
@@ -1005,8 +1050,13 @@ export function createCloudPlatform(project: CloudProject | null): StudioPlatfor
     },
 
     async openProjectInNewWindow(rootKey: string) {
-      const target = parseRootKey(rootKey);
-      if (target && typeof window !== "undefined") {
+      const target = await resolveRootKey(rootKey);
+      // Same contract as setWindowProject: the caller reports "Opened in another window" on any
+      // Resolved call, so a key that opens nothing has to fail rather than answer.
+      if (!target) {
+        throw new Error(`No project to open at ${rootKey}`);
+      }
+      if (typeof window !== "undefined") {
         window.open(editUrl(target), "_blank", "noopener");
       }
       // `_blank` always makes a tab; a browser tab already showing this project is not something

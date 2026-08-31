@@ -293,6 +293,25 @@ describe("openPublishPanel — connect form", () => {
     expect(bodyText()).toContain("owner/repo are all required");
   });
 
+  /* The cloud adapter's projectRoot is the root key "owner/repo@branch". A prefill that only
+     matched the branchless form left both fields empty on the one host that can fill them. */
+  test("prefills owner and repo from a cloud root key", async () => {
+    resetStudioState({ projectConfig: { build: {}, name: "My Site" } });
+    installMockPlatform({
+      cfApi: cfApiMock({ "/accounts": [{ id: DEPLOY.accountId, name: "Acme" }] }),
+      cfConnection: () =>
+        Promise.resolve({ accountId: DEPLOY.accountId, accountName: "Acme", connected: true }),
+      projectRoot: "octocat/site@main",
+    });
+    openPublishPanel();
+    await flush();
+    const values = [...document.querySelectorAll("#layer-modal sp-textfield")].map((el) =>
+      el.getAttribute("value"),
+    );
+    expect(values).toContain("octocat");
+    expect(values).toContain("site");
+  });
+
   test("connects end-to-end and lands on the status view", async () => {
     resetStudioState({ projectConfig: { build: {}, name: "My Site" } });
     installMockPlatform({
