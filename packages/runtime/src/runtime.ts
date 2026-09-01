@@ -19,17 +19,16 @@ import {
   effectScope,
   isRef,
   onEffectCleanup,
+  onScopeDispose,
   reactive,
   ref,
   toRaw,
 } from "@vue/reactivity";
 import {
-  camelToKebab,
-  isDeclarationAtRule,
-  pureSchemeOf,
-  resolveAtQuery,
-  resolveNestedSelector,
-  schemeSelectors,
+  buildStyleRules,
+  cssPropertyName,
+  hashCss,
+  isNestedSelectorKey,
   transposeCanvasPopoverSelector,
 } from "./css.ts";
 import { evaluateExpression, evaluateOperand, isMutating } from "./expression.ts";
@@ -1282,15 +1281,485 @@ function bindProperty(el: HTMLElement, key: string, val: unknown, state: JxScope
   write(asAsset(val));
 }
 
+/*
+ * ─── The Stylesheet Engine ───────────────────────────────────────────────────
+ *
+ * An authored `style` object becomes REAL CSS RULES, delivered through the document's
+ * `adoptedStyleSheets`. Everything below exists to make that true, and the reason it has to be
+ * true is a cascade inversion rather than a missing feature.
+ *
+ * `applyStyle` used to split one style object across two cascade ORIGINS: a top-level scalar went
+ * inline (`el.style.color = …`) while an object-valued key became a per-element `<style>` tag. An
+ * inline declaration beats any non-`!important` rule, so
+ *
+ *     { "backgroundColor": "#6e0303", ":hover": { "backgroundColor": "#15164a" } }
+ *
+ * emitted a perfectly correct `:hover` rule that could never win. Nesting was not missing; it was
+ * outranked. The one existing defence, `mediaOverriddenProps`, moved a base property out of inline
+ * when an `@`-block overrode it — one level deep, `@`-keys only, never `:hover` — which is the
+ * shape of the bug rather than a fix for it. Every style assertion in the suite read the `<style>`
+ * tag's text, so the inversion was invisible to all of them.
+ *
+ * With every declaration in a rule, `:hover` versus base is an ordinary equal-specificity pair and
+ * source order decides, exactly as it does on the compiled page.
+ *
+ * **Three sheet roles, because mutation cost scales with sheet size.** Measured in Chrome 152 over
+ * 500 styled elements: 500 `<style>` tags cost 86.0ms to build, one adopted sheet with hash dedup
+ * costs 1.7ms, and 500 separate adopted sheets cost 6.2ms to build but 84.1ms per style recalc
+ * because each one is walked. On the update path (300 value edits, the Style-panel hot path)
+ * mutating a rule inside one big shared sheet costs 295.7ms, because Chrome rebuilds the whole
+ * sheet's RuleSet on any mutation. So:
+ *
+ *   - the SHARED sheet holds every static, interned rule set and is grown but never rewritten;
+ *   - a reactive declaration is indirected through a custom property, so the rule is static text
+ *     and the update writes `el.style.setProperty("--jx-r0-0", v)` — 12.4ms, and independent of
+ *     sheet size (the same mechanism that makes `${…}` work inside a nested block at all);
+ *   - the SCRATCH sheet takes the elements under live Studio edit and is rewritten with
+ *     `replaceSync`, 7.5ms per 100 structural edits against 76.9ms for delete+insert in the big one.
+ *
+ * **The handle stays `data-jx`, and its value becomes a content hash.** Not a generated class:
+ * `applyAttributes` runs after `applyStyle`, so a static `attributes: { class: … }` would wipe a
+ * class handle. `data-jx` is already there, is specificity (0,1,0), and is not author-writable.
+ * Hashing the built rule text rather than calling `Math.random()` is what gives dedup and SSR
+ * stability, and it covers everything that varies per call site by construction — the authored
+ * object, the resolved `$media` map and the canvas transposer state are all inputs to that text.
+ *
+ * **Jx emits no cascade layer of its own.** Third-party CSS arrives through `$head` unlayered, and
+ * an unlayered rule beats a layered one at any specificity — so layering Jx's own rules would hand
+ * every page's `$head` a win it does not have today. It is also what keeps the canvas's
+ * `@layer jx-canvas-ua` UA emulation working now that base declarations are unlayered rules rather
+ * than inline styles: unlayered still beats layered, which is the same direction author origin
+ * beats UA origin on the shipped page.
+ */
+
+/** A rule set as it was written into a sheet: the texts, plus the live rules when there are any. */
+interface InsertedRules {
+  texts: readonly string[];
+  rules: CSSRule[];
+}
+
+/** A place rules can be written. Two implementations: the CSSOM, and `<style>` text. */
+interface StyleSink {
+  insert: (texts: readonly string[]) => InsertedRules;
+  remove: (inserted: InsertedRules) => void;
+  /** Rewrite the whole sink. Used only by the scratch sheet. */
+  replaceAll: (texts: readonly string[]) => void;
+  /** Everything written, in sheet order. See {@link documentStyleText}. */
+  text: () => string;
+  detach: () => void;
+}
+
 /**
- * Apply inline styles and emit a scoped <style> block for nested CSS selectors and @custom-media
- * breakpoint rules.
+ * A sink over a real `CSSStyleSheet` — constructable and adopted, or a `<style>` element's own.
+ *
+ * @param {CSSStyleSheet} sheet
+ * @param {() => void} detach
+ * @returns {StyleSink}
+ */
+function cssomSink(sheet: CSSStyleSheet, detach: () => void): StyleSink {
+  const entries: InsertedRules[] = [];
+  return {
+    detach,
+    insert(texts) {
+      const rules: CSSRule[] = [];
+      for (const text of texts) {
+        const index = sheet.cssRules.length;
+        try {
+          sheet.insertRule(text, index);
+        } catch {
+          /* One unparseable rule must not take the other twenty with it. A `<style>` element drops
+             exactly the offending rule and keeps going; `insertRule` throws, so this restores the
+             tolerance an author's stylesheet has always had. */
+          continue;
+        }
+        const rule = sheet.cssRules[index];
+        if (rule) {
+          rules.push(rule);
+        }
+      }
+      const inserted: InsertedRules = { rules, texts };
+      entries.push(inserted);
+      return inserted;
+    },
+    remove(inserted) {
+      const at = entries.indexOf(inserted);
+      if (at !== -1) {
+        entries.splice(at, 1);
+      }
+      if (inserted.rules.length === 0) {
+        return;
+      }
+      /* An index scan of a 302-rule sheet measures 0.04ms, so finding the rules costs nothing next
+         to the RuleSet rebuild the deletion itself forces. Descending, or each deletion shifts the
+         indices still to be removed. */
+      const list = [...sheet.cssRules];
+      const indices = inserted.rules
+        .map((rule) => list.indexOf(rule))
+        .filter((index) => index >= 0)
+        .toSorted((a, b) => b - a);
+      for (const index of indices) {
+        sheet.deleteRule(index);
+      }
+      inserted.rules.length = 0;
+    },
+    replaceAll(texts) {
+      entries.length = 0;
+      entries.push({ rules: [], texts });
+      sheet.replaceSync(texts.join("\n"));
+    },
+    text() {
+      return entries.flatMap((entry) => entry.texts.join("\n")).join("\n");
+    },
+  };
+}
+
+/**
+ * The last resort: a `<style>` element whose text is rewritten. No CSSOM required.
+ *
+ * @param {HTMLStyleElement} tag
+ * @returns {StyleSink}
+ */
+function textSink(tag: HTMLStyleElement): StyleSink {
+  const entries: InsertedRules[] = [];
+  const write = () => {
+    tag.textContent = entries.map((entry) => entry.texts.join("\n")).join("\n");
+  };
+  return {
+    detach() {
+      tag.remove();
+    },
+    insert(texts) {
+      const inserted: InsertedRules = { rules: [], texts };
+      entries.push(inserted);
+      write();
+      return inserted;
+    },
+    remove(inserted) {
+      const index = entries.indexOf(inserted);
+      if (index !== -1) {
+        entries.splice(index, 1);
+        write();
+      }
+    },
+    replaceAll(texts) {
+      entries.length = 0;
+      entries.push({ rules: [], texts });
+      write();
+    },
+    text() {
+      return tag.textContent ?? "";
+    },
+  };
+}
+
+/**
+ * Open a sheet on `doc`, preferring a constructable one.
+ *
+ * A constructable stylesheet cannot be adopted into another document, which is why the registry
+ * below is keyed on the document and never cached at module scope: the Studio iframe, the live
+ * preview tab and the parent page each open their own.
+ *
+ * @param {Document} doc
+ * @returns {StyleSink}
+ */
+function openSink(doc: Document): StyleSink {
+  const view = doc.defaultView as (Window & { CSSStyleSheet?: typeof CSSStyleSheet }) | null;
+  const SheetConstructor = view?.CSSStyleSheet;
+  if (typeof SheetConstructor === "function" && Array.isArray(doc.adoptedStyleSheets)) {
+    try {
+      const sheet = new SheetConstructor();
+      doc.adoptedStyleSheets = [...doc.adoptedStyleSheets, sheet];
+      return cssomSink(sheet, () => {
+        doc.adoptedStyleSheets = doc.adoptedStyleSheets.filter((s) => s !== sheet);
+      });
+    } catch {
+      // No constructable stylesheets, or a frozen adoptedStyleSheets. Fall through to a tag.
+    }
+  }
+  const tag = doc.createElement("style");
+  tag.dataset.jxSheet = "";
+  (doc.head ?? doc.documentElement).append(tag);
+  return tag.sheet ? cssomSink(tag.sheet, () => tag.remove()) : textSink(tag);
+}
+
+/** One interned rule set: the rules as written, and how many elements point at them. */
+interface InternEntry {
+  inserted: InsertedRules;
+  refs: number;
+}
+
+/** Everything one document's rules are kept in. */
+interface SheetState {
+  shared: StyleSink;
+  /** Opened on the first live edit, and only then — most documents never have one. */
+  scratch: StyleSink | null;
+  /** Elements living on the scratch sheet, in the order their rules are written. */
+  scratchOwners: Map<HTMLElement, readonly string[]>;
+  /** Scope handle to the rule set it names. */
+  interned: Map<string, InternEntry>;
+  /** Declaration-body at-rule text to the one copy of it. */
+  hoisted: Map<string, InternEntry>;
+  /** Distinguishes `--jx-r<serial>-<n>` variables between elements. */
+  serial: number;
+}
+
+/**
+ * The per-document registry. A `WeakMap` rather than a module-level singleton because one process
+ * renders into several documents (canvas iframe, preview tab, parent) and a constructable sheet
+ * belongs to exactly one of them.
+ */
+const sheetStates = new WeakMap<Document, SheetState>();
+
+/**
+ * @param {Document} doc
+ * @returns {SheetState}
+ */
+function sheetStateFor(doc: Document): SheetState {
+  const existing = sheetStates.get(doc);
+  if (existing) {
+    return existing;
+  }
+  const created: SheetState = {
+    hoisted: new Map(),
+    interned: new Map(),
+    scratch: null,
+    scratchOwners: new Map(),
+    serial: 0,
+    shared: openSink(doc),
+  };
+  sheetStates.set(doc, created);
+  return created;
+}
+
+/** What one element holds, so that releasing it is exact rather than approximate. */
+interface ElementStyleEntry {
+  doc: Document;
+  /** The state this entry's handles belong to; a reset replaces it and orphans them. */
+  state: SheetState;
+  uid: string;
+  /** The interning key in the shared sheet, or null when the element is on the scratch sheet. */
+  interned: string | null;
+  /** Hoisted declaration at-rules this element holds a reference to. */
+  hoisted: readonly string[];
+  /** The `--jx-r…` custom properties its effects write inline. */
+  vars: readonly string[];
+  /** Stops those effects. */
+  stop: (() => void) | null;
+}
+
+/**
+ * Per-element style bookkeeping. The replacement for the old `elementStyleTags`, which exported a
+ * `<style>` element and let its importers remove it by hand; {@link releaseElementStyles} is the
+ * documented teardown in its place, because a rule set is now refcounted and dropping one by hand
+ * would either leak it or take it away from another element that shares it.
+ */
+const elementStyles = new WeakMap<HTMLElement, ElementStyleEntry>();
+
+/** The scope handle `buildStyleRules` writes, before the hash of its own output replaces it. */
+const SCOPE_TOKEN = "jx-scope";
+
+/**
+ * Rewrite the scratch sheet from its owners.
+ *
+ * `scratchOwners` is a STRONG map — it has to be, since the sheet's whole text is rebuilt from it —
+ * so an element only leaves it through {@link releaseElementStyles}. That is not a hole: every way
+ * an edited element can go away calls it. `applyStyle` registers it with the enclosing reactive
+ * scope, Studio's `disposeSubtree` calls it per element, and `resetDocumentStyles` drops the map
+ * wholesale. Sweeping on `isConnected` instead would be wrong rather than merely redundant: an
+ * element is routinely styled before it is inserted.
+ *
+ * @param {SheetState} state
+ */
+function rewriteScratch(state: SheetState) {
+  if (!state.scratch) {
+    return;
+  }
+  state.scratch.replaceAll([...state.scratchOwners.values()].flat());
+}
+
+/**
+ * Drop one reference to an interned rule set, removing its rules when the last one goes.
+ *
+ * @param {SheetState} state
+ * @param {Map<string, InternEntry>} table
+ * @param {string} key
+ */
+function releaseInterned(state: SheetState, table: Map<string, InternEntry>, key: string) {
+  const entry = table.get(key);
+  if (!entry) {
+    return;
+  }
+  entry.refs -= 1;
+  if (entry.refs <= 0) {
+    table.delete(key);
+    state.shared.remove(entry.inserted);
+  }
+}
+
+/**
+ * Take one reference to a rule set, inserting it the first time it is asked for.
+ *
+ * @param {SheetState} state
+ * @param {Map<string, InternEntry>} table
+ * @param {string} key
+ * @param {readonly string[]} texts
+ */
+function retainInterned(
+  state: SheetState,
+  table: Map<string, InternEntry>,
+  key: string,
+  texts: readonly string[],
+) {
+  const existing = table.get(key);
+  if (existing) {
+    existing.refs += 1;
+    return;
+  }
+  table.set(key, { inserted: state.shared.insert(texts), refs: 1 });
+}
+
+/**
+ * Release everything {@link applyStyle} gave an element: its rules, its scope handle, and the inline
+ * custom properties and effects behind its reactive declarations.
+ *
+ * This is the teardown API `elementStyleTags` used to stand in for, and it is exported because
+ * removing a rule set by hand is no longer possible: sets are shared between elements that style
+ * alike, so the only safe removal is a refcounted one. Calling it on an element that has no styles
+ * is a no-op, which is what makes `applyStyle` safe to call twice.
+ *
+ * Callers rarely need it. `applyStyle` registers it with the enclosing reactive scope, so an
+ * element discarded by a re-rendering mapped array or a disposed Studio subtree releases itself.
+ *
+ * @param {HTMLElement} el
+ * @param {ElementStyleEntry} [only] - Release only if this is still the element's current entry
+ */
+export function releaseElementStyles(el: HTMLElement, only?: ElementStyleEntry): void {
+  const entry = elementStyles.get(el);
+  if (!entry || (only !== undefined && entry !== only)) {
+    return;
+  }
+  elementStyles.delete(el);
+  entry.stop?.();
+  for (const name of entry.vars) {
+    el.style.removeProperty(name);
+  }
+  delete el.dataset.jx;
+  /* A `resetDocumentStyles` between the two replaces the state, and its sheets are already gone —
+     so the element-local half above always runs and the sheet half is skipped as already done. */
+  if (sheetStates.get(entry.doc) !== entry.state) {
+    return;
+  }
+  const { state } = entry;
+  if (entry.interned === null) {
+    if (state.scratchOwners.delete(el)) {
+      rewriteScratch(state);
+    }
+  } else {
+    releaseInterned(state, state.interned, entry.interned);
+  }
+  for (const key of entry.hoisted) {
+    releaseInterned(state, state.hoisted, key);
+  }
+}
+
+/**
+ * Discard every sheet this runtime opened on a document, and orphan the element entries that point
+ * into them.
+ *
+ * A full re-render replaces the whole tree, so the alternative is a shared sheet that only ever
+ * grows. The element `WeakMap` cannot be enumerated to be cleared, so entries are invalidated
+ * instead: each one records the `SheetState` it was written into, and a release that finds a
+ * different state registered for the document does the element-local half only. That is what stops
+ * a surviving element from later handing `deleteRule` an index into a sheet nobody is reading.
+ *
+ * @param {Document} [doc] - Defaults to the ambient document
+ */
+export function resetDocumentStyles(doc: Document = document): void {
+  const state = sheetStates.get(doc);
+  if (!state) {
+    return;
+  }
+  sheetStates.delete(doc);
+  for (const el of state.scratchOwners.keys()) {
+    elementStyles.delete(el);
+    delete el.dataset.jx;
+  }
+  state.scratchOwners.clear();
+  state.interned.clear();
+  state.hoisted.clear();
+  state.shared.detach();
+  state.scratch?.detach();
+}
+
+/**
+ * The CSS this engine has written into a document, in sheet order.
+ *
+ * It reports what the engine ASKED the document to adopt, not what the document managed to parse,
+ * and the difference is the point: `insertRule` throws on a rule the host cannot parse, and the
+ * sink swallows that so one bad rule cannot take the rest of an element's set with it. The test DOM
+ * rejects `@position-try` outright, so reading it back off `cssRules` there would report a block
+ * that a browser adopts perfectly well as missing.
+ *
+ * It is also the honest answer to "what CSS did my style object become", which is a question the
+ * Studio style inspector asks and, before this, nothing could answer without scraping `<style>`
+ * tags out of the head.
+ *
+ * @param {Document} [doc] - Defaults to the ambient document
+ * @returns {string} One rule per line, shared sheet first
+ * @docs framework/concepts/styling
+ */
+export function documentStyleText(doc: Document = document): string {
+  const state = sheetStates.get(doc);
+  if (!state) {
+    return "";
+  }
+  return [state.shared.text(), state.scratch?.text() ?? ""].filter(Boolean).join("\n");
+}
+
+/**
+ * Whether a style object declares `display` anywhere in it.
+ *
+ * `defineElement` gives a custom element `display: block` because a custom element defaults to
+ * `inline` and Jx containers behave like `<div>`. It used to test `this.style.display`, which was a
+ * correct test only while the author's own `display` was written inline — the moment it became a
+ * rule the guard stopped seeing it and the default started overriding the author. The test is now
+ * on the source rather than on the element, and it is a deep one on purpose: an inline default
+ * would beat a `:hover` or `@media` `display` just as surely as a base one.
+ *
+ * @param {JxStyle | undefined} style
+ * @returns {boolean}
+ */
+function declaresDisplay(style: JxStyle | undefined): boolean {
+  if (!style || typeof style !== "object") {
+    return false;
+  }
+  for (const [key, value] of Object.entries(style)) {
+    if (key === "display") {
+      return true;
+    }
+    if (value !== null && typeof value === "object" && declaresDisplay(value as JxStyle)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Turn an element's `style` object into CSS rules and adopt them.
+ *
+ * Nothing is written inline except the `--jx-r…` custom properties that carry reactive values, so
+ * an authored `:hover`, `@media` or `@supports` block overrides its own base declaration by
+ * ordinary cascade rules — which is what the emitted CSS always said and the inline write always
+ * prevented. See the engine essay above for the sheet roles and the measurements behind them.
+ *
+ * Calling it twice on one element is safe: the first call's rules are released first.
  *
  * @param {HTMLElement} el
  * @param {JxStyle} styleDef
  * @param {Record<string, string>} [mediaQueries] Named breakpoints from root $media. Default is
  *   `{}`
  * @param {JxScope} [state] Component scope for template string evaluation. Default is `{}`
+ * @docs framework/concepts/styling
  */
 export function applyStyle(
   el: HTMLElement,
@@ -1298,177 +1767,21 @@ export function applyStyle(
   mediaQueries: Record<string, string> = {},
   state: JxScope = {},
 ) {
-  const nested: Record<string, JxStyle> = {};
-  const media: Record<string, JxStyle> = {};
-  const baseDecls: Record<string, string> = {};
-
-  // Collect properties overridden by media queries so we can avoid inline styles for them
-  const mediaOverriddenProps = new Set<string>();
-  for (const [prop, val] of Object.entries(styleDef)) {
-    if (prop.startsWith("@") && val && typeof val === "object") {
-      for (const k of Object.keys(val)) {
-        if (
-          !k.startsWith(":") &&
-          !k.startsWith(".") &&
-          !k.startsWith("&") &&
-          !k.startsWith("[") &&
-          !k.startsWith("@")
-        ) {
-          mediaOverriddenProps.add(k);
-        }
-      }
-    }
-  }
-
-  for (const [prop, val] of Object.entries(styleDef)) {
-    if (val !== null && typeof val === "object" && !Array.isArray(val)) {
-      if (prop.startsWith("@")) {
-        media[prop] = val;
-      } else {
-        nested[prop] = val;
-      }
-      continue;
-    }
-    if (prop.startsWith("@") || isNestedSelector(prop)) {
-      // Scalar under a selector/media key — invalid style shape, drop it.
-      continue;
-    }
-    if (val === undefined) {
-      continue;
-    }
-    const scalar = String(val);
-    if (prop.startsWith("--")) {
-      if (isTemplateString(val)) {
-        effect(() => {
-          el.style.setProperty(prop, canvasStyleValue(evaluateTemplate(val, state)));
-        });
-      } else {
-        el.style.setProperty(prop, canvasStyleValue(scalar));
-      }
-    } else if (isTemplateString(val)) {
-      effect(() => {
-        (el.style as unknown as Record<string, string>)[prop] = canvasStyleValue(
-          evaluateTemplate(val, state),
-        );
-      });
-    } else if (mediaOverriddenProps.has(prop)) {
-      // Goes through toCSSText (which resolves and transposes) — don't do either twice here.
-      baseDecls[prop] = scalar;
-    } else {
-      (el.style as unknown as Record<string, string>)[prop] = canvasStyleValue(scalar);
-    }
-  }
-
-  const hasNested = Object.keys(nested).length > 0;
-  const hasMedia = Object.keys(media).length > 0;
-  const hasBaseDecls = Object.keys(baseDecls).length > 0;
-  if (!hasNested && !hasMedia && !hasBaseDecls) {
-    return;
-  }
-
-  const uid = `jx-${Math.random().toString(36).slice(2, 7)}`;
-  el.dataset.jx = uid;
-
-  let css = "";
-  const baseCSS = toCSSText(baseDecls);
-  if (baseCSS) {
-    css += `[data-jx="${uid}"] { ${baseCSS} }\n`;
-  }
-
-  /* One gate for the whole call, so `reapplyStyle` and every recursion answer alike. Off in
-     production and in preview, where the selector is written exactly as authored. */
-  const transpose = _canvasDelinkPopovers && el.dataset.jxPath !== undefined;
-  /** The selector to emit for `scope`, or null when this rule must not be emitted at all. */
-  const emittable = (scope: string): string | null =>
-    transpose ? transposeCanvasPopoverSelector(scope) : scope;
-
-  function emitNested(scope: string, rules: JxStyle) {
-    const selector = emittable(scope);
-    const props = toCSSText(rules);
-    if (selector !== null && props) {
-      css += `${selector} { ${props} }\n`;
-    }
-    for (const [sel, sub] of Object.entries(rules)) {
-      if (sub === null || typeof sub !== "object" || Array.isArray(sub)) {
-        continue;
-      }
-      if (sel.startsWith("@")) {
-        continue;
-      }
-      emitNested(resolveNestedSelector(scope, sel), sub);
-    }
-  }
-
-  for (const [sel, rules] of Object.entries(nested)) {
-    emitNested(resolveNestedSelector(`[data-jx="${uid}"]`, sel), rules);
-  }
-
-  function emitMediaNested(atRule: string, parentSel: string, obj: JxStyle) {
-    for (const [sel, sub] of Object.entries(obj)) {
-      if (sub === null || typeof sub !== "object" || Array.isArray(sub)) {
-        continue;
-      }
-      if (sel.startsWith("@")) {
-        continue;
-      }
-      const resolved = resolveNestedSelector(parentSel, sel);
-      const selector = emittable(resolved);
-      const props = toCSSText(sub);
-      if (selector !== null && props) {
-        css += `${atRule} { ${selector} { ${props} } }\n`;
-      }
-      emitMediaNested(atRule, resolved, sub);
-    }
-  }
-
-  for (const [key, rules] of Object.entries(media)) {
-    if (key === "@--") {
-      continue;
-    } // Base canvas width, not a real media query
-    /* A declaration-body at-rule has no selector to scope: `@position-try --flip { … }` IS the
-       body. Emitted verbatim and NOT scoped to this element, because the name it declares is
-       document-global — which is also why it is written where it is used rather than somewhere
-       central, exactly as an author writes one in a plain stylesheet. */
-    if (isDeclarationAtRule(key)) {
-      const decls = toCSSText(rules);
-      if (decls) {
-        css += `${key} { ${decls} }\n`;
-      }
-      continue;
-    }
-    const query = resolveAtQuery(key, mediaQueries);
-    const atRule = query === null ? key : `@media ${query}`;
-    const scope = `[data-jx="${uid}"]`;
-    const scheme = query === null ? null : pureSchemeOf(query);
-    if (scheme) {
-      // Dual-emit scheme rules: a media-guarded copy for auto plus a forced-attribute copy.
-      // The forced root attribute wins over the OS preference.
-      const { auto, forced } = schemeSelectors(scope, scheme);
-      css += `${atRule} { ${auto} { ${toCSSText(rules)} } }\n`;
-      emitMediaNested(atRule, auto, rules);
-      emitNested(forced, rules);
-    } else {
-      css += `${atRule} { ${scope} { ${toCSSText(rules)} } }\n`;
-      emitMediaNested(atRule, scope, rules);
-    }
-  }
-
-  const tag = document.createElement("style");
-  tag.textContent = css;
-  tag.dataset.jxOwner = uid;
-  document.head.append(tag);
-  elementStyleTags.set(el, tag);
+  applyStyleInto(el, styleDef, mediaQueries, state, false);
 }
 
 /**
- * Scoped <style> tags emitted per element by applyStyle (latest wins). Lets callers replace an
- * element's emitted styles instead of accumulating orphaned tags.
- */
-export const elementStyleTags = new WeakMap<HTMLElement, HTMLStyleElement>();
-
-/**
- * Re-apply an element's style definition in place: removes the previously emitted scoped <style>
- * tag (if any), clears inline styles, and applies the new definition.
+ * Re-apply an element's style definition in place.
+ *
+ * The Studio Style panel calls this per keystroke, so its rules go to the SCRATCH sheet, which is
+ * rewritten whole with `replaceSync` rather than edited rule by rule inside the shared one: 7.5ms
+ * per 100 structural edits against 76.9ms. The previous rule set is released first — without that
+ * this would leak a set into the shared sheet on every keypress, which is the opposite of the
+ * `<style>`-tag leak it replaced.
+ *
+ * Inline styles are NOT cleared wholesale any more. `el.style.cssText = ""` also destroyed an
+ * author's own `attributes: { style: "…" }` and would now take the custom-element `display` default
+ * with it; only the `--jx-r…` properties this engine wrote are removed.
  *
  * @param {HTMLElement} el
  * @param {JxStyle | undefined} styleDef
@@ -1481,14 +1794,111 @@ export function reapplyStyle(
   mediaQueries: Record<string, string> = {},
   state: JxScope = {},
 ) {
-  const prev = elementStyleTags.get(el);
-  if (prev) {
-    prev.remove();
-    elementStyleTags.delete(el);
+  applyStyleInto(el, styleDef ?? {}, mediaQueries, state, true);
+}
+
+/**
+ * @param {HTMLElement} el
+ * @param {JxStyle} styleDef
+ * @param {Record<string, string>} mediaQueries
+ * @param {JxScope} state
+ * @param {boolean} live - Write to the scratch sheet (the Studio edit path) rather than intern
+ */
+function applyStyleInto(
+  el: HTMLElement,
+  styleDef: JxStyle,
+  mediaQueries: Record<string, string>,
+  state: JxScope,
+  live: boolean,
+) {
+  releaseElementStyles(el);
+  const doc = el.ownerDocument ?? document;
+  const sheetState = sheetStateFor(doc);
+
+  /* One gate for the whole call, so every recursion answers alike. Off in production and in
+     preview, where the selector is written exactly as authored. */
+  const transposeSelector =
+    _canvasDelinkPopovers && el.dataset.jxPath !== undefined
+      ? transposeCanvasPopoverSelector
+      : (selector: string) => selector;
+
+  /* Reactive declarations become `var()` reads of a custom property this element sets inline. The
+     variable inherits, which is correct, and the declaration stays in the rule where `:hover` can
+     override it. The serial keeps two elements' variables apart: a descendant rule reads `var()`
+     from the nearest ancestor that set it, and without it a styled child would shadow its parent's
+     `--jx-r0` with its own. It also makes the rule text — and so the scope handle hashed from it —
+     unique per element, which is exactly the sharing a reactive rule set must not have. */
+  let serial = -1;
+  const sources: { name: string; value: string | JxRef }[] = [];
+  const rules = buildStyleRules(styleDef, {
+    mediaQueries,
+    resolveValue: (_property, value) => {
+      if (serial < 0) {
+        ({ serial } = sheetState);
+        sheetState.serial += 1;
+      }
+      const name = `--jx-r${serial}-${sources.length}`;
+      sources.push({ name, value });
+      return `var(${name})`;
+    },
+    scope: SCOPE_TOKEN,
+    transposeSelector,
+    transposeValue: canvasStyleValue,
+  });
+  if (rules.length === 0) {
+    return;
   }
-  el.style.cssText = "";
-  delete el.dataset.jx;
-  applyStyle(el, styleDef ?? {}, mediaQueries, state);
+
+  /* Declaration-body at-rules declare a document-global NAME — `@position-try --flip`,
+     `@font-face` — so they are written once for the whole document and refcounted, rather than
+     once per element that mentions them. */
+  const scoped = rules.filter((rule) => rule.target !== "unscoped");
+  const unscoped = rules.filter((rule) => rule.target === "unscoped");
+  for (const rule of unscoped) {
+    retainInterned(sheetState, sheetState.hoisted, rule.text, [rule.text]);
+  }
+
+  const uid = `jx-${hashCss(scoped.map((rule) => rule.key).join("|"))}`;
+  const texts = scoped.map((rule) => rule.text.replaceAll(SCOPE_TOKEN, `[data-jx="${uid}"]`));
+  if (texts.length > 0) {
+    el.dataset.jx = uid;
+    if (live) {
+      sheetState.scratch ??= openSink(doc);
+      sheetState.scratchOwners.set(el, texts);
+      rewriteScratch(sheetState);
+    } else {
+      retainInterned(sheetState, sheetState.interned, uid, texts);
+    }
+  }
+
+  const entry: ElementStyleEntry = {
+    doc,
+    hoisted: unscoped.map((rule) => rule.text),
+    interned: texts.length > 0 && !live ? uid : null,
+    state: sheetState,
+    stop: null,
+    uid,
+    vars: sources.map((source) => source.name),
+  };
+  if (sources.length > 0) {
+    const scope = effectScope();
+    scope.run(() => {
+      for (const { name, value } of sources) {
+        effect(() => {
+          const resolved = isRefObj(value)
+            ? resolveRef(value.$ref, state)
+            : evaluateTemplate(value, state);
+          el.style.setProperty(name, canvasStyleValue(String(resolved ?? "")));
+        });
+      }
+    });
+    entry.stop = () => scope.stop();
+  }
+  elementStyles.set(el, entry);
+  /* Ties the rules to the render that made them: a mapped array's discarded generation, or a
+     Studio subtree being replaced, stops its scope and the rule set goes with it. Guarded on the
+     entry so a later `reapplyStyle` is not undone by an older scope disposing after it. */
+  onScopeDispose(() => releaseElementStyles(el, entry), true);
 }
 
 /*
@@ -2542,14 +2952,6 @@ function isRefObj(v: unknown): v is JxRef {
 }
 
 /**
- * @param {string} k
- * @returns {boolean}
- */
-function isNestedSelector(k: string) {
-  return k.startsWith(":") || k.startsWith(".") || k.startsWith("&") || k.startsWith("[");
-}
-
-/**
  * Walk a path off a value. Delegates to the one tokenizer (`pointer.ts`) — this used to split on
  * `/[./]/`, which no other path in the codebase agreed with.
  *
@@ -2647,32 +3049,45 @@ function mergeProps(def: JxElement, parentState: JxScope): JxScope {
 }
 
 /*
- * The CSS-authoring rules live in `./css.ts`, which imports nothing at all. They are re-exported
+ * The CSS-authoring rules live in `./css.ts`, whose only import is a pair of type guards. They are
+ * re-exported
  * here because they always were part of this module's surface and moving them must not break a
  * consumer; a host that cannot afford the DOM runtime imports `@jxsuite/runtime/css` instead.
  */
 export {
+  buildStyleRules,
   camelToKebab,
   COLOR_SCHEME_ATTR,
   COLOR_SCHEME_STORAGE_KEY,
+  cssPropertyName,
+  cssRuleText,
+  hashCss,
   isDeclarationAtRule,
+  isNestedSelectorKey,
   pureSchemeOf,
   resolveAtQuery,
   resolveNestedSelector,
   schemeSelectors,
   transposeCanvasPopoverSelector,
 } from "./css.ts";
+export type { CssBuildOptions, CssRule, CssRuleTarget } from "./css.ts";
 
 /**
  * Convert a style rules object to a CSS text string (skipping nested selectors).
+ *
+ * Kept for consumers; nothing in this repository composes a rule this way any more, because
+ * `buildStyleRules` answers the same question for a whole style object rather than one flat level
+ * of it. It shares that function's property spelling — `cssPropertyName`, not `camelToKebab` — so a
+ * custom property survives it: `--fooBar` and `--foo-bar` are two different properties, and
+ * kebab-casing one renames it out from under the `var()` that reads it.
  *
  * @param {Record<string, unknown> | object} rules
  * @returns {string}
  */
 export function toCSSText(rules: Record<string, unknown> | object) {
   return Object.entries(rules)
-    .filter(([k, v]) => !isNestedSelector(k) && (v === null || typeof v !== "object"))
-    .map(([p, v]) => `${camelToKebab(p)}: ${canvasStyleValue(String(v))}`)
+    .filter(([k, v]) => !isNestedSelectorKey(k) && (v === null || typeof v !== "object"))
+    .map(([p, v]) => `${cssPropertyName(p)}: ${canvasStyleValue(String(v))}`)
     .join("; ");
 }
 
@@ -2932,10 +3347,10 @@ export async function defineElement(source: string | JxDocument, baseUrl?: strin
       const slottedChildren = [...this.childNodes];
       this.replaceChildren();
 
-      // Custom elements default to display:inline — use block so they behave as
-      // Containers (matching <div> semantics).  The component's own style can
-      // Override this if needed.
-      if (!this.style.display) {
+      /* Custom elements default to `display: inline`; a Jx container behaves like a `<div>`, so
+         one is supplied. The test is on the DEFINITION rather than on `this.style`, because the
+         author's own `display` is a rule now and an inline default would beat it at any depth. */
+      if (!declaresDisplay(def.style)) {
         this.style.display = "block";
       }
 

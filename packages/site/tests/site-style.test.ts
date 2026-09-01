@@ -44,7 +44,9 @@ describe("buildSiteStyleCSS", () => {
     expect(css).toContain(":root { color-scheme: light dark }");
   });
 
-  test("literal @(query) blocks work; unresolvable at-keys are skipped", () => {
+  test("literal @(query) blocks work, and a non-media at-rule passes through", () => {
+    /* `@supports` used to be dropped here and emitted by the compiler, so a project style meant
+       one thing in a host and another on the shipped page. Both go through `buildStyleRules` now. */
     const css = buildSiteStyleCSS(
       {
         "@(prefers-color-scheme: light)": { "--fg": "#111" },
@@ -54,7 +56,17 @@ describe("buildSiteStyleCSS", () => {
       id,
     );
     expect(css).toContain(':root:where([data-color-scheme="light"]) { --fg: #111 }');
-    expect(css).not.toContain("@supports");
+    expect(css).toContain("@supports (gap: 1px) { body { gap: 1 } }");
+  });
+
+  test("a declaration-body at-rule is emitted once, with no selector", () => {
+    // `@font-face { … }` IS the body; splitting it across `:root` and `body` would emit it twice.
+    const css = buildSiteStyleCSS(
+      { "@font-face": { fontFamily: "Jx", src: "url(/a.woff2)" } },
+      {},
+      id,
+    );
+    expect(css).toBe("@font-face { font-family: Jx; src: url(/a.woff2) }");
   });
 
   /*

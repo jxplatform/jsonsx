@@ -1,19 +1,20 @@
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
-import { describe, test, expect, mock, spyOn } from "bun:test";
+import { describe, test, expect, beforeEach, mock, spyOn } from "bun:test";
 import { reactive } from "@vue/reactivity";
 import type { Ref } from "@vue/reactivity";
 import {
   applyStyle,
   buildScope,
-  elementStyleTags,
   Jx,
   reapplyStyle,
   renderNode as _renderNode,
+  resetDocumentStyles,
   resolvePrototype,
   resolveRef,
   setSkipContentResolution,
 } from "../src/runtime";
 import type { JxDocument } from "@jxsuite/schema/types";
+import { adoptedCSS, elementCSS } from "./style-text.ts";
 
 try {
   GlobalRegistrator.register();
@@ -154,19 +155,33 @@ describe("applyAttributes template strings", () => {
 // ─── applyStyle: template strings, nested-in-nested, media ───────────────────
 
 describe("applyStyle gaps", () => {
-  test("template string in custom property and regular property is reactive", async () => {
+  test("a template value becomes a var() the rule reads and an effect writes", async () => {
+    /* The indirection is what lets a reactive declaration live in a RULE. The rule text is static,
+       so it is never mutated on an update — the effect writes one inline custom property, which is
+       12.4ms per 300 edits against 84.5ms for tearing the rule down and rebuilding it, and it does
+       not degrade as the sheet grows. It is also what makes `${…}` work inside `:hover` at all. */
     const state = reactive({ c: "red" });
     const el = document.createElement("div");
-    applyStyle(el, { "--accent": "${state.c}", color: "${state.c}" } as any, {}, state);
-    expect(el.style.getPropertyValue("--accent")).toBe("red");
-    expect(el.style.color).toBe("red");
+    document.body.append(el);
+    applyStyle(
+      el,
+      { ":hover": { color: "${state.c}" }, "--accent": "${state.c}" } as any,
+      {},
+      state,
+    );
+    const uid = el.dataset.jx as string;
+    expect(elementCSS(el).split("\n")).toEqual([
+      `[data-jx="${uid}"] { --accent: var(--jx-r0-0) }`,
+      `[data-jx="${uid}"]:hover { color: var(--jx-r0-1) }`,
+    ]);
+    expect(el.style.cssText).toContain("--jx-r0-0: red");
     state.c = "blue";
     await wait();
-    expect(el.style.getPropertyValue("--accent")).toBe("blue");
-    expect(el.style.color).toBe("blue");
+    expect(el.style.getPropertyValue("--jx-r0-0")).toBe("blue");
+    expect(el.style.getPropertyValue("--jx-r0-1")).toBe("blue");
   });
 
-  test("nested selectors recurse (&, [attr], :pseudo, .class, descendant, @ skipped)", () => {
+  test("nested selectors recurse (&, [attr], :pseudo, .class, descendant, and @media too)", () => {
     const el = document.createElement("div");
     applyStyle(el, {
       ".kid": {
@@ -181,15 +196,17 @@ describe("applyStyle gaps", () => {
     } as any);
     const uid = el.dataset.jx as string;
     expect(uid).toBeTruthy();
-    const tag = elementStyleTags.get(el) as HTMLStyleElement;
-    const css = tag.textContent as string;
+    const css = elementCSS(el);
     expect(css).toContain(`[data-jx="${uid}"].kid { color: red }`);
     expect(css).toContain(`[data-jx="${uid}"].kid:hover { color: blue }`);
     expect(css).toContain(`[data-jx="${uid}"].kid:focus { outline: 1px solid }`);
     expect(css).toContain(`[data-jx="${uid}"].kid[data-a] { padding: 2px }`);
     expect(css).toContain(`[data-jx="${uid}"].kid.sub { margin: 1px }`);
     expect(css).toContain(`[data-jx="${uid}"].kid span { font-size: 10px }`);
-    expect(css).not.toContain("@media print");
+    /* Defect 1: `emitNested` skipped `@` keys, so a media query nested UNDER a selector was
+       dropped outright while the same pair in the other order emitted. Studio carried a hoisting
+       workaround for exactly this. */
+    expect(css).toContain(`@media print { [data-jx="${uid}"].kid { color: black } }`);
   });
 
   test("media queries: named breakpoint, @( shorthand, raw @media, @-- skipped, base decls", () => {
@@ -209,9 +226,9 @@ describe("applyStyle gaps", () => {
       { "--sm": "(min-width: 640px)" },
     );
     const uid = el.dataset.jx as string;
-    const css = (elementStyleTags.get(el) as HTMLStyleElement).textContent as string;
-    // Base decl moved out of inline style because it is media-overridden
-    expect(el.style.color).toBe("");
+    const css = elementCSS(el);
+    // Every declaration is a rule now, so nothing authored is left inline to outrank one.
+    expect(el.style.cssText).toBe("");
     expect(css).toContain(`[data-jx="${uid}"] { color: red }`);
     expect(css).toContain(`@media (min-width: 640px) { [data-jx="${uid}"] { color: blue } }`);
     expect(css).toContain(`@media (max-width: 100px) { [data-jx="${uid}"] { margin: 0 } }`);
@@ -227,32 +244,44 @@ describe("applyStyle gaps", () => {
   test("scalar under a selector-like key is dropped", () => {
     const el = document.createElement("div");
     applyStyle(el, { ":hover": "red", color: "green" } as any);
-    expect(el.style.color).toBe("green");
-    expect(elementStyleTags.get(el)).toBeUndefined();
+    // The base declaration is a rule now; only the malformed `:hover` scalar is dropped.
+    expect(elementCSS(el)).toBe(`[data-jx="${el.dataset.jx}"] { color: green }`);
   });
 });
 
 // ─── reapplyStyle ─────────────────────────────────────────────────────────────
 
 describe("reapplyStyle", () => {
-  test("removes previous scoped style tag and inline styles", () => {
-    const el = document.createElement("div");
-    applyStyle(el, { ".kid": { color: "red" }, color: "purple" } as any);
-    const prevTag = elementStyleTags.get(el) as HTMLStyleElement;
-    expect(prevTag.isConnected).toBe(true);
-    reapplyStyle(el, { color: "green" });
-    expect(prevTag.isConnected).toBe(false);
-    expect(elementStyleTags.get(el)).toBeUndefined();
-    expect(el.style.color).toBe("green");
-    expect(el.dataset.jx).toBeUndefined();
+  beforeEach(() => {
+    resetDocumentStyles();
   });
 
-  test("handles element with no previous style tag and undefined def", () => {
+  test("releases the previous rule set rather than accumulating one per keystroke", () => {
     const el = document.createElement("div");
+    document.body.append(el);
+    applyStyle(el, { ".kid": { color: "red" }, color: "purple" } as any);
+    expect(adoptedCSS()).toContain("purple");
+    reapplyStyle(el, { color: "green" });
+    // Defect 5 was one orphaned `<style>` per re-render; a leaked rule set is the same bug.
+    expect(adoptedCSS()).not.toContain("purple");
+    expect(elementCSS(el)).toBe(`[data-jx="${el.dataset.jx}"] { color: green }`);
+  });
+
+  test("an undefined def clears the rules and leaves the author's own inline style alone", () => {
+    /* `el.style.cssText = ""` used to run here, and it destroyed an author's
+       `attributes: { style: "…" }` along with the runtime's own writes. Only the `--jx-r…`
+       properties this engine wrote are removed now. */
+    const el = document.createElement("div");
+    document.body.append(el);
     el.style.color = "red";
+    applyStyle(el, { fontSize: "1rem" });
     // oxlint-disable-next-line unicorn/no-useless-undefined -- param is required; exercises the undefined styleDef branch
     reapplyStyle(el, undefined);
-    expect(el.style.color).toBe("");
+    expect({ css: adoptedCSS(), inline: el.style.color, uid: el.dataset.jx }).toEqual({
+      css: "",
+      inline: "red",
+      uid: undefined,
+    });
   });
 });
 

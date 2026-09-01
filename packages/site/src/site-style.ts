@@ -11,24 +11,32 @@
  * Two hosts share it, which is why it is here rather than in either of them: the studio canvas,
  * which passes a transposer rewriting viewport units to container units, and the live preview
  * origin, which passes identity because a browser tab IS the viewport.
+ *
+ * The nesting inside a block is NOT this module's own recursion any more: it delegates to
+ * `buildStyleRules`, which the runtime and the compiler also use, so all three agree about what an
+ * `@media` inside a selector inside an `@supports` means.
  */
 
-import { camelToKebab, pureSchemeOf, resolveAtQuery, schemeSelectors } from "@jxsuite/runtime/css";
+import {
+  buildStyleRules,
+  isDeclarationAtRule,
+  isNestedSelectorKey,
+  pureSchemeOf,
+} from "@jxsuite/runtime/css";
+import type { JxStyle } from "@jxsuite/schema/types";
 
 /** Id of the injected site-style tag (replace-in-place, never accumulate). */
 export const SITE_STYLE_ID = "jx-site-style";
-
-/** Serialize scalar declarations, kebab-casing property names and transposing values. */
-function toDecls(props: Record<string, unknown>, transpose: (value: string) => string): string {
-  return Object.entries(props)
-    .map(([key, value]) => `${camelToKebab(key)}: ${transpose(String(value))}`)
-    .join("; ");
-}
 
 /**
  * Build the site-style sheet text: custom properties on `:root`, plain properties on `body`,
  * conditional `@`-blocks resolved against `mediaQueries` (scheme queries dual-emitted per the
  * forced-scheme contract), and `color-scheme: light dark` declared when a scheme query exists.
+ *
+ * The `:root` / `body` split is the one decision this builder owns; everything after it is handed
+ * to `buildStyleRules`, which is the single definition of what a Jx style object means as CSS. That
+ * is what makes a nested selector inside a conditional block compose rather than flatten to one
+ * level, and what makes a host and the compiled page agree about a `@supports` block.
  *
  * @param {Record<string, unknown>} siteStyle
  * @param {Record<string, string>} mediaQueries
@@ -41,62 +49,56 @@ export function buildSiteStyleCSS(
   transpose: (value: string) => string,
 ): string {
   const rules: string[] = [];
-  const rootProps: Record<string, unknown> = {};
-  const bodyProps: Record<string, unknown> = {};
-  const condBlocks: [string, Record<string, unknown>][] = [];
+  const push = (style: JxStyle, selector: string | null) => {
+    for (const rule of buildStyleRules(style, {
+      mediaQueries,
+      scope: selector,
+      transposeValue: transpose,
+    })) {
+      rules.push(rule.text);
+    }
+  };
+
+  const rootProps: JxStyle = {};
+  const bodyProps: JxStyle = {};
+  const condBlocks: [string, JxStyle][] = [];
 
   for (const [key, value] of Object.entries(siteStyle)) {
     if (value !== null && typeof value === "object" && !Array.isArray(value)) {
       if (key.startsWith("@")) {
-        condBlocks.push([key, value as Record<string, unknown>]);
+        condBlocks.push([key, value as JxStyle]);
       }
       // Non-@ objects (nested element selectors) are page-content styling — the resolved doc's
       // Own style pass covers those; the site sheet handles tokens + conditional overrides.
       continue;
     }
-    if (key.startsWith(":") || key.startsWith(".") || key.startsWith("[") || key.startsWith("@")) {
+    if (isNestedSelectorKey(key) || key.startsWith("@")) {
       continue;
     }
     if (key.startsWith("--")) {
-      rootProps[key] = value;
+      rootProps[key] = value as string;
     } else {
-      bodyProps[key] = value;
+      bodyProps[key] = value as string;
     }
   }
 
-  const rootCSS = toDecls(rootProps, transpose);
-  if (rootCSS) {
-    rules.push(`:root { ${rootCSS} }`);
-  }
-  const bodyCSS = toDecls(bodyProps, transpose);
-  if (bodyCSS) {
-    rules.push(`body { ${bodyCSS} }`);
-  }
+  push(rootProps, ":root");
+  push(bodyProps, "body");
 
   for (const [atKey, block] of condBlocks) {
-    const query = resolveAtQuery(atKey, mediaQueries);
-    if (query === null) {
+    /* A declaration-body at-rule has no selector to split across, and the name it declares is
+       document-global — one block, not one per target. */
+    if (isDeclarationAtRule(atKey)) {
+      push({ [atKey]: block }, null);
       continue;
     }
-    const scheme = pureSchemeOf(query);
-    const emit = (selector: string, props: string) => {
-      if (!props) {
-        return;
-      }
-      if (scheme) {
-        const { auto, forced } = schemeSelectors(selector, scheme);
-        rules.push(`@media ${query} { ${auto} { ${props} } }`, `${forced} { ${props} }`);
-      } else {
-        rules.push(`@media ${query} { ${selector} { ${props} } }`);
-      }
-    };
-    const condRoot: Record<string, unknown> = {};
-    const condBody: Record<string, unknown> = {};
-    const condSubs: [string, Record<string, unknown>][] = [];
+    const condRoot: JxStyle = {};
+    const condBody: JxStyle = {};
+    const condSubs: [string, JxStyle][] = [];
     for (const [k, v] of Object.entries(block)) {
       if (v !== null && typeof v === "object" && !Array.isArray(v)) {
         if (!k.startsWith("@")) {
-          condSubs.push([k, v as Record<string, unknown>]);
+          condSubs.push([k, v as JxStyle]);
         }
         continue;
       }
@@ -106,10 +108,10 @@ export function buildSiteStyleCSS(
         condBody[k] = v;
       }
     }
-    emit(":root", toDecls(condRoot, transpose));
-    emit("body", toDecls(condBody, transpose));
+    push({ [atKey]: condRoot }, ":root");
+    push({ [atKey]: condBody }, "body");
     for (const [sel, sub] of condSubs) {
-      emit(sel, toDecls(sub, transpose));
+      push({ [atKey]: sub }, sel);
     }
   }
 

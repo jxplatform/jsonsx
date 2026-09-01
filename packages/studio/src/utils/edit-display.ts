@@ -294,11 +294,16 @@ export function prepareForEditMode(node: JxMutableNode): JxMutableNode {
       }
       out.attributes = processed;
     } else if (k === "style") {
-      // Replace template strings in style values with empty strings
+      /* Drop template-valued style declarations. State is not live in edit mode, so the value
+         cannot be resolved; omitting the property lets the cascade answer, which is exactly what
+         the `""` this used to write meant while declarations went inline. As a RULE, `color: ` is
+         a malformed declaration instead of a no-op. Mirrored by iframe-patch's editModeStyle. */
       if (v && typeof v === "object") {
         const s: Record<string, unknown> = {};
         for (const [sk, sv] of Object.entries(v)) {
-          s[sk] = typeof sv === "string" && sv.includes("${") ? "" : sv;
+          if (typeof sv !== "string" || !sv.includes("${")) {
+            s[sk] = sv;
+          }
         }
         out.style = s;
       } else {

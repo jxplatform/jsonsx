@@ -5,7 +5,7 @@
  */
 import "./with-dom.js";
 import { beforeAll, describe, expect, test } from "bun:test";
-import { buildScope, elementStyleTags } from "@jxsuite/runtime";
+import { applyStyle, buildScope } from "@jxsuite/runtime";
 import {
   disposeAllSubtrees,
   disposeSubtree,
@@ -72,23 +72,22 @@ describe("renderSubtreeIframe", () => {
 });
 
 describe("disposeSubtree / disposeAllSubtrees", () => {
-  test("stops the subtree's scope and removes its scoped style tag", () => {
+  test("stops the subtree's scope and hands its rule set back", () => {
     const el = renderSubtreeIframe(
       docOf({ tagName: "p", textContent: "x" }),
       ["children", 0],
       ctx,
     ) as HTMLElement;
-    // Simulate a runtime-emitted scoped style tag for the rendered element.
-    const tag = document.createElement("style");
-    document.head.append(tag);
-    elementStyleTags.set(el, tag);
+    /* The runtime's own teardown API, not a `<style>` tag this test invents. Rule sets are shared
+       between elements that style alike, so only a refcounted release is safe. */
+    applyStyle(el, { color: "rebeccapurple" });
+    expect(el.dataset.jx).toBeTruthy();
 
     disposeSubtree(el);
-    expect(tag.isConnected).toBe(false); // Style tag removed.
-    expect(elementStyleTags.has(el)).toBe(false);
+    expect(el.dataset.jx).toBeUndefined();
   });
 
-  test("ignores elements it never rendered (no scope, no style tag)", () => {
+  test("ignores elements it never rendered (no scope, no rules)", () => {
     const plain = document.createElement("div");
     plain.append(document.createElement("span"));
     expect(() => disposeSubtree(plain)).not.toThrow();

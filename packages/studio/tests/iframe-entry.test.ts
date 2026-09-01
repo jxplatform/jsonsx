@@ -1,5 +1,6 @@
 import "./with-dom.js";
 import { afterEach, describe, expect, test } from "bun:test";
+import { documentStyleText, resetDocumentStyles } from "@jxsuite/runtime";
 import { fakeChannelPair } from "../src/canvas/iframe-channel";
 import { flush } from "./harness";
 import { bootCanvasIframe, layoutHitFor, startCanvasIframe } from "../src/canvas/iframe-entry";
@@ -1353,10 +1354,8 @@ describe("startCanvasIframe — stylebook mode", () => {
   });
 
   async function bootStylebook(gen: number) {
-    // Scoped style tags land in document.head and outlive the per-test body reset.
-    for (const tag of document.head.querySelectorAll("style[data-jx-owner]")) {
-      tag.remove();
-    }
+    // Adopted rules live on the document and outlive the per-test body reset.
+    resetDocumentStyles();
     const pair = fakeChannelPair<ParentToIframe, IframeToParent>();
     const acks: IframeToParent[] = [];
     pair.parent.onMessage((m) => acks.push(m));
@@ -1370,10 +1369,7 @@ describe("startCanvasIframe — stylebook mode", () => {
     return { acks, container, pair };
   }
 
-  const headCss = () =>
-    [...document.head.querySelectorAll("style[data-jx-owner]")]
-      .map((s) => s.textContent)
-      .join("\n");
+  const headCss = () => documentStyleText();
 
   test("styleUpdate at the rendered gen reapplies the root style WITHOUT a re-render", async () => {
     const { container, pair } = await bootStylebook(3);

@@ -5,14 +5,15 @@
  * a width-sized iframe, so `@media` blocks evaluate for real — this replaces the legacy parent-side
  * inline-style flatten (`buildStylebookElement`/`refreshStylebookStyles`).
  *
- * Two runtime facts shape {@link transposeStylebookStyle}:
+ * One runtime fact shapes {@link transposeStylebookStyle}: tag-keyed rules on the generated root
+ * would restyle the card chrome (`div` rules hit chrome divs), so every tag rule `T` is re-keyed to
+ * `` `& .element-card-preview ${T}` `` — applyStyle resolves `&` to the root's `[data-jx=uid]`
+ * scope, confining the cascade to specimens.
  *
- * 1. The runtime's `applyStyle` emits `@media.selector` nesting but DROPS `selector.@media`
- *    (`emitNested` skips `@` keys) — the legacy flatten honored both orders, so tag rules' embedded
- *    `@name` blocks are HOISTED into the corresponding top-level `@name` block here.
- * 2. Tag-keyed rules on the generated root would restyle the card chrome (`div` rules hit chrome
- *    divs), so every tag rule `T` is re-keyed to `` `& .element-card-preview ${T}` `` — applyStyle
- *    resolves `&` to the root's `[data-jx=uid]` scope, confining the cascade to specimens.
+ * There used to be a second, and it was a workaround rather than a fact: `applyStyle` emitted
+ * `@media → selector` but DROPPED `selector → @media`, so a tag rule's embedded `@name` block was
+ * HOISTED into the corresponding top-level one here. The runtime composes both orders now, so the
+ * hoist is gone and a nested `@name` block stays where the author wrote it.
  */
 
 import { serializeJxPath } from "../canvas/path-mapping";
@@ -46,74 +47,26 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === "object" && !Array.isArray(v);
 }
 
-/** The specimen-scoping selector prefix (see module doc, runtime fact 2). */
+/** The specimen-scoping selector prefix (see the module doc). */
 const SPECIMEN_SCOPE = "& .element-card-preview";
-
-/** Deep-merge `add` into `base` (objects merge, scalars overwrite; add wins). */
-function mergeRules(
-  base: Record<string, unknown> | undefined,
-  add: Record<string, unknown>,
-): Record<string, unknown> {
-  const out: Record<string, unknown> = { ...base };
-  for (const [k, v] of Object.entries(add)) {
-    out[k] = isPlainObject(v) && isPlainObject(out[k]) ? mergeRules(out[k], v) : v;
-  }
-  return out;
-}
-
-/** Drop nested `@` keys from a rule object (already-hoisted media can't nest deeper). */
-function stripAtKeys(rule: Record<string, unknown>): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(rule)) {
-    if (isPlainObject(v) && k.startsWith("@")) {
-      continue;
-    }
-    out[k] = isPlainObject(v) ? stripAtKeys(v) : v;
-  }
-  return out;
-}
 
 /**
  * Transform the merged effective document style into the generated root's style block: flat scalars
- * and `--` custom props stay at the top (inheritance into specimens), tag rules are re-keyed under
- * {@link SPECIMEN_SCOPE}, and `selector.@media` nesting is hoisted into top-level `@name` blocks
- * (both per the module doc). Shared by the doc generator and the live `styleUpdate` fast path so an
- * edit round-trips through the exact same transform.
+ * and `--` custom props stay at the top (inheritance into specimens) and tag rules are re-keyed
+ * under {@link SPECIMEN_SCOPE}, per the module doc. Shared by the doc generator and the live
+ * `styleUpdate` fast path so an edit round-trips through the exact same transform.
  */
 export function transposeStylebookStyle(effectiveStyle: JxStyle): JxStyle {
   const style = effectiveStyle as Record<string, unknown>;
   const out: Record<string, unknown> = {};
-  const mediaOut: Record<string, Record<string, unknown>> = {};
 
-  /** Re-key + hoist one tag rule subtree; returns the cleaned (media-free) rule. */
-  const processTagRule = (
-    rule: Record<string, unknown>,
-    tagPath: string,
-  ): Record<string, unknown> => {
+  /** Drop the base-width marker, which is not a query and would resolve to `@media --`. */
+  const withoutBaseWidth = (rule: Record<string, unknown>): Record<string, unknown> => {
     const cleaned: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(rule)) {
-      if (!isPlainObject(v)) {
+      if (k !== "@--") {
         cleaned[k] = v;
-        continue;
       }
-      if (k.startsWith("@")) {
-        if (k === "@--") {
-          continue; // Base canvas width marker, not a real query.
-        }
-        mediaOut[k] ??= {};
-        const bucket = mediaOut[k];
-        const sel = `${SPECIMEN_SCOPE} ${tagPath}`;
-        bucket[sel] = mergeRules(
-          bucket[sel] as Record<string, unknown> | undefined,
-          stripAtKeys(v),
-        );
-        continue;
-      }
-      if (isTagPath(k)) {
-        cleaned[k] = processTagRule(v, `${tagPath} ${k}`);
-        continue;
-      }
-      cleaned[k] = v; // Pseudo/class/& sub-rules ride along under the re-keyed parent.
     }
     return cleaned;
   };
@@ -123,33 +76,29 @@ export function transposeStylebookStyle(effectiveStyle: JxStyle): JxStyle {
       out[k] = v; // Flat scalars + -- custom props.
       continue;
     }
+    if (k === "@--") {
+      continue; // Base canvas width marker, not a real query.
+    }
     if (k.startsWith("@")) {
-      if (k === "@--") {
-        continue;
-      }
       // Media block: re-key tag rules inside; non-tag keys (scalars/pseudo) apply to the root.
-      mediaOut[k] ??= {};
-      const bucket = mediaOut[k];
+      const bucket: Record<string, unknown> = {};
       for (const [mk, mv] of Object.entries(v)) {
         if (isPlainObject(mv) && isTagPath(mk)) {
-          const sel = `${SPECIMEN_SCOPE} ${mk}`;
-          bucket[sel] = mergeRules(bucket[sel] as Record<string, unknown> | undefined, mv);
+          bucket[`${SPECIMEN_SCOPE} ${mk}`] = withoutBaseWidth(mv);
         } else {
           bucket[mk] = mv;
         }
       }
+      out[k] = bucket;
       continue;
     }
     if (isTagPath(k)) {
-      out[`${SPECIMEN_SCOPE} ${k}`] = processTagRule(v, k);
+      out[`${SPECIMEN_SCOPE} ${k}`] = withoutBaseWidth(v);
       continue;
     }
     out[k] = v;
   }
 
-  for (const [mk, mv] of Object.entries(mediaOut)) {
-    out[mk] = isPlainObject(out[mk]) ? mergeRules(out[mk] as Record<string, unknown>, mv) : mv;
-  }
   return out as JxStyle;
 }
 

@@ -379,14 +379,16 @@ describe("prepareForEditMode media elements", () => {
 });
 
 describe("prepareForEditMode style handling", () => {
-  test("blanks template strings in style values, keeps the rest", () => {
+  test("drops template-valued style declarations, keeps the rest", () => {
+    /* Dropped, not blanked to `""`. A declaration is a RULE now, and `width: ` is a malformed one
+       where the old inline write was a silent no-op. Omitting lets the cascade answer, which is
+       what blanking meant. */
     const out = prep({
       style: { color: "red", width: "${w}px" },
       tagName: "div",
       textContent: "x",
     });
-    expect(out.style.color).toBe("red");
-    expect(out.style.width).toBe("");
+    expect(out.style).toEqual({ color: "red" });
   });
 
   test("non-object style passes through", () => {

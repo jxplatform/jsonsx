@@ -2,6 +2,7 @@ import { GlobalRegistrator } from "@happy-dom/global-registrator";
 import { describe, test, expect, mock, spyOn } from "bun:test";
 import { reactive } from "@vue/reactivity";
 import { defineElement, Jx, renderNode as _renderNode } from "../src/runtime";
+import { elementCSS } from "./style-text.ts";
 import type { JxDocument } from "@jxsuite/schema/types";
 
 try {
@@ -250,7 +251,7 @@ describe("renderCustomElementWithProps", () => {
       } as any,
       reactive({}),
     );
-    expect(el.style.color).toBe("red");
+    expect(elementCSS(el)).toBe(`[data-jx="${el.dataset.jx}"] { color: red }`);
     expect(el.dataset.host).toBe("yes");
   });
 });

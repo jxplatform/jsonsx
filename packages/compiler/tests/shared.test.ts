@@ -645,9 +645,7 @@ describe("buildComponentCSS", () => {
       color: "red",
       fontSize: "16px",
     });
-    expect(css).toContain("my-comp {");
-    expect(css).toContain("color: red;");
-    expect(css).toContain("font-size: 16px;");
+    expect(css).toContain("my-comp { color: red; font-size: 16px }");
   });
 
   test("skips pseudo-selectors from host rules but emits them as CSS rules", () => {
@@ -656,7 +654,7 @@ describe("buildComponentCSS", () => {
       "@--md": { fontSize: "20px" },
       color: "red",
     });
-    expect(css).toContain("color: red;");
+    expect(css).toContain("my-comp { color: red }");
     expect(css).toContain(":hover");
     expect(css).toContain("@media");
   });
@@ -1090,7 +1088,7 @@ describe("compileStyles", () => {
       tagName: "div",
     };
     const result = compileStyles(doc);
-    expect(result).toContain("font-size: 14px;");
+    expect(result).toContain("font-size: 14px");
     expect(result).toContain("@media (min-width: 768px)");
     expect(result).toContain("font-size: 18px");
   });

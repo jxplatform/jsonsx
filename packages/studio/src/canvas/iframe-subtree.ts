@@ -11,7 +11,7 @@
  * WeakMap, this stamps `data-jx-path` and tracks per-subtree effect scopes locally.
  */
 
-import { elementStyleTags, renderNode, runScoped } from "@jxsuite/runtime";
+import { releaseElementStyles, renderNode, runScoped } from "@jxsuite/runtime";
 import { getNodeAtPath } from "../state";
 import { makeStamper } from "./iframe-render";
 import { prepareForEditMode } from "../utils/edit-display";
@@ -60,8 +60,9 @@ export function renderSubtreeIframe(
 }
 
 /**
- * Release a removed/replaced subtree: stop the effect scopes rooted inside it and drop the scoped
- * `<style>` tags the runtime emitted for its elements (otherwise they orphan in the iframe head).
+ * Release a removed/replaced subtree: stop the effect scopes rooted inside it and hand every
+ * element's rule set back to the runtime's stylesheet engine (otherwise its rules orphan in the
+ * iframe's adopted sheet).
  */
 export function disposeSubtree(el: Element): void {
   const targets: Element[] = [el, ...el.querySelectorAll("*")];
@@ -69,11 +70,7 @@ export function disposeSubtree(el: Element): void {
     if (!(t instanceof HTMLElement)) {
       continue;
     }
-    const tag = elementStyleTags.get(t);
-    if (tag) {
-      tag.remove();
-      elementStyleTags.delete(t);
-    }
+    releaseElementStyles(t);
     const stop = elScope.get(t);
     if (stop) {
       stop();

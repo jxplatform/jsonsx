@@ -191,32 +191,33 @@ describe("transposeStylebookStyle", () => {
     expect(out["--accent"]).toBe("#f00");
     expect(out["font-family"]).toBe("serif");
     expect(out["& .element-card-preview h1"]).toEqual({ "font-size": "2rem" });
-    // Nested tag rules stay nested (emitNested descends them relative to the re-keyed parent).
+    // Nested tag rules stay nested (the builder descends them relative to the re-keyed parent).
     expect(out["& .element-card-preview table"]).toEqual({ th: { padding: "4px" } });
     // No bare tag keys survive (a bare `div` rule would restyle the card chrome).
     expect(out.h1).toBeUndefined();
     expect(out.table).toBeUndefined();
   });
 
-  test("hoists selector.@media into top-level @media.selector (the runtime drops the former)", () => {
+  test("a nested @media stays where the author wrote it — the hoist is gone", () => {
+    /* This used to hoist `selector → @media` into the top-level `@media → selector` block, because
+       the runtime emitted only the latter. The runtime composes both orders now, so the workaround
+       became a rewrite of the author's own structure for no reason. */
     const out = transposeStylebookStyle({
       h1: { "@md": { color: "green" }, color: "red" },
       ul: { li: { "@md": { margin: "0" } } },
     } as JxStyle) as Record<string, unknown>;
-    expect(out["& .element-card-preview h1"]).toEqual({ color: "red" });
-    expect(out["@md"]).toEqual({
-      "& .element-card-preview h1": { color: "green" },
-      "& .element-card-preview ul li": { margin: "0" },
-    });
+    expect(out["& .element-card-preview h1"]).toEqual({ "@md": { color: "green" }, color: "red" });
+    expect(out["& .element-card-preview ul"]).toEqual({ li: { "@md": { margin: "0" } } });
+    expect(out["@md"]).toBeUndefined();
   });
 
-  test("merges hoisted rules into an existing @media block (media-wraps-selector order kept)", () => {
+  test("a top-level @media block still re-keys the tag rules inside it", () => {
+    // Still needed: a bare `h1` rule on the generated root would reach the card chrome.
     const out = transposeStylebookStyle({
       "@md": { h1: { "font-weight": "700" }, "line-height": "1.4" },
-      h1: { "@md": { color: "green" } },
     } as JxStyle) as Record<string, unknown>;
     expect(out["@md"]).toEqual({
-      "& .element-card-preview h1": { color: "green", "font-weight": "700" },
+      "& .element-card-preview h1": { "font-weight": "700" },
       "line-height": "1.4",
     });
   });

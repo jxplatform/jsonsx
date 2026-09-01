@@ -222,10 +222,13 @@ export const EDIT_PLACEHOLDER_CSS = `
 /* The UA rule a de-popovered element lost, re-supplied at UA-EQUIVALENT PRECEDENCE.
 
    The cascade layer is the mechanism and it is the whole point. An unlayered author declaration
-   beats a layered one whatever its specificity — and in the canvas a base declaration is written
-   as an INLINE style by applyStyle, which beats it harder still. That is exactly how author origin
-   beats UA origin on the shipped page, so the canvas reproduces the real cascade rather than an
-   approximation of it.
+   beats a layered one whatever its specificity, and every declaration applyStyle emits is an
+   unlayered rule in an adopted sheet. That is exactly how author origin beats UA origin on the
+   shipped page, so the canvas reproduces the real cascade rather than an approximation of it.
+
+   This used to read "a base declaration is written as an INLINE style", which was true and is the
+   reason the guarantee survived the move: inline beat layered harder still, and unlayered beats it
+   by the same rule one step down. Jx emits no layer of its own, which is what keeps that true.
 
    Deliberately NOT forced with a priority flag. A popover whose base rule sets display is laid out
    on every page whether open or not; that is a real defect, @jxsuite/schema/overlays reports it as
