@@ -58,9 +58,7 @@ Attribute values may also be reactive templates (`"aria-label": "${state.count} 
 
 ### Boolean values
 
-An attribute value of `true` or `false`, written directly or resolved from a `${...}` template, is
-spelled the way the attribute itself is read. HTML has two rules here, and Jx picks the right one
-from the attribute name, so conditional markup is just a boolean:
+An attribute value of `true` or `false`, written directly or resolved from a `${...}` template, is spelled the way the attribute itself is read. HTML has two rules here, and Jx picks the right one from the attribute name, so conditional markup is just a boolean:
 
 ```json
 {
@@ -69,9 +67,7 @@ from the attribute name, so conditional markup is just a boolean:
 }
 ```
 
-**Presence attributes** are read by presence alone: `open`, `disabled`, `checked`, `hidden`,
-`required`, `selected` and the rest of the HTML boolean family. `true` writes the bare name, `false`
-removes the attribute entirely:
+**Presence attributes** are read by presence alone: `open`, `disabled`, `checked`, `hidden`, `required`, `selected` and the rest of the HTML boolean family. `true` writes the bare name, `false` removes the attribute entirely:
 
 ```html
 <details open></details>
@@ -80,14 +76,10 @@ removes the attribute entirely:
 ```
 
 :::doc-warning
-Never write `"open": "false"` as a string. HTML counts _any_ value as present, `"false"` included,
-so `<details open="false">` is an **open** `<details>`. This is the reason a boolean is not
-stringified.
+Never write `"open": "false"` as a string. HTML counts _any_ value as present, `"false"` included, so `<details open="false">` is an **open** `<details>`. This is the reason a boolean is not stringified.
 :::
 
-**Enumerated attributes** carry the word in their text and treat an empty value as unset. Every
-`aria-*` attribute is one, along with `contenteditable`, `draggable` and `spellcheck`. A boolean
-writes the word for these, in both directions:
+**Enumerated attributes** carry the word in their text and treat an empty value as unset. Every `aria-*` attribute is one, along with `contenteditable`, `draggable` and `spellcheck`. A boolean writes the word for these, in both directions:
 
 ```json
 { "attributes": { "aria-expanded": "${state.open}" } }
@@ -99,28 +91,19 @@ writes the word for these, in both directions:
 <div aria-expanded="false"></div>
 ```
 
-`popover` sits between the two families and is the one attribute worth naming. It is enumerated (its
-keywords are `auto`, `manual` and `hint`), but an empty value means `auto` rather than unset, so a
-boolean `true` writing the bare name happens to be right. A value the browser does not recognise
-falls back to `manual`, which gives up closing on Escape and on a click outside without saying so,
-and `popover="true"` is such a value. Write the keyword:
+`popover` sits between the two families and is the one attribute worth naming. It is enumerated (its keywords are `auto`, `manual` and `hint`), but an empty value means `auto` rather than unset, so a boolean `true` writing the bare name happens to be right. A value the browser does not recognise falls back to `manual`, which gives up closing on Escape and on a click outside without saying so, and `popover="true"` is such a value. Write the keyword:
 
 ```json
 { "attributes": { "popover": "auto" } }
 ```
 
-Studio reports a boolean `popover` as a problem rather than correcting it. See
-[Popovers and overlays](/docs/framework/concepts/overlays).
+Studio reports a boolean `popover` as a problem rather than correcting it. See [Popovers and overlays](/docs/framework/concepts/overlays).
 
-That distinction matters for accessibility: a bare `aria-hidden` is _not_ hidden, and an omitted
-`contenteditable` means "inherit from the parent" rather than `false`. Writing either as a presence
-attribute would silently invert it.
+That distinction matters for accessibility: a bare `aria-hidden` is _not_ hidden, and an omitted `contenteditable` means "inherit from the parent" rather than `false`. Writing either as a presence attribute would silently invert it.
 
-A **string** is never reinterpreted in either family. `"aria-current": "false"` stays exactly that,
-which is how you write the not-the-current-page marker beside `"aria-current": "page"`.
+A **string** is never reinterpreted in either family. `"aria-current": "false"` stays exactly that, which is how you write the not-the-current-page marker beside `"aria-current": "page"`.
 
-The compiled page and the live runtime apply the same rule, so a prerendered element does not change
-meaning when it hydrates.
+The compiled page and the live runtime apply the same rule, so a prerendered element does not change meaning when it hydrates.
 
 ## Children
 

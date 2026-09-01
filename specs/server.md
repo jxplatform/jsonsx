@@ -2,9 +2,9 @@
 
 ## Development Server with Live Reload, Proxy Resolution, and Studio API
 
-**Version:** 0.2.23
-**Status:** Implemented
-**Updated:** 2026-08-31
+**Version:** 0.2.23\
+**Status:** Implemented\
+**Updated:** 2026-08-31\
 **License:** MIT
 
 ---
@@ -60,18 +60,9 @@ A non-site root gets a plain `createDevServer`. `parseDevArgs` and `createDistMi
 
 ## 3. Core Endpoints
 
-The request path is matched in this order (`src/server.ts`), after a leading **deployment base** is
-stripped from it:
+The request path is matched in this order (`src/server.ts`), after a leading **deployment base** is stripped from it:
 
-0. **The base.** A project whose `url` carries a path is served from that path, and a build emits
-   every URL under it ([site-architecture.md §14.7](./site-architecture.md)). The server strips that
-   prefix once, at the edge, rather than moving the dev root: `localhost:3000/` is unchanged for
-   every project that never sets one, and `localhost:3000/m/my-site/assets/x.js` resolves to the
-   same file the deployed site serves. Answering only the bare path would mean previewing URLs the
-   deployed site never uses, which is the class of bug that is only found in production. The
-   boundary is a segment, so `/m/my-sitefile` is not under `/m/my-site`. Everything below — the
-   extension mounts included — therefore routes on the bare path, which is the opposite of the
-   generated worker, where the base is on the routes themselves because that worker IS the origin.
+0. **The base.** A project whose `url` carries a path is served from that path, and a build emits every URL under it ([site-architecture.md §14.7](./site-architecture.md)). The server strips that prefix once, at the edge, rather than moving the dev root: `localhost:3000/` is unchanged for every project that never sets one, and `localhost:3000/m/my-site/assets/x.js` resolves to the same file the deployed site serves. Answering only the bare path would mean previewing URLs the deployed site never uses, which is the class of bug that is only found in production. The boundary is a segment, so `/m/my-sitefile` is not under `/m/my-site`. Everything below — the extension mounts included — therefore routes on the bare path, which is the opposite of the generated worker, where the base is on the routes themselves because that worker IS the origin.
 1. `GET /__reload` — SSE live reload (when watching)
 2. `POST /__jx_resolve__` — `$prototype`/`$src` proxy
 3. `POST /__jx_server__` — `timing: "server"` function proxy
@@ -143,111 +134,40 @@ The server imports the module and calls the exported function as `fn(args, env)`
 
 ### 3.4 Live Site Preview (an origin per project)
 
-> **Status: Implemented.** `src/live-preview.ts`, `src/preview-client.ts`, composing
-> `@jxsuite/site`. Reached by `POST /__studio/preview` (§4.1) and by the desktop launchers' own
-> `previewSite` RPC.
+> **Status: Implemented.** `src/live-preview.ts`, `src/preview-client.ts`, composing `@jxsuite/site`. Reached by `POST /__studio/preview` (§4.1) and by the desktop launchers' own `previewSite` RPC.
 
-The project's working tree, browsable as a site, on a loopback origin of its own. This is what
-Studio's `Open in Browser` opens (specs/studio.md §10.1): each page is composed on demand — route,
-layout, `$elements`, `$site`/`$page`, `<head>` — and handed to `@jxsuite/runtime`, which assembles
-the DOM in the reader's browser. No compiler is on the path.
+The project's working tree, browsable as a site, on a loopback origin of its own. This is what Studio's `Open in Browser` opens (specs/studio.md §10.1): each page is composed on demand — route, layout, `$elements`, `$site`/`$page`, `<head>` — and handed to `@jxsuite/runtime`, which assembles the DOM in the reader's browser. No compiler is on the path.
 
-**Why a second origin, when the paths mean the same thing an editing server already serves.**
-`site-preview.ts` needs its own origin because a built page addresses its OUTPUT by paths an editing
-server reads as SOURCES. That argument does not apply here and two others do:
+**Why a second origin, when the paths mean the same thing an editing server already serves.** `site-preview.ts` needs its own origin because a built page addresses its OUTPUT by paths an editing server reads as SOURCES. That argument does not apply here and two others do:
 
-- **Lifetime.** One tab per project needs one origin per project, and an editing server is per
-  WINDOW. The map is keyed by normalized project root and lives for the process, so two windows on
-  one project share an origin and no single window's teardown may close it.
-- **Isolation.** A previewed page runs the project's own JavaScript, third-party script included. On
-  the chromium build the Studio shell is served BY the editing server, so a preview mounted there
-  would share `localStorage`, IndexedDB and service-worker scope with the editor.
+- **Lifetime.** One tab per project needs one origin per project, and an editing server is per WINDOW. The map is keyed by normalized project root and lives for the process, so two windows on one project share an origin and no single window's teardown may close it.
+- **Isolation.** A previewed page runs the project's own JavaScript, third-party script included. On the chromium build the Studio shell is served BY the editing server, so a preview mounted there would share `localStorage`, IndexedDB and service-worker scope with the editor.
 
-**What it serves, in the order a published site would answer.** A path is a FILE if the tree has one
-there and a ROUTE otherwise; a miss is the project's own `/404` at HTTP 404. Files come from
-`@jxsuite/site`'s allowlist, which **defaults closed**: `public/`, `components/`, `layouts/`,
-`pages/`, `assets/`, `media/`, `content/`, `data/` and `styles/`, never `project.json`, a lockfile,
-a `wrangler.*` or a dotfile. That is deliberately NOT `serveProjectFile`'s rule, which serves the
-whole project root — on the editor's origin that is Studio addressing files it already holds paths
-for, and on an origin running project script it is a way to read `.dev.vars`.
+**What it serves, in the order a published site would answer.** A path is a FILE if the tree has one there and a ROUTE otherwise; a miss is the project's own `/404` at HTTP 404. Files come from `@jxsuite/site`'s allowlist, which **defaults closed**: `public/`, `components/`, `layouts/`, `pages/`, `assets/`, `media/`, `content/`, `data/` and `styles/`, never `project.json`, a lockfile, a `wrangler.*` or a dotfile. That is deliberately NOT `serveProjectFile`'s rule, which serves the whole project root — on the editor's origin that is Studio addressing files it already holds paths for, and on an origin running project script it is a way to read `.dev.vars`.
 
-Every response carries `Cache-Control: private, no-store` (a composed page is a function of a tree
-that changes under it and is not revalidatable), `X-Robots-Tag: noindex, nofollow`,
-`X-Content-Type-Options: nosniff` and `Referrer-Policy: same-origin`.
+Every response carries `Cache-Control: private, no-store` (a composed page is a function of a tree that changes under it and is not revalidatable), `X-Robots-Tag: noindex, nofollow`, `X-Content-Type-Options: nosniff` and `Referrer-Policy: same-origin`.
 
-**The host's own surfaces live under `/__jx_live__/`**, dispatched ahead of everything: the
-`@jxsuite/runtime` browser bundle (immutable), the reload client, `project.json`'s `style` as a
-stylesheet, the reload stream, a retarget acknowledgement and a liveness probe. Not `/_jx/` — that
-is the extension-mount namespace, which a previewed page still needs — and not `/__studio__/`,
-because a preview origin must not look like the editor's.
+**The host's own surfaces live under `/__jx_live__/`**, dispatched ahead of everything: the `@jxsuite/runtime` browser bundle (immutable), the reload client, `project.json`'s `style` as a stylesheet, the reload stream, a retarget acknowledgement and a liveness probe. Not `/_jx/` — that is the extension-mount namespace, which a previewed page still needs — and not `/__studio__/`, because a preview origin must not look like the editor's.
 
-**The overlay is what makes it the canvas rather than the disk.** Studio publishes the bytes a save
-would write for each dirty document and this origin prefers them at every read. They are held in
-memory and written nowhere, so there is no file to go stale and a crash leaves the preview showing
-the saved state. The store is keyed by project root and lives independently of a running origin,
-because the editor's flush on the way to opening a tab publishes BEFORE the origin exists — an
-overlay tied to the origin's lifetime would lose the newest edit on the one render the author is
-watching for. It is bounded, and eviction is REPORTED rather than silent: an overlay that quietly
-forgets a document shows the saved bytes for a file the author is actively editing with nothing
-anywhere to explain the difference.
+**The overlay is what makes it the canvas rather than the disk.** Studio publishes the bytes a save would write for each dirty document and this origin prefers them at every read. They are held in memory and written nowhere, so there is no file to go stale and a crash leaves the preview showing the saved state. The store is keyed by project root and lives independently of a running origin, because the editor's flush on the way to opening a tab publishes BEFORE the origin exists — an overlay tied to the origin's lifetime would lose the newest edit on the one render the author is watching for. It is bounded, and eviction is REPORTED rather than silent: an overlay that quietly forgets a document shows the saved bytes for a file the author is actively editing with nothing anywhere to explain the difference.
 
-**A page is whatever format its extension parses, not only JSON.** `@jxsuite/site` composes `.json`
-itself and asks the host for anything else, which is the seam that decides whether a markdown page
-renders at all; this origin fills it with the project's own extension registry, so `pages/index.md`
-composes here exactly as it does in a build. The registry is a function of `project.json`'s
-`extensions`, so the CONFIG is what it is built from — building it from the project root alone
-yields an empty registry, and the page then reports that it needs a parser this host does not run
-while the host is in fact running one. `project.json` is read through the overlay like every other
-read, so adding an extension in Studio takes effect on the next reload rather than on the next save.
-A host without a registry — a Worker, where a format's parser is not reachable — still routes the
-page and reports it by name, which is the failure the seam exists to make legible.
+**A page is whatever format its extension parses, not only JSON.** `@jxsuite/site` composes `.json` itself and asks the host for anything else, which is the seam that decides whether a markdown page renders at all; this origin fills it with the project's own extension registry, so `pages/index.md` composes here exactly as it does in a build. The registry is a function of `project.json`'s `extensions`, so the CONFIG is what it is built from — building it from the project root alone yields an empty registry, and the page then reports that it needs a parser this host does not run while the host is in fact running one. `project.json` is read through the overlay like every other read, so adding an extension in Studio takes effect on the next reload rather than on the next save. A host without a registry — a Worker, where a format's parser is not reachable — still routes the page and reports it by name, which is the failure the seam exists to make legible.
 
-**The project's own components register without being declared**, by the rule `imports.md` §1.4
-states: the composer walks the composed document against the tree and points `$elements` at every
-`components/<tag>.json` it names, transitively. Nothing else here would — a build discovers those
-tags by scanning HTML it has already rendered and there is no build on this path, so taking
-`$elements` literally left a page's own components as inert unknown tags while the canvas beside it
-rendered them.
+**The project's own components register without being declared**, by the rule `imports.md` §1.4 states: the composer walks the composed document against the tree and points `$elements` at every `components/<tag>.json` it names, transitively. Nothing else here would — a build discovers those tags by scanning HTML it has already rendered and there is no build on this path, so taking `$elements` literally left a page's own components as inert unknown tags while the canvas beside it rendered them.
 
-**Reload is the §3.1 stream, shared.** The same reading of the EventSource contract — `retry:`, the
-`id:` that arms `Last-Event-ID`, one reload on resume and none on a first connection — is defined
-once in `src/sse.ts` and composed by both surfaces. A change coalesces: a save fires the overlay
-retraction and the filesystem watcher both, and both compose to identical bytes, so one save is one
-reload. The window has a maximum as well as a debounce, because a git checkout emits hundreds of
-events closer together than the debounce and a pure trailing timer would starve until it finished.
-The watcher is the session's existing one with a second consumer, never a second watcher: two
-chokidars on one tree double the inotify watch count and can disagree about what §3.1's policy
-ignores.
+**Reload is the §3.1 stream, shared.** The same reading of the EventSource contract — `retry:`, the `id:` that arms `Last-Event-ID`, one reload on resume and none on a first connection — is defined once in `src/sse.ts` and composed by both surfaces. A change coalesces: a save fires the overlay retraction and the filesystem watcher both, and both compose to identical bytes, so one save is one reload. The window has a maximum as well as a debounce, because a git checkout emits hundreds of events closer together than the debounce and a pure trailing timer would starve until it finished. The watcher is the session's existing one with a second consumer, never a second watcher: two chokidars on one tree double the inotify watch count and can disagree about what §3.1's policy ignores.
 
-**A retarget is acknowledged, not assumed.** Asked to point this project's tab at a route, the
-origin sends a named `navigate` event and waits briefly for a client to say it took it. A closed
-tab's stream drops promptly, but a frozen or back/forward-cached one looks connected and will not
-act, so the answer a caller acts on is an acknowledgement rather than a client count. When the wait
-loses the race the caller opens a tab, which is the visible failure and the deliberate choice.
+**A retarget is acknowledged, not assumed.** Asked to point this project's tab at a route, the origin sends a named `navigate` event and waits briefly for a client to say it took it. A closed tab's stream drops promptly, but a frozen or back/forward-cached one looks connected and will not act, so the answer a caller acts on is an acknowledgement rather than a client count. When the wait loses the race the caller opens a tab, which is the visible failure and the deliberate choice.
 
-**The resolver runs here, behind a credential of its own.** `/__jx_resolve__` and `/__jx_server__`
-are mounted and gated exactly as §4.2 gates them — token, Origin, Host, Fetch Metadata — against a
-token minted per preview origin, so compromising an editing server's does not hand this one over.
-The page's own POST is same-origin, which the strict policy admits. Without them a content
-collection renders as an empty list, because `ContentEntry` always needs a server: that is the
-difference between previewing a site and previewing its chrome. The exposure this widens is stated
-rather than implied — third-party script inside a previewed page reaches two routes that `import()`
-project code — and it is a change of venue rather than of kind, since the cross-origin canvas iframe
-already holds a token for the same two routes and renders the same documents.
+**The resolver runs here, behind a credential of its own.** `/__jx_resolve__` and `/__jx_server__` are mounted and gated exactly as §4.2 gates them — token, Origin, Host, Fetch Metadata — against a token minted per preview origin, so compromising an editing server's does not hand this one over. The page's own POST is same-origin, which the strict policy admits. Without them a content collection renders as an empty list, because `ContentEntry` always needs a server: that is the difference between previewing a site and previewing its chrome. The exposure this widens is stated rather than implied — third-party script inside a previewed page reaches two routes that `import()` project code — and it is a change of venue rather than of kind, since the cross-origin canvas iframe already holds a token for the same two routes and renders the same documents.
 
-**No Content-Security-Policy is sent, and the reason is not oversight.** Template strings need
-`'unsafe-eval'` and the shell inlines a module script and a JSON block, so any policy this could
-send today would contain `'unsafe-eval'` plus `'unsafe-inline'` or a hash. A permissive policy that
-protects nothing is worse than none, because it reads like a control.
+**No Content-Security-Policy is sent, and the reason is not oversight.** Template strings need `'unsafe-eval'` and the shell inlines a module script and a JSON block, so any policy this could send today would contain `'unsafe-eval'` plus `'unsafe-inline'` or a hash. A permissive policy that protects nothing is worse than none, because it reads like a control.
 
 ---
 
 ## 4. Studio API (`/__studio/*`)
 
-> **Status: Implemented.** The routes ship, and so does the failure half: every failure is an
-> RFC 9457 problem document (§4.3), from one registry the docs are generated from, guarded by
-> `scripts/check-error-shapes.ts`. `gitPull`'s `409 {conflicts}` — the one failure the route table
-> has always published and never produced — is produced now.
+> **Status: Implemented.** The routes ship, and so does the failure half: every failure is an RFC 9457 problem document (§4.3), from one registry the docs are generated from, guarded by `scripts/check-error-shapes.ts`. `gitPull`'s `409 {conflicts}` — the one failure the route table has always published and never produced — is produced now.
 
 The reference implementation of the Studio Backend Protocol, serving Studio's Platform Abstraction Layer (specs/desktop.md §3, §5).
 
@@ -258,12 +178,9 @@ The canonical endpoint list is the `STUDIO_ROUTES` table in `@jxsuite/protocol` 
 - **Site preview and build** — `POST /__studio/preview` renders the working tree at a route on the live origin (§3.4) and reports whether a client already holding this project's preview took it; `POST|DELETE /__studio/preview/overlay` publishes and retracts one document's unsaved bytes; `POST /__studio/build` runs the compiler and names where the output is browsable
 - **Session / project** — activate, project metadata/probing, site enumeration, project creation, directory location (placing a `showDirectoryPicker()` handle on disk by the id it wrote into a hidden `.jx-loc-id`, so the New Project **Location** field gets a real folder chooser in the browser — specs/desktop.md §8.2.1), starters, AI-guided site import (NDJSON progress stream, whose terminal line carries what the run found)
 - **Filesystem** — directory listing and project-wide search on one route (`files?dir=` / `files?glob=`), file CRUD, upload, rename (with refactor report, and a reset of any co-editing room keyed to the old path), locate. Both listing shapes answer in **stable path order**: `readdir` and glob scans report in filesystem order, which varies with a directory's write history, and Studio's collection grid inserts rows in listing order, so an unsorted listing reaches the user as a table that reshuffles itself between opens. Codepoint order, not locale collation, so two implementations agree.
-- **Realtime co-editing** — `GET /__studio/collab`: a WebSocket upgrade speaking the `@jxsuite/collab` wire envelope (one socket per project, documents multiplexed by path); a plain GET answers the capability probe. Implemented in `src/collab.ts`: rooms seed from the file on disk, persistence is explicit (flush on save, plus graceful shutdown), and genuinely external file changes bump the doc epoch and reset subscribers.
-  A **rename is not an external change** — it comes from this API's own route — but it moves a file out from under a room keyed to its path, so the rename handler reports the OLD path through the same reset. Without it the room survives the move holding pre-rename content and the shutdown flush writes it back, recreating the file the rename deleted; a room enters the flush worklist on its seed transaction, so an unedited document is not exempt. A host mounting `handleStudioApi` itself supplies the hook (`onFileMoved`); `createDevServer` wires it.
+- **Realtime co-editing** — `GET /__studio/collab`: a WebSocket upgrade speaking the `@jxsuite/collab` wire envelope (one socket per project, documents multiplexed by path); a plain GET answers the capability probe. Implemented in `src/collab.ts`: rooms seed from the file on disk, persistence is explicit (flush on save, plus graceful shutdown), and genuinely external file changes bump the doc epoch and reset subscribers. A **rename is not an external change** — it comes from this API's own route — but it moves a file out from under a room keyed to its path, so the rename handler reports the OLD path through the same reset. Without it the room survives the move holding pre-rename content and the shutdown flush writes it back, recreating the file the rename deleted; a room enters the flush worklist on its seed transaction, so an unedited document is not exempt. A host mounting `handleStudioApi` itself supplies the hook (`onFileMoved`); `createDevServer` wires it.
 - **Documents / components / formats** — component discovery, CEM extraction, the project's format/extension registry, the extension catalogue this backend can offer (extensions.md §9.2), generated project schemas, format parse/serialize dispatch, plugin schemas, code services (§5)
-- **Packages** — dependency list/add/remove/install, an install-staleness check, the newest published version of
-  every dependency (`packages/versions`, reported whether or not the pin is behind — comparing them is the
-  client's job), bulk version updates
+- **Packages** — dependency list/add/remove/install, an install-staleness check, the newest published version of every dependency (`packages/versions`, reported whether or not the pin is behind — comparing them is the client's job), bulk version updates
 - **Git** — status, branches, log, stage/unstage, commit, push/pull/fetch, checkout, branch, diff/show, discard, init, remotes, clone, PR
 - **Data surface + secrets** — connector connections, connection test, additive schema push, row paging/CRUD, secret env-var names (never values)
 - **AI proxy** — SSE chat proxy and model catalogue
@@ -279,10 +196,7 @@ This binds the refactor routes in particular, because their sweep runs in the pr
 
 ### 4.2 Security
 
-> **Status: Implemented.** Both entry points apply the gate, and the gate now reads
-> `Sec-Fetch-*` as well as `Origin`/`Host`. The three surfaces the loopback project server used to
-> dispatch ahead of it — the AI proxy, the `/_jx/*` extension mounts, and project files at their
-> natural URLs — are gated at the strength each one warrants.
+> **Status: Implemented.** Both entry points apply the gate, and the gate now reads `Sec-Fetch-*` as well as `Origin`/`Host`. The three surfaces the loopback project server used to dispatch ahead of it — the AI proxy, the `/_jx/*` extension mounts, and project files at their natural URLs — are gated at the strength each one warrants.
 
 Both server entry points share one set of primitives (`src/net-guard.ts`), applied at different strengths:
 
@@ -334,61 +248,30 @@ Which instrument gates which surface is a judgement about who calls it, not a un
 
 ### 4.3 Failure Shape
 
-> **Status: Implemented.** `src/problem.ts` and the `PROBLEM_TYPES` registry in
-> `@jxsuite/protocol`; `scripts/check-error-shapes.ts` keeps the old shapes from regrowing.
+> **Status: Implemented.** `src/problem.ts` and the `PROBLEM_TYPES` registry in `@jxsuite/protocol`; `scripts/check-error-shapes.ts` keeps the old shapes from regrowing.
 
 **Every failure is an RFC 9457 problem document** at `application/problem+json`.
 
-There were four shapes before — `Response.json({error}, {status})`, a bare-text body, a 200
-carrying an `upstreamError` field, and a thrown string that became an empty 500 — and the Studio
-client carried a separate reader for each. The cost was not the inconsistency. It was that a failure
-could reach the user with **no detail at all**, because the reader that ran was not the one for the
-shape that arrived.
+There were four shapes before — `Response.json({error}, {status})`, a bare-text body, a 200 carrying an `upstreamError` field, and a thrown string that became an empty 500 — and the Studio client carried a separate reader for each. The cost was not the inconsistency. It was that a failure could reach the user with **no detail at all**, because the reader that ran was not the one for the shape that arrived.
 
-**The type is the contract.** Problem types live in one table (`PROBLEM_TYPES`), in the same idiom
-as `STUDIO_ROUTES`: declared once, exported as data, rendered into the docs by the same generator.
-A type is a _class_ of failure a client might handle differently, never a message — "the project
-root was refused" is a type, "root /x/y was refused" is a `detail`. Two consequences:
+**The type is the contract.** Problem types live in one table (`PROBLEM_TYPES`), in the same idiom as `STUDIO_ROUTES`: declared once, exported as data, rendered into the docs by the same generator. A type is a _class_ of failure a client might handle differently, never a message — "the project root was refused" is a type, "root /x/y was refused" is a `detail`. Two consequences:
 
-- **`type` URIs are absolute**, under `https://jxsuite.com/problems/`. RFC 9457 permits a relative
-  reference resolved against the request URL, which on a dev server is
-  `http://127.0.0.1:3000/problems/…` and serves nothing.
-- **The status belongs to the type, not to the call site.** A type answerable with two statuses is
-  two types. `401` and `403` are therefore separate: one asks the client to authenticate, the other
-  says no, and collapsing them would make a missing API key indistinguishable from a refused root.
+- **`type` URIs are absolute**, under `https://jxsuite.com/problems/`. RFC 9457 permits a relative reference resolved against the request URL, which on a dev server is `http://127.0.0.1:3000/problems/…` and serves nothing.
+- **The status belongs to the type, not to the call site.** A type answerable with two statuses is two types. `401` and `403` are therefore separate: one asks the client to authenticate, the other says no, and collapsing them would make a missing API key indistinguishable from a refused root.
 
-**`instance` is never emitted.** It identifies one occurrence, and Jx has no per-occurrence
-resource to point at; a field whose only possible value is a fabricated URI is noise that looks like
-information.
+**`instance` is never emitted.** It identifies one occurrence, and Jx has no per-occurrence resource to point at; a field whose only possible value is a fabricated URI is noise that looks like information.
 
-**`error` is emitted as a deprecated alias of `detail`, for one release.** That is the whole
-sequencing device: every existing client reads `body.error`, so emitting both lets the server change
-shape without a synchronized release across every client call site. The clients follow, then a
-one-line change deletes the alias. Nothing new is written against it.
+**`error` is emitted as a deprecated alias of `detail`, for one release.** That is the whole sequencing device: every existing client reads `body.error`, so emitting both lets the server change shape without a synchronized release across every client call site. The clients follow, then a one-line change deletes the alias. Nothing new is written against it.
 
 **Three places where a problem document would be wrong**, and each stays as it is:
 
-- **The code services** (§5) answer **200**. A syntax error in the author's snippet is the _result_
-  of a lint or a format, not a failure of the request that asked for one.
-- **The AI model catalogue** answers **200** with an `upstreamError` field. It is degraded success:
-  the catalogue is still delivered, from defaults.
-- **In-stream frames are not response bodies.** By the time an SSE `error` frame is written the
-  response has begun with a 200 and no status can change. The adoption there is that the frame
-  **carries** a problem (`problem` beside the existing `message`), rather than being replaced by
-  one. The same reasoning covers the RPC bridge's `{error, id}` envelope in `project-server.ts`.
+- **The code services** (§5) answer **200**. A syntax error in the author's snippet is the _result_ of a lint or a format, not a failure of the request that asked for one.
+- **The AI model catalogue** answers **200** with an `upstreamError` field. It is degraded success: the catalogue is still delivered, from defaults.
+- **In-stream frames are not response bodies.** By the time an SSE `error` frame is written the response has begun with a 200 and no status can change. The adoption there is that the frame **carries** a problem (`problem` beside the existing `message`), rather than being replaced by one. The same reasoning covers the RPC bridge's `{error, id}` envelope in `project-server.ts`.
 
-**The client keeps one reader.** `problemDetail` reads a problem's `detail`, the legacy `error`, and
-finally the type's `title` — most-specific first, since a `title` describes the type rather than the
-occurrence. It answers `null` when a body says nothing, so a caller can supply better words than any
-generic fallback. A problem's `type` also **is** the structured error code the Studio UI already
-branched on: `problemSlug` derives it, and `installUrl` is the extension member (§3.2) that the
-`needs-installation-access` type documents.
+**The client keeps one reader.** `problemDetail` reads a problem's `detail`, the legacy `error`, and finally the type's `title` — most-specific first, since a `title` describes the type rather than the occurrence. It answers `null` when a body says nothing, so a caller can supply better words than any generic fallback. A problem's `type` also **is** the structured error code the Studio UI already branched on: `problemSlug` derives it, and `installUrl` is the extension member (§3.2) that the `needs-installation-access` type documents.
 
-**No CORS, ever.** The guard script bans `Access-Control-Allow-*` outright. It is not a shape rule:
-the whole loopback model rests on the browser refusing cross-origin reads (§4.2), so one such header
-would hand that containment away. There is none in the repository today, and that fact is
-load-bearing rather than incidental — which is exactly what needs a check, since nothing in the code
-makes it visible.
+**No CORS, ever.** The guard script bans `Access-Control-Allow-*` outright. It is not a shape rule: the whole loopback model rests on the browser refusing cross-origin reads (§4.2), so one such header would hand that containment away. There is none in the repository today, and that fact is load-bearing rather than incidental — which is exactly what needs a check, since nothing in the code makes it visible.
 
 ---
 

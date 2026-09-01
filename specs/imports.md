@@ -1,8 +1,8 @@
 # Imports
 
-**Version:** 0.1.10-draft
-**Status:** Partial
-**Updated:** 2026-08-27
+**Version:** 0.1.10-draft\
+**Status:** Partial\
+**Updated:** 2026-08-27\
 **License:** MIT
 
 ---
@@ -66,19 +66,9 @@ With these imports in place, `.md` files are discoverable as pages/components, c
 project.json $elements  +  page $elements  =  effective $elements (union, dedup)
 ```
 
-**A component the project itself defines does not have to be declared.** Almost nothing writes
-`$elements` for its own components, and three surfaces each reach the same effective set a different
-way: a build scans the rendered HTML for tags it compiled and emits a module script per tag, the
-studio canvas walks the document against the project's component registry, and a host composing from
-the working tree walks the document against the tree. Every hyphenated tag a document names that
-`components/<tag>.json` defines joins the effective set, transitively through the components those
-definitions name, so a component that brings another registers both.
+**A component the project itself defines does not have to be declared.** Almost nothing writes `$elements` for its own components, and three surfaces each reach the same effective set a different way: a build scans the rendered HTML for tags it compiled and emits a module script per tag, the studio canvas walks the document against the project's component registry, and a host composing from the working tree walks the document against the tree. Every hyphenated tag a document names that `components/<tag>.json` defines joins the effective set, transitively through the components those definitions name, so a component that brings another registers both.
 
-Declaration remains what a page needs for anything the project does not define — an npm specifier,
-or a component whose file name is not its tag — and a declared entry is deduplicated against a
-discovered one by the path it RESOLVES to, so a layout's `../components/nav.json` and a discovered
-`./components/nav.json` are one entry. Only `.json` components are discoverable: a `$ref` is fetched
-and parsed by the browser, which has no extension parser to hand.
+Declaration remains what a page needs for anything the project does not define — an npm specifier, or a component whose file name is not its tag — and a declared entry is deduplicated against a discovered one by the path it RESOLVES to, so a layout's `../components/nav.json` and a discovered `./components/nav.json` are one entry. Only `.json` components are discoverable: a `$ref` is fetched and parsed by the browser, which has no extension parser to hand.
 
 ## 2. npm Web Component Discovery
 

@@ -2,55 +2,30 @@
 
 ## Extension Packages, Schema Composition, and the Capability Contract
 
-**Version:** 0.4.3-draft
-**Status:** Partial
-**Updated:** 2026-08-31
+**Version:** 0.4.3-draft\
+**Status:** Partial\
+**Updated:** 2026-08-31\
 **License:** MIT
 
-Supersedes v1 ("Format-Extension Classes and the Capability Contract"). The
-format-class contract from v1 survives unchanged (§6–§8); v2 adds the package
-layer around it: extension packages, manifest-driven registration, JSON-Schema
-composition, project sections, server mounts, and the studio settings
-vocabulary. The relationships vocabulary has a companion spec:
-[relationships.md](./relationships.md).
+Supersedes v1 ("Format-Extension Classes and the Capability Contract"). The format-class contract from v1 survives unchanged (§6–§8); v2 adds the package layer around it: extension packages, manifest-driven registration, JSON-Schema composition, project sections, server mounts, and the studio settings vocabulary. The relationships vocabulary has a companion spec: [relationships.md](./relationships.md).
 
 ---
 
 ## 1. Overview and principles
 
-Jx documents are JSON. Everything else — markdown and CSV content, dynamic
-data tables, authentication, payments, or anything a third party dreams up —
-enters the system through **extension packages**. The core story:
+Jx documents are JSON. Everything else — markdown and CSV content, dynamic data tables, authentication, payments, or anything a third party dreams up — enters the system through **extension packages**. The core story:
 
-> Jx provides the canvas. Each project defines its own shape. Any developer
-> can extend the framework in every way the core extensions do — without
-> forking or refactoring the core packages.
+> Jx provides the canvas. Each project defines its own shape. Any developer can extend the framework in every way the core extensions do — without forking or refactoring the core packages.
 
 Principles:
 
-1. **Extensions are packages.** The unit of admission is an npm package (or a
-   local directory) shipping a `jx-extension.json` manifest. A project opts in
-   with one line.
-2. **Core never depends on extensions.** Extension packages live in the
-   repository's top-level `extensions/` tree and may depend on core packages
-   (`packages/*`) and on each other. No core package may declare a runtime
-   dependency on an extension package or import from one in `src/`. CI
-   enforces this (`scripts/check-dep-rules.ts`).
-3. **JSON introspection first.** Hosts read JSON (manifests, `.class.json`
-   descriptors, schema fragments) to discover what an extension provides, and
-   import implementation code only to invoke declared static capability
-   methods by `role`.
-4. **JSON-Schema-native validation.** A project's effective schema is a plain
-   JSON Schema 2020-12 document composed from the core schema and each
-   extension's shipped schema fragment. Any compliant validator can validate a
-   project offline — there is no jx-specific composition runtime.
-5. **`.json` is the single native built-in.** Jx _is_ JSON, so hosts handle
-   `.json` inline and consult the registry for everything else.
+1. **Extensions are packages.** The unit of admission is an npm package (or a local directory) shipping a `jx-extension.json` manifest. A project opts in with one line.
+2. **Core never depends on extensions.** Extension packages live in the repository's top-level `extensions/` tree and may depend on core packages (`packages/*`) and on each other. No core package may declare a runtime dependency on an extension package or import from one in `src/`. CI enforces this (`scripts/check-dep-rules.ts`).
+3. **JSON introspection first.** Hosts read JSON (manifests, `.class.json` descriptors, schema fragments) to discover what an extension provides, and import implementation code only to invoke declared static capability methods by `role`.
+4. **JSON-Schema-native validation.** A project's effective schema is a plain JSON Schema 2020-12 document composed from the core schema and each extension's shipped schema fragment. Any compliant validator can validate a project offline — there is no jx-specific composition runtime.
+5. **`.json` is the single native built-in.** Jx _is_ JSON, so hosts handle `.json` inline and consult the registry for everything else.
 
-`@jxsuite/parser` is the reference extension: its content collections are
-wired exactly the way a third-party extension would wire them. Swap it out or
-add new extensions, and every integration point (build, dev server, studio
-editing, runtime data access, deployed-site serving) keeps working.
+`@jxsuite/parser` is the reference extension: its content collections are wired exactly the way a third-party extension would wire them. Swap it out or add new extensions, and every integration point (build, dev server, studio editing, runtime data access, deployed-site serving) keeps working.
 
 ---
 
@@ -75,21 +50,11 @@ extensions/
 
 Rules:
 
-- `packages/*` = **core**, `extensions/*` = **extensions**, `examples` and
-  `sites/*` = leaf apps (exempt consumers, like user projects).
+- `packages/*` = **core**, `extensions/*` = **extensions**, `examples` and `sites/*` = leaf apps (exempt consumers, like user projects).
 - Extensions may list core packages and other extensions in `dependencies`.
-- Core packages may **never** list an extension in `dependencies`,
-  `peerDependencies`, or `optionalDependencies`, and may never import
-  `@jxsuite/<extension>` from `src/`. `devDependencies` are permitted (test
-  fixtures only) — the publish graph uses runtime deps.
-- **Bundling carve-outs** are explicit, allowlisted with rationale in
-  `scripts/check-dep-rules.ts`: `packages/desktop` (an offline app shipping a
-  complete environment as installers; never published to npm) bundles the
-  first-party extensions. A cloud studio distribution may do the same in its
-  own app build. Carve-outs live at the app layer, never in core libraries.
-- Extension packages follow the same conventions as core packages: published
-  as TypeScript source under `@jxsuite/*`, `workspace:^` intra-repo deps,
-  per-package `bunfig.toml` coverage ratchet, release-please versioning.
+- Core packages may **never** list an extension in `dependencies`, `peerDependencies`, or `optionalDependencies`, and may never import `@jxsuite/<extension>` from `src/`. `devDependencies` are permitted (test fixtures only) — the publish graph uses runtime deps.
+- **Bundling carve-outs** are explicit, allowlisted with rationale in `scripts/check-dep-rules.ts`: `packages/desktop` (an offline app shipping a complete environment as installers; never published to npm) bundles the first-party extensions. A cloud studio distribution may do the same in its own app build. Carve-outs live at the app layer, never in core libraries.
+- Extension packages follow the same conventions as core packages: published as TypeScript source under `@jxsuite/*`, `workspace:^` intra-repo deps, per-package `bunfig.toml` coverage ratchet, release-please versioning.
 
 ---
 
@@ -108,26 +73,14 @@ A project declares its extensions in `project.json`:
 }
 ```
 
-- `extensions` entries are bare package names or relative paths (for local /
-  unpublished extensions). Package names resolve **project-first**: the
-  project's own `node_modules`, then the host's (the `createNodeFormatIO`
-  resolution order). Projects own their extension dependencies — a scaffolded
-  project lists `@jxsuite/parser` in its `package.json`.
-- `imports` retains its original, reduced job ([imports.md](./imports.md)):
-  mapping `$prototype` names to **project-local** class files. It no longer
-  registers formats or extensions; imports-based auto-discovery is gone.
-- Name visibility: the manifest's class keys become `$prototype`-visible
-  names. On a name collision, a project-local `imports` entry wins over a
-  manifest class; two extensions exporting the same class name is an error
-  the registry reports (rename via a local wrapper class to disambiguate).
-- **No implicit defaults.** A project with no `extensions` supports only
-  `.json` documents and core state prototypes.
+- `extensions` entries are bare package names or relative paths (for local / unpublished extensions). Package names resolve **project-first**: the project's own `node_modules`, then the host's (the `createNodeFormatIO` resolution order). Projects own their extension dependencies — a scaffolded project lists `@jxsuite/parser` in its `package.json`.
+- `imports` retains its original, reduced job ([imports.md](./imports.md)): mapping `$prototype` names to **project-local** class files. It no longer registers formats or extensions; imports-based auto-discovery is gone.
+- Name visibility: the manifest's class keys become `$prototype`-visible names. On a name collision, a project-local `imports` entry wins over a manifest class; two extensions exporting the same class name is an error the registry reports (rename via a local wrapper class to disambiguate).
+- **No implicit defaults.** A project with no `extensions` supports only `.json` documents and core state prototypes.
 
 ### 3.1 Section keys
 
-Extensions contribute top-level `project.json` keys ("sections") — `content`
-(parser), `connections` and `data` (connector), `auth` (auth). By convention
-section keys are single words. The section key is used verbatim as:
+Extensions contribute top-level `project.json` keys ("sections") — `content` (parser), `connections` and `data` (connector), `auth` (auth). By convention section keys are single words. The section key is used verbatim as:
 
 - the property name in `project.json`,
 - the key under `_project` in resolved scope (`config._project.content`),
@@ -139,8 +92,7 @@ Two extensions claiming the same section key is a registry error.
 
 ## 4. The `jx-extension.json` manifest
 
-Located at the package root, referenced by a `"jx"` field in `package.json`
-(`"jx": "./jx-extension.json"`) and included in `exports` and `files`.
+Located at the package root, referenced by a `"jx"` field in `package.json` (`"jx": "./jx-extension.json"`) and included in `exports` and `files`.
 
 ```json
 {
@@ -170,9 +122,7 @@ Located at the package root, referenced by a `"jx"` field in `package.json`
 | `classes`     | `Record<string, string>` | `$prototype`-visible name → class descriptor path, relative to the manifest.                                   |
 | `schemas`     | `object`                 | Schema fragments this package contributes: `project` (project.json sections), `document` (document positions). |
 
-The manifest is pure data, validated by the generated
-`extension-manifest.schema.json` (`@jxsuite/schema`). It enumerates; it does
-not define behavior — behavior lives in the class descriptors it points to.
+The manifest is pure data, validated by the generated `extension-manifest.schema.json` (`@jxsuite/schema`). It enumerates; it does not define behavior — behavior lives in the class descriptors it points to.
 
 ---
 
@@ -180,47 +130,13 @@ not define behavior — behavior lives in the class descriptors it points to.
 
 ### 5.1 Fragments
 
-- **Core** ships `@jxsuite/schema/schemas/project.core.schema.json`: the core
-  project properties (`name`, `url`, `build`, `imports`, `extensions`,
-  `$schema`, …) plus two published `$defs`: `JxFieldSchema` (the
-  JSON-Schema-subset field shape used by content/table schemas) and
-  `RelationshipRef` (see [relationships.md](./relationships.md)). The core
-  fragment is **open** (no `additionalProperties: false`) — closure happens in
-  the generated entry document.
-- **Each extension** ships fragments named in its manifest. A project fragment
-  contributes plain `properties` for its section keys. Fragments must be
-  **standalone-valid** 2020-12 schema documents with their own `$id`.
-- **First-party fragment `$id`s** follow
-  `https://jxsuite.com/schema/ext/<extension>/<kind>/v<n>`, where `<kind>` names
-  what the fragment contributes (`project`, `document`, `fields`). Nothing
-  resolves by `$id` — §5.2 embeds fragments by slug and drops the `$id` — so this
-  is a convention rather than a resolution requirement, and a third-party
-  fragment with any other `$id` composes normally. It is worth holding to because
-  the `<kind>` segment is what lets one extension ship a second fragment without
-  renaming its first.
+- **Core** ships `@jxsuite/schema/schemas/project.core.schema.json`: the core project properties (`name`, `url`, `build`, `imports`, `extensions`, `$schema`, …) plus two published `$defs`: `JxFieldSchema` (the JSON-Schema-subset field shape used by content/table schemas) and `RelationshipRef` (see [relationships.md](./relationships.md)). The core fragment is **open** (no `additionalProperties: false`) — closure happens in the generated entry document.
+- **Each extension** ships fragments named in its manifest. A project fragment contributes plain `properties` for its section keys. Fragments must be **standalone-valid** 2020-12 schema documents with their own `$id`.
+- **First-party fragment `$id`s** follow `https://jxsuite.com/schema/ext/<extension>/<kind>/v<n>`, where `<kind>` names what the fragment contributes (`project`, `document`, `fields`). Nothing resolves by `$id` — §5.2 embeds fragments by slug and drops the `$id` — so this is a convention rather than a resolution requirement, and a third-party fragment with any other `$id` composes normally. It is worth holding to because the `<kind>` segment is what lets one extension ship a second fragment without renaming its first.
 
 ### 5.2 Generated entry documents
 
-`jx schema` writes two committed files into the project root, each a
-**self-contained, single-resource schema**: the core schema and every enabled
-extension's fragments are embedded under `$defs`, and **every `$ref` is a
-root-relative JSON Pointer** (`#/$defs/project-core-v2/$defs/StyleObject`).
-Generation is two passes — bundle (resolve each fragment file and embed it,
-keyed by `$id`) then flatten (§5.4: rekey the embeds to readable slugs, drop
-their `$id`s, rewrite every ref to a root pointer). Neither the relative
-`./node_modules/...` paths of the intermediate form nor the canonical `$id`
-refs of the bundled form survive into the committed file, because neither
-resolves everywhere: relative paths need Node module resolution, which editors
-do not perform (hoisted workspaces leave in-repo projects without their own
-`node_modules`), and `$id`-scoped refs inside a compound document need a fully
-compliant validator, which the editors are not (§5.4). Root pointers are the
-one form ajv `jx validate`, VS Code's JSON language service, and the studio's
-Monaco all resolve identically. `jx dev` does not run it on startup (it builds
-the site); live regeneration happens **on demand** instead: the dev server's
-`GET /__studio/project-schemas` endpoint (behind the studio's
-`fetchProjectSchemas` PAL member) regenerates entry documents that are
-missing or older than `project.json` — so a studio settings save (which
-rewrites `project.json`) is picked up on the next fetch. The two files:
+`jx schema` writes two committed files into the project root, each a **self-contained, single-resource schema**: the core schema and every enabled extension's fragments are embedded under `$defs`, and **every `$ref` is a root-relative JSON Pointer** (`#/$defs/project-core-v2/$defs/StyleObject`). Generation is two passes — bundle (resolve each fragment file and embed it, keyed by `$id`) then flatten (§5.4: rekey the embeds to readable slugs, drop their `$id`s, rewrite every ref to a root pointer). Neither the relative `./node_modules/...` paths of the intermediate form nor the canonical `$id` refs of the bundled form survive into the committed file, because neither resolves everywhere: relative paths need Node module resolution, which editors do not perform (hoisted workspaces leave in-repo projects without their own `node_modules`), and `$id`-scoped refs inside a compound document need a fully compliant validator, which the editors are not (§5.4). Root pointers are the one form ajv `jx validate`, VS Code's JSON language service, and the studio's Monaco all resolve identically. `jx dev` does not run it on startup (it builds the site); live regeneration happens **on demand** instead: the dev server's `GET /__studio/project-schemas` endpoint (behind the studio's `fetchProjectSchemas` PAL member) regenerates entry documents that are missing or older than `project.json` — so a studio settings save (which rewrites `project.json`) is picked up on the next fetch. The two files:
 
 **`<project>/project.schema.json`**
 
@@ -244,183 +160,55 @@ rewrites `project.json`) is picked up on the next fetch. The two files:
 }
 ```
 
-Each `$defs` slug is derived from the resource's `$id` — scheme, authority and
-the conventional `schema/` segment dropped, remaining path segments joined with
-dashes (`https://jxsuite.com/schema/project/core/v2` → `project-core-v2`),
-numeric suffix on collision.
+Each `$defs` slug is derived from the resource's `$id` — scheme, authority and the conventional `schema/` segment dropped, remaining path segments joined with dashes (`https://jxsuite.com/schema/project/core/v2` → `project-core-v2`), numeric suffix on collision.
 
-**`<project>/document.schema.json`** — the core document schema
-(`@jxsuite/schema/schema.json`, `$id` `https://jxsuite.com/schema/v1`) embedded
-the same way and referenced as `"allOf": [{ "$ref": "#/$defs/v1" }]`, plus the
-paths union resource (`https://jxsuite.com/schema/document/paths/v2`) re-embedded
-under `$defs.PathsValue` as the union of extension-contributed `$paths` shapes,
-with each contributing document fragment embedded alongside it. The core
-reference sits in a single-member `allOf` and **never** as a root-level `$ref`:
-VS Code resolves a `$ref` by shallow-merging the target's keys into the
-referencing node, so from the root that overwrites the entry's own `$defs` with
-the core resource's, breaking every `#/$defs/<embed>/...` pointer.
+**`<project>/document.schema.json`** — the core document schema (`@jxsuite/schema/schema.json`, `$id` `https://jxsuite.com/schema/v1`) embedded the same way and referenced as `"allOf": [{ "$ref": "#/$defs/v1" }]`, plus the paths union resource (`https://jxsuite.com/schema/document/paths/v2`) re-embedded under `$defs.PathsValue` as the union of extension-contributed `$paths` shapes, with each contributing document fragment embedded alongside it. The core reference sits in a single-member `allOf` and **never** as a root-level `$ref`: VS Code resolves a `$ref` by shallow-merging the target's keys into the referencing node, so from the root that overwrites the entry's own `$defs` with the core resource's, breaking every `#/$defs/<embed>/...` pointer.
 
-The emitter composes with project-relative fragment paths as an intermediate
-form only; the committed output is always run through the bundler and then the
-flattener (§5.4). Both passes are idempotent on an already-committed document —
-a resource whose `$id` is already present is never embedded twice, and a
-document with no `$id`s and no relative refs has nothing left to rewrite — so
-re-processing a committed entry document is a no-op.
+The emitter composes with project-relative fragment paths as an intermediate form only; the committed output is always run through the bundler and then the flattener (§5.4). Both passes are idempotent on an already-committed document — a resource whose `$id` is already present is never embedded twice, and a document with no `$id`s and no relative refs has nothing left to rewrite — so re-processing a committed entry document is a no-op.
 
 `project.json` binds via `"$schema": "./project.schema.json"`.
 
 ### 5.3 The two union resources ($id shadowing)
 
-Two positions are **open recursion points** where fragments must reference the
-_effective_ union without knowing it. Each is a well-known schema resource
-that core ships as a default and the generated entry document **re-embeds
-under the same `$id` with the effective union** — compound-document `$id`
-resolution then lands every reference on the entry document's embed instead of
-the shipped default. The override is decided during generation, not at
-validation time: the flattener (§5.4) rewrites each canonical-`$id` reference
-to the root pointer of the entry's embed, so the committed file states the
-outcome outright and no consumer has to implement `$id` shadowing to get it
-right.
+Two positions are **open recursion points** where fragments must reference the _effective_ union without knowing it. Each is a well-known schema resource that core ships as a default and the generated entry document **re-embeds under the same `$id` with the effective union** — compound-document `$id` resolution then lands every reference on the entry document's embed instead of the shipped default. The override is decided during generation, not at validation time: the flattener (§5.4) rewrites each canonical-`$id` reference to the root pointer of the entry's embed, so the committed file states the outcome outright and no consumer has to implement `$id` shadowing to get it right.
 
 | Resource $id                                   | Position                                                                                                                               | Shipped default → entry-document union                                                                                                                                                                                                                     |
 | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `https://jxsuite.com/schema/project/fields/v2` | Field-schema values inside section entry schemas (content frontmatter fields, table columns) — recursive through `properties`/`items`. | Default: core `JxFieldSchema` + `RelationshipRef`. Entry adds extension field extras (e.g. connector column shapes).                                                                                                                                       |
 | `https://jxsuite.com/schema/document/paths/v2` | The `$paths` value of a document.                                                                                                      | Default: the core source shapes (`values`, data-file `$ref`, legacy array) plus an unknown-source escape hatch. Entry drops the escape hatch and unions each extension's paths shape (parser's `ContentPathsSource`; a connector table source is planned). |
 
-Fragments write `{ "$ref": "https://jxsuite.com/schema/project/fields/v2" }`
-at field positions — no local fallbacks needed.
+Fragments write `{ "$ref": "https://jxsuite.com/schema/project/fields/v2" }` at field positions — no local fallbacks needed.
 
-**Unions are additive, and the two differ in one member.** An entry embed
-shadows the shipped default outright rather than extending it, so it must
-restate the core members or they stop validating the moment an extension
-contributes one. The paths union carries one member the entry union does not:
-a permissive "source shape from an extension this schema cannot see" branch.
-A shipped default has no way to know which extensions a project enables, so
-without it every `{ "contentType": "blog" }` would be a false error wherever
-the default is what is in play — the studio's offline fallback before
-per-project schemas arrive, and clients fetching the canonical URL. The entry
-document does know, so it omits that branch and validates `$paths` exactly:
-an unrecognized source (a misspelled discriminator, a shape whose extension is
-not enabled) is an error rather than a route that silently expands to nothing.
+**Unions are additive, and the two differ in one member.** An entry embed shadows the shipped default outright rather than extending it, so it must restate the core members or they stop validating the moment an extension contributes one. The paths union carries one member the entry union does not: a permissive "source shape from an extension this schema cannot see" branch. A shipped default has no way to know which extensions a project enables, so without it every `{ "contentType": "blog" }` would be a false error wherever the default is what is in play — the studio's offline fallback before per-project schemas arrive, and clients fetching the canonical URL. The entry document does know, so it omits that branch and validates `$paths` exactly: an unrecognized source (a misspelled discriminator, a shape whose extension is not enabled) is an error rather than a route that silently expands to nothing.
 
-Standalone validation registers the shipped defaults
-(`@jxsuite/schema/schemas/project.fields.schema.json`,
-`schemas/document.paths.schema.json`); composed validation gets the entry
-embeds. Because `RelationshipRef` is part of the shipped default, and because
-the paths default carries its unknown-source branch, a validator that only sees
-the defaults never reports false errors — extension extras are the only
-entry-exclusive shapes, and the entry is where they are checked exactly.
+Standalone validation registers the shipped defaults (`@jxsuite/schema/schemas/project.fields.schema.json`, `schemas/document.paths.schema.json`); composed validation gets the entry embeds. Because `RelationshipRef` is part of the shipped default, and because the paths default carries its unknown-source branch, a validator that only sees the defaults never reports false errors — extension extras are the only entry-exclusive shapes, and the entry is where they are checked exactly.
 
-> **Why not `$dynamicRef`?** The 2020-12 dynamic-anchor keywords are the
-> textbook fit on paper, but ajv (8.x) supports `$dynamicAnchor` only at
-> schema-resource roots — and our recursion unit (a field schema) is not the
-> document root, so the entry document cannot legally host the override
-> anchor. `$id` shadowing achieves the identical outermost-wins override with
-> plain `$ref`s and first-class validator support (verified against ajv 8.20;
-> see `packages/schema/tests/project-schemas.test.ts`).
+> **Why not `$dynamicRef`?** The 2020-12 dynamic-anchor keywords are the textbook fit on paper, but ajv (8.x) supports `$dynamicAnchor` only at schema-resource roots — and our recursion unit (a field schema) is not the document root, so the entry document cannot legally host the override anchor. `$id` shadowing achieves the identical outermost-wins override with plain `$ref`s and first-class validator support (verified against ajv 8.20; see `packages/schema/tests/project-schemas.test.ts`).
 
-**Everything else is plain composition.** Top-level section keys combine via
-`allOf` + `unevaluatedProperties: false` at the entry document (2020-12
-`unevaluatedProperties` sees annotations from adjacent `allOf` branches — its
-designed use). Cross-extension unions and enums (format names, connection
-names) are emitted by the generator, which is the single aggregation party.
+**Everything else is plain composition.** Top-level section keys combine via `allOf` + `unevaluatedProperties: false` at the entry document (2020-12 `unevaluatedProperties` sees annotations from adjacent `allOf` branches — its designed use). Cross-extension unions and enums (format names, connection names) are emitted by the generator, which is the single aggregation party.
 
 ### 5.4 Validation
 
-- Every consumer resolves the committed entry documents **offline with no file
-  access at all**: they are self-contained single-resource schemas (§5.2), so
-  every `$ref` is a root-relative JSON Pointer into the same document. No
-  `node_modules`, no network, no editor configuration.
+- Every consumer resolves the committed entry documents **offline with no file access at all**: they are self-contained single-resource schemas (§5.2), so every `$ref` is a root-relative JSON Pointer into the same document. No `node_modules`, no network, no editor configuration.
 
-  **Why root pointers and not a `$id`-keyed compound document.** VS Code's JSON
-  language service — which Monaco embeds, so this covers the studio too —
-  implements neither half of compound-document resolution. It resolves a
-  `#/pointer` ref against the DOCUMENT ROOT, never re-based on an enclosing
-  `$id`, so an embedded fragment's own `#/$defs/StyleObject` reports
-  `$ref '/$defs/StyleObject' ... can not be resolved`; and it treats any ref
-  with a non-empty part before `#` as external, fetching
-  `https://jxsuite.com/schema/...` over the network rather than matching the
-  embedded resource sitting in the same file. Offline that fails outright;
-  online it silently substitutes the shipped defaults for the project's
-  effective unions, which is the §5.3 override quietly not applying. Only the
-  first resolve error surfaces as a diagnostic, so one visible complaint can
-  hide many. Root pointers avoid both paths, and cost nothing under ajv.
+  **Why root pointers and not a `$id`-keyed compound document.** VS Code's JSON language service — which Monaco embeds, so this covers the studio too — implements neither half of compound-document resolution. It resolves a `#/pointer` ref against the DOCUMENT ROOT, never re-based on an enclosing `$id`, so an embedded fragment's own `#/$defs/StyleObject` reports `$ref '/$defs/StyleObject' ... can not be resolved`; and it treats any ref with a non-empty part before `#` as external, fetching `https://jxsuite.com/schema/...` over the network rather than matching the embedded resource sitting in the same file. Offline that fails outright; online it silently substitutes the shipped defaults for the project's effective unions, which is the §5.3 override quietly not applying. Only the first resolve error surfaces as a diagnostic, so one visible complaint can hide many. Root pointers avoid both paths, and cost nothing under ajv.
 
-  **The `$schema` binding must be satisfied by registration, not by fetching.**
-  A file's own `$schema` (§5.2) OVERRIDES any file-pattern association the host
-  configured — the language service resolves it first and returns — so a host
-  that registers the entry documents only by pattern leaves every bound file
-  resolving a URI it has no way to load. That is not a partial failure: the file
-  then validates against an empty schema, so one "cannot load schema"
-  diagnostic hides every real error in it. A host holding the entry documents
-  in memory (the studio, via `fetchProjectSchemas`) must therefore ALSO
-  register them under the id the pointer resolves to — for a project mounted at
-  the root, `file:///project.schema.json` and `file:///document.schema.json` —
-  which keeps resolution offline and makes the binding equivalent to the
-  pattern association. Enabling a schema-request service is not an alternative:
-  the resolved id carries a `file:` scheme, and fetching would reopen the
-  external-`$ref` hazard the flattening exists to close.
+  **The `$schema` binding must be satisfied by registration, not by fetching.** A file's own `$schema` (§5.2) OVERRIDES any file-pattern association the host configured — the language service resolves it first and returns — so a host that registers the entry documents only by pattern leaves every bound file resolving a URI it has no way to load. That is not a partial failure: the file then validates against an empty schema, so one "cannot load schema" diagnostic hides every real error in it. A host holding the entry documents in memory (the studio, via `fetchProjectSchemas`) must therefore ALSO register them under the id the pointer resolves to — for a project mounted at the root, `file:///project.schema.json` and `file:///document.schema.json` — which keeps resolution offline and makes the binding equivalent to the pattern association. Enabling a schema-request service is not an alternative: the resolved id carries a `file:` scheme, and fetching would reopen the external-`$ref` hazard the flattening exists to close.
 
-  A relative pointer resolves against the file's OWN directory, so it needs one
-  `../` per level (`../document.schema.json` from `pages/`, `../../` from
-  `pages/blog/`). A pointer with too few names a file that does not exist, and
-  fails identically in every consumer — it is an authoring error, not something
-  a host compensates for.
+  A relative pointer resolves against the file's OWN directory, so it needs one `../` per level (`../document.schema.json` from `pages/`, `../../` from `pages/blog/`). A pointer with too few names a file that does not exist, and fails identically in every consumer — it is an authoring error, not something a host compensates for.
 
-- **A first-party schema resolves from the HOST, and a generator that cannot
-  find one stops.** `@jxsuite/*.json` refs are read from the workspace running
-  the generator, before the project-local file at the same path is looked at;
-  everything else keeps resolving project-first, because a project's own
-  extension fragments are what the loader is FOR. There is no fallback in the
-  first-party direction: if the host has no such package the composition fails,
-  naming the ref and the specifier.
+- **A first-party schema resolves from the HOST, and a generator that cannot find one stops.** `@jxsuite/*.json` refs are read from the workspace running the generator, before the project-local file at the same path is looked at; everything else keeps resolving project-first, because a project's own extension fragments are what the loader is FOR. There is no fallback in the first-party direction: if the host has no such package the composition fails, naming the ref and the specifier.
 
-  **Refusing is the point.** A starter pins PUBLISHED `@jxsuite/*` versions
-  because it is a template a user scaffolds from, so iterating one inside the
-  studio runs `bun install` in its root and materialises a real
-  `@jxsuite/schema` beside a workspace far ahead of it. Both the file shortcut
-  and the project-first require preferred that copy, and one starter's committed
-  document schema was composed from a core nine minor versions behind — not
-  merely stale but NARROWER than its own content: `ChildrenValue.oneOf` lost its
-  computed-children branch, which made that starter's own pages invalid against
-  its own schema. Nothing noticed for six weeks, because the artifact was only
-  ever regenerated on the machine that had the shadow. A fallback would restore
-  exactly that failure, silently, on whichever machine happened to carry a
-  stray install.
+  **Refusing is the point.** A starter pins PUBLISHED `@jxsuite/*` versions because it is a template a user scaffolds from, so iterating one inside the studio runs `bun install` in its root and materialises a real `@jxsuite/schema` beside a workspace far ahead of it. Both the file shortcut and the project-first require preferred that copy, and one starter's committed document schema was composed from a core nine minor versions behind — not merely stale but NARROWER than its own content: `ChildrenValue.oneOf` lost its computed-children branch, which made that starter's own pages invalid against its own schema. Nothing noticed for six weeks, because the artifact was only ever regenerated on the machine that had the shadow. A fallback would restore exactly that failure, silently, on whichever machine happened to carry a stray install.
 
-- **A validator does not write what it is checking.** `jx validate` composes a
-  stale entry document in memory and leaves the committed file untouched;
-  `jx schema` is the command that writes. Regenerating during validation made
-  the check green on a machine with a shadowed core precisely because it
-  validated against the narrower artifact it had just written over the
-  repository's.
+- **A validator does not write what it is checking.** `jx validate` composes a stale entry document in memory and leaves the committed file untouched; `jx schema` is the command that writes. Regenerating during validation made the check green on a machine with a shadowed core precisely because it validated against the narrower artifact it had just written over the repository's.
 
-- `jx validate` (compiler CLI) validates the WHOLE project tree: `project.json`
-  against `./project.schema.json` (ajv-2020; a restricted file loader with a
-  host-resolution fallback still handles legacy unbundled entry documents);
-  every document under `components/`, `pages/`, and `layouts/` against the
-  bundled document schema; every project-local `*.class.json` against the
-  class schema; each enabled extension's fragments compiled standalone against
-  the shipped default unions; and a self-containment check that flags any
-  residual relative `$ref` in a committed entry document ("regenerate with
-  `jx schema`"). CI runs this over every project root in the repo
-  (`bun run schema:validate-all`).
-- The generic bundler (embed fragments under `$defs` keyed by `$id`,
-  preserving resource boundaries) is the mechanism behind the committed form,
-  not just an escape hatch: `jx schema` bundles before writing, and the dev
-  server / cloud studio serve the same bundles via `fetchProjectSchemas`.
-  Where a client fetches the canonical URLs instead (they are served from
-  jxsuite.com), it gets the shipped defaults — degradation is
-  _under-suggestion_ of extension field extras, never false errors.
+- `jx validate` (compiler CLI) validates the WHOLE project tree: `project.json` against `./project.schema.json` (ajv-2020; a restricted file loader with a host-resolution fallback still handles legacy unbundled entry documents); every document under `components/`, `pages/`, and `layouts/` against the bundled document schema; every project-local `*.class.json` against the class schema; each enabled extension's fragments compiled standalone against the shipped default unions; and a self-containment check that flags any residual relative `$ref` in a committed entry document ("regenerate with `jx schema`"). CI runs this over every project root in the repo (`bun run schema:validate-all`).
+- The generic bundler (embed fragments under `$defs` keyed by `$id`, preserving resource boundaries) is the mechanism behind the committed form, not just an escape hatch: `jx schema` bundles before writing, and the dev server / cloud studio serve the same bundles via `fetchProjectSchemas`. Where a client fetches the canonical URLs instead (they are served from jxsuite.com), it gets the shipped defaults — degradation is _under-suggestion_ of extension field extras, never false errors.
 
 ### 5.5 Composition is host-agnostic
 
-Composition itself — core fragment plus each enabled extension's fragments,
-bundled then flattened — is one pure function taking an injected JSON loader.
-Every host supplies only the loader and the refs; none supplies the algorithm.
-A project's entry documents therefore cannot depend on which host generated
-them, which is what lets a project move between a laptop, the desktop app and
-the cloud without its validation changing.
+Composition itself — core fragment plus each enabled extension's fragments, bundled then flattened — is one pure function taking an injected JSON loader. Every host supplies only the loader and the refs; none supplies the algorithm. A project's entry documents therefore cannot depend on which host generated them, which is what lets a project move between a laptop, the desktop app and the cloud without its validation changing.
 
 The loader is the entire host-specific surface:
 
@@ -429,21 +217,13 @@ The loader is the entire host-specific surface:
 | `jx schema`, dev server, desktop | Filesystem, restricted to the project root, with host resolution for `./node_modules/...` | Project-relative paths                                                        |
 | Cloud session                    | A build-time table of bundled artifacts, plus the session's working tree                  | Bare specifiers for bundled packages; tree paths for project-local extensions |
 
-The cloud composes **on demand and writes nothing back**: a cloud project needs
-no committed `*.schema.json` to get full editor validation. Its constraint is
-that a Worker ships a fixed set of extension packages, so an extension the
-platform does not bundle is dropped from the registry before composition rather
-than passed to it — the composer fails loudly on a fragment it cannot load,
-because emitting an entry document that silently under-validates would be worse
-than an error. Dropping the extension instead lands on the §5.3 degradation:
-under-suggestion of that extension's extras, never false errors.
+The cloud composes **on demand and writes nothing back**: a cloud project needs no committed `*.schema.json` to get full editor validation. Its constraint is that a Worker ships a fixed set of extension packages, so an extension the platform does not bundle is dropped from the registry before composition rather than passed to it — the composer fails loudly on a fragment it cannot load, because emitting an entry document that silently under-validates would be worse than an error. Dropping the extension instead lands on the §5.3 degradation: under-suggestion of that extension's extras, never false errors.
 
 ---
 
 ## 6. Class descriptors and admission blocks
 
-An extension's classes are ordinary Jx `.class.json` descriptors. A class
-participates in host dispatch through one or more **admission blocks**:
+An extension's classes are ordinary Jx `.class.json` descriptors. A class participates in host dispatch through one or more **admission blocks**:
 
 | Block       | Grants                                                                                      | Spec section |
 | ----------- | ------------------------------------------------------------------------------------------- | ------------ |
@@ -452,37 +232,25 @@ participates in host dispatch through one or more **admission blocks**:
 | `server`    | A mounted route subtree in the deployed-site worker and the dev server.                     | §11          |
 | `connector` | A database connection provider: dialect, schema deploy, bindings, connection testing.       | §12          |
 
-Classes with no admission block are plain external classes (state
-`$prototype` targets) — the standard contract: a constructor taking a single
-`config` object, an instance `resolve()` returning JSON-serializable data,
-optional `subscribe()` for reactive updates.
+Classes with no admission block are plain external classes (state `$prototype` targets) — the standard contract: a constructor taking a single `config` object, an instance `resolve()` returning JSON-serializable data, optional `subscribe()` for reactive updates.
 
 ### 6.1 Host introspection contract
 
 Hosts **introspect JSON only** and import code only to invoke:
 
-1. Resolve each `extensions` entry to a package root; read the manifest named
-   by its `"jx"` field; read each listed `.class.json`.
+1. Resolve each `extensions` entry to a package root; read the manifest named by its `"jx"` field; read each listed `.class.json`.
 2. Detect participation via the admission blocks.
-3. Find capabilities by scanning `$defs.methods` for well-known `role` values;
-   the method's `identifier` (fallback: its key) names the static method.
-4. To invoke: import `$implementation` (resolved relative to the `.class.json`
-   location), take the export named by the class `title`, call
-   `Export[identifier](...args)`.
-5. Respect `timing`: if the host's environment is not listed, delegate to the
-   dev server.
+3. Find capabilities by scanning `$defs.methods` for well-known `role` values; the method's `identifier` (fallback: its key) names the static method.
+4. To invoke: import `$implementation` (resolved relative to the `.class.json` location), take the export named by the class `title`, call `Export[identifier](...args)`.
+5. Respect `timing`: if the host's environment is not listed, delegate to the dev server.
 
-The registry implementing this contract lives at
-`@jxsuite/schema/extension-registry` (`buildExtensionRegistry(extensions, io,
-projectRoot)`) with injected I/O so the identical logic serves node and
-browser hosts.
+The registry implementing this contract lives at `@jxsuite/schema/extension-registry` (`buildExtensionRegistry(extensions, io, projectRoot)`) with injected I/O so the identical logic serves node and browser hosts.
 
 ---
 
 ## 7. The `format` block
 
-Unchanged from v1. A class participates in format dispatch iff it has a
-top-level `format` object:
+Unchanged from v1. A class participates in format dispatch iff it has a top-level `format` object:
 
 ```json
 "format": {
@@ -502,34 +270,17 @@ top-level `format` object:
 | `exportTarget`  | `boolean`                            | `false` | When true, site builds emit a serialized sidecar per page in this format (requires a `serialize` capability).                                                                     |
 | `remote`        | `boolean`                            | `false` | When true, the `load` capability accepts `http(s)` URLs as sources. Remote content sources **must** name a remote-capable format explicitly — there is no implicit remote format. |
 
-Two classes may claim the same extension **only with disjoint capabilities**;
-the registry build fails on an ambiguous `(extension, capability)` pair. A
-registry never claims `.json`.
+Two classes may claim the same extension **only with disjoint capabilities**; the registry build fails on an ambiguous `(extension, capability)` pair. A registry never claims `.json`.
 
-**`mediaType` is parsed, not passed through.** The value reaches an HTTP header, an editor's file
-association and a Studio label, and nothing checked it — so `text/markdown;variant GFM`, one
-missing `=`, would have been served verbatim as a malformed header value. The grammar enforced is
-RFC 6838 §4.2: `type "/" [tree "."] subtype ["+" suffix] *(";" parameter)`, both halves limited to
-127 characters of the restricted set, with the `vnd.`, `prs.` and `x.` registration trees
-recognized. The check is **grammatical, not a registry lookup** — an unregistered subtype is
-well-formed and is accepted.
+**`mediaType` is parsed, not passed through.** The value reaches an HTTP header, an editor's file association and a Studio label, and nothing checked it — so `text/markdown;variant GFM`, one missing `=`, would have been served verbatim as a malformed header value. The grammar enforced is RFC 6838 §4.2: `type "/" [tree "."] subtype ["+" suffix] *(";" parameter)`, both halves limited to 127 characters of the restricted set, with the `vnd.`, `prs.` and `x.` registration trees recognized. The check is **grammatical, not a registry lookup** — an unregistered subtype is well-formed and is accepted.
 
-Parameters are part of the value and carry meaning: `@jxsuite/parser` declares
-`text/markdown; variant=GFM`, which is how RFC 7763 and RFC 7764 say _which_ markdown a format
-speaks. That is also why a consumer that **keys** on a type — a File System Access `accept` map, an
-editor language id — must use the type's **essence** (`text/markdown`) rather than the declared
-string. `mediaTypeEssence` on the registry entry is that value; two Studio call sites broke the
-moment the parameter was declared, which is the argument for the distinction existing in the type
-rather than in each caller's `split("/")`.
+Parameters are part of the value and carry meaning: `@jxsuite/parser` declares `text/markdown; variant=GFM`, which is how RFC 7763 and RFC 7764 say _which_ markdown a format speaks. That is also why a consumer that **keys** on a type — a File System Access `accept` map, an editor language id — must use the type's **essence** (`text/markdown`) rather than the declared string. `mediaTypeEssence` on the registry entry is that value; two Studio call sites broke the moment the parameter was declared, which is the argument for the distinction existing in the type rather than in each caller's `split("/")`.
 
 ---
 
 ## 8. Capability methods
 
-Capabilities are declared in `$defs.methods` using well-known `role` values.
-All capability methods are `scope: "static"` — hosts call them on the
-implementation class without constructing an instance. The instance
-`resolve()` method remains the runtime's on-demand access path.
+Capabilities are declared in `$defs.methods` using well-known `role` values. All capability methods are `scope: "static"` — hosts call them on the implementation class without constructing an instance. The instance `resolve()` method remains the runtime's on-demand access path.
 
 | Role           | Block       | Signature                                                                   | Consumers                                                                          |
 | -------------- | ----------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
@@ -548,205 +299,86 @@ implementation class without constructing an instance. The instance
 | `deploySchema` | `connector` | `(tables, connection, { env, dryRun }) → { statements, applied, warnings }` | `jx db push`, studio push                                                          |
 | `bindings`     | `connector` | `(connection) → wrangler config fragment`                                   | scaffolding, `jx db push`                                                          |
 
-**What `parse` returns is decided by `documentKinds`, not by a second declaration.** A format
-declaring `page` or `component` returns a `JxDocument`: the compiler builds its page and component
-globs from `documentExtensions("page"|"component")` and casts every `parse` result, so the claim is
-already load-bearing in the build. A format declaring only `content` makes no such claim, and may
-return `ContentLoaderEntry[]` — the parser's `Csv` does exactly that, which is why it declares no
-`serialize`.
+**What `parse` returns is decided by `documentKinds`, not by a second declaration.** A format declaring `page` or `component` returns a `JxDocument`: the compiler builds its page and component globs from `documentExtensions("page"|"component")` and casts every `parse` result, so the claim is already load-bearing in the build. A format declaring only `content` makes no such claim, and may return `ContentLoaderEntry[]` — the parser's `Csv` does exactly that, which is why it declares no `serialize`.
 
-**`rewrite` is not a weaker `serialize`, and the two are not ranked.** `serialize` says _this
-document round-trips through me_; `rewrite` says only _I can replace these authored values in my own
-source text and change nothing else_. A format may declare either, both or neither, and a load-only
-format can honestly promise the second while never being able to promise the first: re-emitting a
-CSV collection would mean choosing a quoting style, a line ending and a column order the author
-already chose, while replacing one cell's text requires no opinion about any of them.
+**`rewrite` is not a weaker `serialize`, and the two are not ranked.** `serialize` says _this document round-trips through me_; `rewrite` says only _I can replace these authored values in my own source text and change nothing else_. A format may declare either, both or neither, and a load-only format can honestly promise the second while never being able to promise the first: re-emitting a CSV collection would mean choosing a quoting style, a line ending and a column order the author already chose, while replacing one cell's text requires no opinion about any of them.
 
-`edits` is a list of `{ from, to }` naming values as `parse` produced them, and a match is on the
-WHOLE value, never a substring — `hero.jpg` must not rewrite the middle of `my-hero.jpg`. Every
-other byte of the source is preserved. That is the whole contract, and it is enough for the rename
-refactor: a reference living inside a collection is repaired rather than reported as a remainder the
-author has to fix by hand (§9.3 of site-architecture.md). Where a format declares both, a rename
-prefers `serialize`, because a full round trip can express a change — a custom-element tag rename —
-that a list of value edits cannot.
+`edits` is a list of `{ from, to }` naming values as `parse` produced them, and a match is on the WHOLE value, never a substring — `hero.jpg` must not rewrite the middle of `my-hero.jpg`. Every other byte of the source is preserved. That is the whole contract, and it is enough for the rename refactor: a reference living inside a collection is repaired rather than reported as a remainder the author has to fix by hand (§9.3 of site-architecture.md). Where a format declares both, a rename prefers `serialize`, because a full round trip can express a change — a custom-element tag rename — that a list of value edits cannot.
 
 Studio reads the pair to answer two questions it used to have no answer for:
 
-- **Creation.** A format is offered in the New File dialog when some registered class declares BOTH
-  `parse` and `serialize` for its extension (per `(extension, capability)`, so a split claim across
-  two classes counts). Without `parse` the file cannot be opened after it is created; without
-  `serialize` its first save writes another format's bytes into it.
-- **Conversion.** A format is a conversion endpoint when it declares both capabilities AND a `page`
-  or `component` document kind. `.json` is the endpoint every conversion shares, because a registry
-  never claims it (studio.md §8.4).
+- **Creation.** A format is offered in the New File dialog when some registered class declares BOTH `parse` and `serialize` for its extension (per `(extension, capability)`, so a split claim across two classes counts). Without `parse` the file cannot be opened after it is created; without `serialize` its first save writes another format's bytes into it.
+- **Conversion.** A format is a conversion endpoint when it declares both capabilities AND a `page` or `component` document kind. `.json` is the endpoint every conversion shares, because a registry never claims it (studio.md §8.4).
 
-Declaring both capabilities is therefore the whole of what a third-party format extension has to do
-to appear in both surfaces; neither carries a list of format names.
-| `testConnection` | `connector` | `(connection, env) → { ok, error? }` | studio connections UI, CLI |
+Declaring both capabilities is therefore the whole of what a third-party format extension has to do to appear in both surfaces; neither carries a list of format names. | `testConnection` | `connector` | `(connection, env) → { ok, error? }` | studio connections UI, CLI |
 
-`resolvePaths` methods declare a `"discriminator"` — the `$paths` key that
-routes to them (parser: `contentType`). Hosts dispatch on which discriminator
-key is present in the `$paths` value. A connector `table` discriminator
-(dynamic-table-driven page paths) is **planned**; no connector descriptor
-declares one today — `contentType` is the only registered discriminator.
+`resolvePaths` methods declare a `"discriminator"` — the `$paths` key that routes to them (parser: `contentType`). Hosts dispatch on which discriminator key is present in the `$paths` value. A connector `table` discriminator (dynamic-table-driven page paths) is **planned**; no connector descriptor declares one today — `contentType` is the only registered discriminator.
 
-**`_meta` is reserved in a `resolvePaths` result.** Every other key in a returned
-object is a route parameter, substituted into the URL pattern; `_meta` is not,
-and the host strips it before substitution. It carries facts about the **source
-entry** the route was generated from, which the route would otherwise have no
-way to learn — its `sourcePath` is the `[slug]` template, not the entry. The one
-the build reads today is `mtime`, which is what lets a sitemap date each post in
-a collection by the post rather than by the template
-(`site-architecture.md` §8.4.1). A capability may omit it; a route with no entry
-behind it falls back to its own file.
+**`_meta` is reserved in a `resolvePaths` result.** Every other key in a returned object is a route parameter, substituted into the URL pattern; `_meta` is not, and the host strips it before substitution. It carries facts about the **source entry** the route was generated from, which the route would otherwise have no way to learn — its `sourcePath` is the `[slug]` template, not the entry. The one the build reads today is `mtime`, which is what lets a sitemap date each post in a collection by the post rather than by the template (`site-architecture.md` §8.4.1). A capability may omit it; a route with no entry behind it falls back to its own file.
 
 ### 8.1 `timing`
 
-Each capability method may declare a `timing` array — the environments allowed
-to invoke it directly:
+Each capability method may declare a `timing` array — the environments allowed to invoke it directly:
 
-- Values: `"compiler"`, `"server"`, `"client"`. Default when omitted:
-  `["compiler", "server"]` (assume node-only).
-- A host whose environment is excluded round-trips through the dev server
-  (`POST /__studio/format`, `POST /__jx_resolve__`) instead of importing the
-  implementation.
-- Browser-safe capabilities (no `fs`/`glob`/node imports on their code path)
-  should declare `"client"` so the studio can call them in-process.
+- Values: `"compiler"`, `"server"`, `"client"`. Default when omitted: `["compiler", "server"]` (assume node-only).
+- A host whose environment is excluded round-trips through the dev server (`POST /__studio/format`, `POST /__jx_resolve__`) instead of importing the implementation.
+- Browser-safe capabilities (no `fs`/`glob`/node imports on their code path) should declare `"client"` so the studio can call them in-process.
 
 ### 8.2 Options as parameters
 
-Capability options are declared as ordinary `parameters` with JSON-Schema
-types. This gives the studio enough metadata to render option UIs without any
-host-side knowledge of the extension.
+Capability options are declared as ordinary `parameters` with JSON-Schema types. This gives the studio enough metadata to render option UIs without any host-side knowledge of the extension.
 
 ### 8.3 `lower`
 
-`lower` lets a state class compile away: at build time, when a state entry's
-timing excludes the compiler, the compiler checks the class descriptor for a
-`lower` capability and, if present, replaces the def in place with the
-returned core-shape def (`Request`, `Function`, …). This is how dynamic-data
-queries become plain reactive fetches in compiled sites with no extension
-code shipped to the browser.
+`lower` lets a state class compile away: at build time, when a state entry's timing excludes the compiler, the compiler checks the class descriptor for a `lower` capability and, if present, replaces the def in place with the returned core-shape def (`Request`, `Function`, …). This is how dynamic-data queries become plain reactive fetches in compiled sites with no extension code shipped to the browser.
 
-A lowered def may carry a `$bundle: string[]` key naming client modules it
-depends on (typically `npm:` specifiers, e.g. a browser client the def
-dynamic-imports). The compiler registers each specifier with the sidecar
-bundler (spec.md §5.3 "Compiled-site delivery") and strips `$bundle` from the
-def — it is host metadata, never part of the emitted core shape. The def
-obtains its bundle URL from the shared deterministic mapping
-(`@jxsuite/schema/asset-paths` `sidecarAssetPath`), so extension and compiler
-agree on the path without coordination at lower time.
+A lowered def may carry a `$bundle: string[]` key naming client modules it depends on (typically `npm:` specifiers, e.g. a browser client the def dynamic-imports). The compiler registers each specifier with the sidecar bundler (spec.md §5.3 "Compiled-site delivery") and strips `$bundle` from the def — it is host metadata, never part of the emitted core shape. The def obtains its bundle URL from the shared deterministic mapping (`@jxsuite/schema/asset-paths` `sidecarAssetPath`), so extension and compiler agree on the path without coordination at lower time.
 
 ### 8.4 `emit`
 
-`emit` lets a section-owner class contribute derived build artifacts — search
-indexes, feeds, export manifests — to the compiled site:
+`emit` lets a section-owner class contribute derived build artifacts — search indexes, feeds, export manifests — to the compiled site:
 
 ```
 emit(sectionValue, { projectConfig, root, sections, routes })
   → { path: string, content: string | Uint8Array }[]
 ```
 
-- **Timing** is `["compiler"]`; the site build invokes it after routes,
-  components, and the worker are generated, before redirects and the
-  `public/` copy.
-- **Gating**: when the class owns a project section (`project.key`), `emit`
-  runs only if the project declares a non-empty value for that key — the same
-  gating as section loading and server mounts. Classes without a `project`
-  block always run.
-- **The host writes the files.** `path` is outDir-relative (a leading `/` is
-  tolerated); the host creates directories, guards against path traversal
-  (a path escaping the build output is a build error), and counts the files
-  in the build summary. Extensions return data and never touch the
-  filesystem, keeping `emit` pure and testable.
-- **Errors** from one emitter are collected like route errors — they fail the
-  build report without aborting other emitters. Files earlier in a returned
-  batch are already written when a later path is rejected.
-- **Ordering**: the `public/` copy runs after `emit`, so a same-named file in
-  `public/` shadows an emitted file — the same semantics as `sitemap.xml`.
-- **Context**: `sections` holds the loaded project sections (e.g. the
-  parser's content collections keyed by collection name), `routes` the
-  expanded route table. Emitters derive their output from this loaded data
-  rather than re-reading source files.
-- **An emitted artifact is downloaded and parsed by a visitor**, so an emitter
-  owes it the same care as any other output — and above all must not emit the
-  same content twice. `@jxsuite/search` did: it wrote one document per page
-  carrying the full page text **and** one per heading section carrying its own
-  slice of that same text. On jxsuite.com that was 922,007 characters of page
-  text against 899,502 of section text, of which only ~22,505 (2.4%) was
-  preamble no section already covered — an index twice the size it needed to
-  be, and twice the tokenising cost on every visitor's main thread.
+- **Timing** is `["compiler"]`; the site build invokes it after routes, components, and the worker are generated, before redirects and the `public/` copy.
+- **Gating**: when the class owns a project section (`project.key`), `emit` runs only if the project declares a non-empty value for that key — the same gating as section loading and server mounts. Classes without a `project` block always run.
+- **The host writes the files.** `path` is outDir-relative (a leading `/` is tolerated); the host creates directories, guards against path traversal (a path escaping the build output is a build error), and counts the files in the build summary. Extensions return data and never touch the filesystem, keeping `emit` pure and testable.
+- **Errors** from one emitter are collected like route errors — they fail the build report without aborting other emitters. Files earlier in a returned batch are already written when a later path is rejected.
+- **Ordering**: the `public/` copy runs after `emit`, so a same-named file in `public/` shadows an emitted file — the same semantics as `sitemap.xml`.
+- **Context**: `sections` holds the loaded project sections (e.g. the parser's content collections keyed by collection name), `routes` the expanded route table. Emitters derive their output from this loaded data rather than re-reading source files.
+- **An emitted artifact is downloaded and parsed by a visitor**, so an emitter owes it the same care as any other output — and above all must not emit the same content twice. `@jxsuite/search` did: it wrote one document per page carrying the full page text **and** one per heading section carrying its own slice of that same text. On jxsuite.com that was 922,007 characters of page text against 899,502 of section text, of which only ~22,505 (2.4%) was preamble no section already covered — an index twice the size it needed to be, and twice the tokenising cost on every visitor's main thread.
 
-  With sections on, the page document now carries only the text **before** the
-  first section-starting heading; the sections partition the rest. An entry
-  that yielded no sections keeps its full text, because nothing else would
-  index it. No word leaves the index, and a body-text match now surfaces the
-  section that contains it rather than competing with it.
+  With sections on, the page document now carries only the text **before** the first section-starting heading; the sections partition the rest. An entry that yielded no sections keeps its full text, because nothing else would index it. No word leaves the index, and a body-text match now surfaces the section that contains it rather than competing with it.
 
 ### 8.5 `assets`
 
 > **Status: Implemented.**
 
-`assets` publishes a directory the section already reads from at a site URL,
-so files that live beside a section's sources — an external content
-collection's co-located images, most of all — resolve for every host:
+`assets` publishes a directory the section already reads from at a site URL, so files that live beside a section's sources — an external content collection's co-located images, most of all — resolve for every host:
 
 ```
 assets(sectionValue, { projectConfig, root }) → { urlPrefix: string, dir: string }[]
 ```
 
-A returned pair is an **asset mount**: `urlPrefix` is a site-absolute URL
-prefix (a leading slash is added if missing, a trailing one dropped), `dir`
-the absolute directory it maps onto. `dir` may sit outside the project root —
-that is the point: a `content` source of `../../docs` is unreachable by every
-other path the host knows.
+A returned pair is an **asset mount**: `urlPrefix` is a site-absolute URL prefix (a leading slash is added if missing, a trailing one dropped), `dir` the absolute directory it maps onto. `dir` may sit outside the project root — that is the point: a `content` source of `../../docs` is unreachable by every other path the host knows.
 
-- **Timing** is `["compiler", "server"]`, and the call is a pure function of
-  the section's configuration — no loaded entries, no filesystem walk beyond
-  checking that a source directory exists. Hosts may call it per build, per
-  project-context load, or per request.
-- **Gating** matches `emit`: a class owning a project section contributes only
-  when the project declares a non-empty value for that key.
-- **Prefix exclusivity**: two mounts may share a `dir`, but a `urlPrefix`
-  claimed for two different directories is a configuration error, reported
-  like a route error. The first declaration wins.
-- **URL mapping** is deterministic and hash-free, shared by every host through
-  `@jxsuite/schema/asset-paths` (`assetUrlFor`, `resolveAssetUrl`,
-  `collectAssetUrls`). Reverse mapping decodes a URL exactly once, refuses a
-  still-encoded dot or slash, and refuses `.`/`..` and empty segments, so a
-  mounted URL can never escape its directory.
+- **Timing** is `["compiler", "server"]`, and the call is a pure function of the section's configuration — no loaded entries, no filesystem walk beyond checking that a source directory exists. Hosts may call it per build, per project-context load, or per request.
+- **Gating** matches `emit`: a class owning a project section contributes only when the project declares a non-empty value for that key.
+- **Prefix exclusivity**: two mounts may share a `dir`, but a `urlPrefix` claimed for two different directories is a configuration error, reported like a route error. The first declaration wins.
+- **URL mapping** is deterministic and hash-free, shared by every host through `@jxsuite/schema/asset-paths` (`assetUrlFor`, `resolveAssetUrl`, `collectAssetUrls`). Reverse mapping decodes a URL exactly once, refuses a still-encoded dot or slash, and refuses `.`/`..` and empty segments, so a mounted URL can never escape its directory.
 
 Hosts consume mounts in three places:
 
-- **The site build** resolves mounted URLs while optimizing images (so a
-  mounted image gets the same `srcset` treatment as one in `public/`), scans
-  its compiled HTML and CSS for mounted URLs, and copies **only the
-  referenced files** into the build output at their URL path. Entry files
-  beside them never reach `dist/`. A referenced URL with no file behind it is
-  reported as a warning, not a build error. The copy runs after `emit` and
-  before the `public/` copy, so `public/` still shadows.
-- **The dev and desktop servers** serve mounts ahead of the project root and
-  `public/`, each contained against its own `dir` — so a preview renders the
-  same URLs the built site will.
-- **`jx preview`** needs nothing: it serves `dist/`, where the files already
-  are.
+- **The site build** resolves mounted URLs while optimizing images (so a mounted image gets the same `srcset` treatment as one in `public/`), scans its compiled HTML and CSS for mounted URLs, and copies **only the referenced files** into the build output at their URL path. Entry files beside them never reach `dist/`. A referenced URL with no file behind it is reported as a warning, not a build error. The copy runs after `emit` and before the `public/` copy, so `public/` still shadows.
+- **The dev and desktop servers** serve mounts ahead of the project root and `public/`, each contained against its own `dir` — so a preview renders the same URLs the built site will.
+- **`jx preview`** needs nothing: it serves `dist/`, where the files already are.
 
-Statically referenced assets are the contract. A `src` a page computes at
-runtime cannot be discovered by the build scan, so those files belong in
-`public/`.
+Statically referenced assets are the contract. A `src` a page computes at runtime cannot be discovered by the build scan, so those files belong in `public/`.
 
-**A host that cannot execute extension code sees only content-section mounts.**
-`assets` is a class capability, so a host with no extension runtime — a
-browser-hosted editor, a Worker session that loads configuration but not
-implementations — cannot call it and cannot know a third-party section's
-mounts. Such a host derives the mounts of the built-in `content` section from
-`project.json` alone, which is deterministic (`/content/<type>`, one per
-locale directory for a `{locale}` source), and treats every other section as
-having none. The consequence is bounded and worth stating: media beside an
-unknown section's sources resolves as authored rather than at a mount URL, so
-it is broken in that host's preview and correct on the built site. A mount
-whose `dir` sits outside the project root is unreachable for such a host in
-any case, because it addresses files by project path.
+**A host that cannot execute extension code sees only content-section mounts.** `assets` is a class capability, so a host with no extension runtime — a browser-hosted editor, a Worker session that loads configuration but not implementations — cannot call it and cannot know a third-party section's mounts. Such a host derives the mounts of the built-in `content` section from `project.json` alone, which is deterministic (`/content/<type>`, one per locale directory for a `{locale}` source), and treats every other section as having none. The consequence is bounded and worth stating: media beside an unknown section's sources resolves as authored rather than at a mount URL, so it is broken in that host's preview and correct on the built site. A mount whose `dir` sits outside the project root is unreachable for such a host in any case, because it addresses files by project path.
 
 ---
 
@@ -761,22 +393,13 @@ head(sectionValue, { projectConfig, root }) → JxHeadEntry[]
 ```
 
 - **Timing** is `["compiler"]`, and it runs **once, before the first page is built** — not per page.
-- **Gating** is the same as `emit` and `assets`: a class owning a project section contributes only
-  when the project declares a non-empty value for its key.
-- **Placement.** Contributions sit below the project's own `$head`, so the ordinary dedup rule
-  (§8.3 of `site-architecture.md`) lets an author override one by writing the same entry themselves.
-- **Failure** is a warning naming the class, not a build error. A missing discovery link is not
-  worth failing a build over.
+- **Gating** is the same as `emit` and `assets`: a class owning a project section contributes only when the project declares a non-empty value for its key.
+- **Placement.** Contributions sit below the project's own `$head`, so the ordinary dedup rule (§8.3 of `site-architecture.md`) lets an author override one by writing the same entry themselves.
+- **Failure** is a warning naming the class, not a build error. A missing discovery link is not worth failing a build over.
 
-**Why this is not `emit`.** The two answer different questions at different times. `emit` derives
-_files_ from loaded content and runs after the last page has been written; `head` derives _entries_
-from **configuration** and must run before the first one. A feed needs both — the document from
-`emit`, the `<link rel="alternate">` from here — and a capability that ran at `emit`'s point could
-not reach any page's `<head>`, because they were all written already.
+**Why this is not `emit`.** The two answer different questions at different times. `emit` derives _files_ from loaded content and runs after the last page has been written; `head` derives _entries_ from **configuration** and must run before the first one. A feed needs both — the document from `emit`, the `<link rel="alternate">` from here — and a capability that ran at `emit`'s point could not reach any page's `<head>`, because they were all written already.
 
-It is deliberately narrow: the context carries `projectConfig` and `root` and **not** the loaded
-sections, because a contribution that depends on content is a contribution that cannot run early
-enough to be used.
+It is deliberately narrow: the context carries `projectConfig` and `root` and **not** the loaded sections, because a contribution that depends on content is a contribution that cannot run early enough to be used.
 
 ## 9. The `project` block
 
@@ -798,19 +421,13 @@ A class owns a project.json section iff it has a top-level `project` object:
 | `description`   | `string`  | —       | Studio help text.                                                                                            |
 | `referenceable` | `boolean` | `false` | Opts the section's named entries into the relationships vocabulary ([relationships.md](./relationships.md)). |
 
-The section's **value schema is not duplicated here** — it lives in the
-package's project fragment (`manifest.schemas.project`, §5.1). Hosts needing
-the entry shape (studio settings forms, reference pickers) read
-`properties[<key>]` from the fragment via the registry.
+The section's **value schema is not duplicated here** — it lives in the package's project fragment (`manifest.schemas.project`, §5.1). Hosts needing the entry shape (studio settings forms, reference pickers) read `properties[<key>]` from the fragment via the registry.
 
-Behavior attaches through capabilities on the same class: `projectData` loads
-the section into `_project[<key>]`; `resolvePaths` expands `$paths` values
-carrying its discriminator.
+Behavior attaches through capabilities on the same class: `projectData` loads the section into `_project[<key>]`; `resolvePaths` expands `$paths` values carrying its discriminator.
 
 ### 9.1 `$studio.settings`
 
-The `project` class's `$studio` block may declare a settings section, rendered
-generically by the studio:
+The `project` class's `$studio` block may declare a settings section, rendered generically by the studio:
 
 ```json
 "$studio": {
@@ -837,24 +454,13 @@ generically by the studio:
 | `entry.newEntry` | Template for freshly created entries, with `${key}` substitution.                                                                                                                                         |
 | `renderer`       | Escape hatch: names a studio-registered custom section renderer. First-party extensions use the generic path.                                                                                             |
 
-Built-in controls: `"schema-builder"` (visual JSON-Schema field editor),
-`"secret"` (value committed via the platform's secret store, **never**
-project.json), `"binding"` (signal/route-param binding), plus implicit
-defaults per type/enum/format. Enum choices may be dynamic via
-`{ "$ref": "#/$context/<pointer>" }` — a JSON-pointer walk over the project
-config (with `{@param}` segment substitution and the `$formats` virtual root),
-e.g. `#/$context/connections`, `#/$context/auth/roles`.
+Built-in controls: `"schema-builder"` (visual JSON-Schema field editor), `"secret"` (value committed via the platform's secret store, **never** project.json), `"binding"` (signal/route-param binding), plus implicit defaults per type/enum/format. Enum choices may be dynamic via `{ "$ref": "#/$context/<pointer>" }` — a JSON-pointer walk over the project config (with `{@param}` segment substitution and the `$formats` virtual root), e.g. `#/$context/connections`, `#/$context/auth/roles`.
 
 ### 9.2 The extension catalogue
 
-§3 says a project opts in with one line, and that line is only half the truth:
-the package must also be a dependency, or the registry cannot resolve it.
-Nothing in the model connects the two, so a host that lets a person type a
-package name into `extensions` produces a project that fails to build.
+§3 says a project opts in with one line, and that line is only half the truth: the package must also be a dependency, or the registry cannot resolve it. Nothing in the model connects the two, so a host that lets a person type a package name into `extensions` produces a project that fails to build.
 
-The **catalogue** is what a host offers instead: the extensions it can run,
-whether or not this project enables them, each annotated with what the project
-would still have to do.
+The **catalogue** is what a host offers instead: the extensions it can run, whether or not this project enables them, each annotated with what the project would still have to do.
 
 | Key           | Type                         | Meaning                                                                   |
 | ------------- | ---------------------------- | ------------------------------------------------------------------------- |
@@ -872,49 +478,27 @@ would still have to do.
 
 Three rules make it correct rather than merely convenient.
 
-**It is a host capability, not a constant.** Not every host can run every
-extension: a Worker ships a fixed set of packages (§5.5), and one it does not
-bundle is dropped from the registry before composition. A host that served a
-shipped list would offer an action it would then refuse, so a host answers for
-itself and one that cannot answer offers nothing.
+**It is a host capability, not a constant.** Not every host can run every extension: a Worker ships a fixed set of packages (§5.5), and one it does not bundle is dropped from the registry before composition. A host that served a shipped list would offer an action it would then refuse, so a host answers for itself and one that cannot answer offers nothing.
 
-**`bundled` and `installed` are probed, never declared.** What a packaged
-application stages and what a Worker bundles are facts about a build, not about
-this repository, so they are answered by resolving `<name>/jx-extension.json`
-the way §6.1 says a host resolves it. A declared value would be a claim made
-somewhere that cannot see the answer.
+**`bundled` and `installed` are probed, never declared.** What a packaged application stages and what a Worker bundles are facts about a build, not about this repository, so they are answered by resolving `<name>/jx-extension.json` the way §6.1 says a host resolves it. A declared value would be a claim made somewhere that cannot see the answer.
 
-**Discovery follows the exports map, and `"jx"` is a hint.** A package is an
-extension to a host exactly when `<name>/jx-extension.json` resolves, because
-that is the only path §4 gives. A package declaring `"jx"` whose `exports` omit
-that subpath will fail to enable, so it is reported with a `problem` naming the
-missing entry rather than silently dropped: the difference between an omission
-and a message the reader can act on.
+**Discovery follows the exports map, and `"jx"` is a hint.** A package is an extension to a host exactly when `<name>/jx-extension.json` resolves, because that is the only path §4 gives. A package declaring `"jx"` whose `exports` omit that subpath will fail to enable, so it is reported with a `problem` naming the missing entry rather than silently dropped: the difference between an omission and a message the reader can act on.
 
-**No version rides the catalogue.** It names packages, and the version is
-resolved when one is installed. A range recorded here would be read long after
-it was written, and can name a version that was never published.
+**No version rides the catalogue.** It names packages, and the version is resolved when one is installed. A range recorded here would be read long after it was written, and can name a version that was never published.
 
 ---
 
 ## 10. Studio format hints
 
-Unchanged from v1: format classes describe their studio control surface
-declaratively in `$studio` — `icon`, `modes`, `documentMode`,
-`newFileTemplate`, and the `elements` allowlist/nesting constraints gating
-structural editing. The studio interprets this data generically; it never
-hard-codes per-format element sets.
+Unchanged from v1: format classes describe their studio control surface declaratively in `$studio` — `icon`, `modes`, `documentMode`, `newFileTemplate`, and the `elements` allowlist/nesting constraints gating structural editing. The studio interprets this data generically; it never hard-codes per-format element sets.
 
-Additional generic hint: `$studio.stateDefaults` — an object merged into
-state defs the studio creates for this prototype (e.g. `{ "timing":
-"client" }` for browser-only classes).
+Additional generic hint: `$studio.stateDefaults` — an object merged into state defs the studio creates for this prototype (e.g. `{ "timing": "client" }` for browser-only classes).
 
 ---
 
 ## 11. The `server` block
 
-A class contributes routes to the deployed-site worker (and the dev server)
-iff it has a top-level `server` object plus a `mount` capability:
+A class contributes routes to the deployed-site worker (and the dev server) iff it has a top-level `server` object plus a `mount` capability:
 
 ```json
 "server": { "basePath": "/_jx/auth", "order": 10, "module": "@jxsuite/auth/worker" }
@@ -928,18 +512,9 @@ iff it has a top-level `server` object plus a `mount` capability:
 
 Contract:
 
-- `mount(options, ctx)` is static, `timing: ["server"]`. It returns a
-  **fetch-style handler** `(request: Request, env: Record<string, unknown>) =>
-Promise<Response>`. Mount providers need no HTTP framework; the generated
-  worker wraps handlers (`app.all('<basePath>/*', c => handler(c.req.raw,
-c.env))`), and the dev server dispatches to them directly.
-- `options` is JSON inlined at generation time (identifiers only — see §13)
-  plus host-provided values (the section manifest, resolved class
-  constructors).
-- `ctx` is one shared mutable `JxServerContext` object created per worker
-  isolate and passed to every mount in `order`. Mounts communicate through
-  it. The auth extension (order 10) sets `ctx.auth`; the connector data mount
-  (order 20) consumes it:
+- `mount(options, ctx)` is static, `timing: ["server"]`. It returns a **fetch-style handler** `(request: Request, env: Record<string, unknown>) => Promise<Response>`. Mount providers need no HTTP framework; the generated worker wraps handlers (`app.all('<basePath>/*', c => handler(c.req.raw, c.env))`), and the dev server dispatches to them directly.
+- `options` is JSON inlined at generation time (identifiers only — see §13) plus host-provided values (the section manifest, resolved class constructors).
+- `ctx` is one shared mutable `JxServerContext` object created per worker isolate and passed to every mount in `order`. Mounts communicate through it. The auth extension (order 10) sets `ctx.auth`; the connector data mount (order 20) consumes it:
 
 ```ts
 interface JxServerContext {
@@ -951,8 +526,7 @@ interface JxServerContext {
 }
 ```
 
-- **Fail-closed rule**: a mount that gates writes on authorization must deny
-  everything except explicitly-public rules when `ctx.auth` is absent.
+- **Fail-closed rule**: a mount that gates writes on authorization must deny everything except explicitly-public rules when `ctx.auth` is absent.
 
 The connector's data mount serves the canonical wire contract:
 
@@ -966,32 +540,20 @@ DELETE /_jx/data/:table/:id
 
 ### 11.1 Section-owner `deploySchema` (push contributions)
 
-A **non-connector** `project` class may also declare a `deploySchema`
-capability, letting its section contribute steps to the schema push
-(`jx db push`, the studio push button). The signature differs from the
-connector variant — there is no single connection def to hand over:
+A **non-connector** `project` class may also declare a `deploySchema` capability, letting its section contribute steps to the schema push (`jx db push`, the studio push button). The signature differs from the connector variant — there is no single connection def to hand over:
 
 ```
 deploySchema(sectionValue, projectConfig, { env, dryRun?, connection?, connectors? })
   → { steps, applied, warnings, connection }
 ```
 
-`steps` are ready push-plan entries (`{ kind, table?, summary, sql?,
-connection? }`); hosts append them **after** the connector plan and default
-each step's `kind` to the contributing section key — the auth extension's
-Better Auth system-table migration lands as `kind: "auth"` steps this way.
-`connectors` carries the same provider stand-ins the mounts receive, so dev
-pushes hit the `local:` stand-in databases. When a push is filtered to a
-`connection` the section does not live on, the capability returns empty
-steps. Hosts stay extension-agnostic: registry dispatch only, no extension
-imports, no hardcoded section names.
+`steps` are ready push-plan entries (`{ kind, table?, summary, sql?, connection? }`); hosts append them **after** the connector plan and default each step's `kind` to the contributing section key — the auth extension's Better Auth system-table migration lands as `kind: "auth"` steps this way. `connectors` carries the same provider stand-ins the mounts receive, so dev pushes hit the `local:` stand-in databases. When a push is filtered to a `connection` the section does not live on, the capability returns empty steps. Hosts stay extension-agnostic: registry dispatch only, no extension imports, no hardcoded section names.
 
 ---
 
 ## 12. The `connector` block
 
-A class provides database connections iff it has a top-level `connector`
-object plus the connector capabilities (§8):
+A class provides database connections iff it has a top-level `connector` object plus the connector capabilities (§8):
 
 ```json
 "connector": {
@@ -1015,53 +577,26 @@ object plus the connector capabilities (§8):
 
 ## 13. Security and secrets
 
-- **Secrets never enter `project.json`.** Committed config carries
-  identifiers and env-var _names_ only (`urlEnv: "SUPABASE_DB_URL"`,
-  `secretEnv: "BETTER_AUTH_SECRET"`).
-- Local development: values live in `<project>/.dev.vars` (git-ignored;
-  wrangler convention). The dev server merges it over `process.env` when
-  constructing mount environments.
+- **Secrets never enter `project.json`.** Committed config carries identifiers and env-var _names_ only (`urlEnv: "SUPABASE_DB_URL"`, `secretEnv: "BETTER_AUTH_SECRET"`).
+- Local development: values live in `<project>/.dev.vars` (git-ignored; wrangler convention). The dev server merges it over `process.env` when constructing mount environments.
 - Production: `wrangler secret put <NAME>` (or the platform's secret store).
-- Studio secret entry goes through the platform's secrets surface
-  (`/__studio/secrets` — list returns **names only**, never values); the
-  `"secret"` form control writes there, never to project.json.
-- Dev-server studio data routes (`/__studio/data/*`) are the owner console:
-  they intentionally bypass table permission rules and are protected by the
-  dev server's loopback/token boundary. Cloud backends must gate them on
-  collaboration permission.
+- Studio secret entry goes through the platform's secrets surface (`/__studio/secrets` — list returns **names only**, never values); the `"secret"` form control writes there, never to project.json.
+- Dev-server studio data routes (`/__studio/data/*`) are the owner console: they intentionally bypass table permission rules and are protected by the dev server's loopback/token boundary. Cloud backends must gate them on collaboration permission.
 
 ### 13.1 Auth session cookies
 
 > **Status: Implemented.**
 
-The `auth` section's Better Auth options are not left at the library's defaults, because two of
-those defaults are wrong for the platform Jx deploys to:
+The `auth` section's Better Auth options are not left at the library's defaults, because two of those defaults are wrong for the platform Jx deploys to:
 
-- **Cookies default to secure, and step down only for an origin positively known to be plain HTTP.**
-  Better Auth derives `useSecureCookies` from the base URL, falling back to
-  `NODE_ENV === "production"` — which is unset on Cloudflare Workers, so the library's own default
-  produced non-`Secure`, unprefixed session cookies in exactly the place it matters. The one host
-  that genuinely serves auth over plain HTTP is the local dev server, and it pins `BETTER_AUTH_URL`
-  to its own origin so the answer is read rather than guessed.
-- **Rate limiting is on everywhere.** The library gates its own default on the same `NODE_ENV`, so
-  the limit was off in production and off in development — a limit nobody ever finds out is broken.
-  Storage is the in-memory default, which on a serverless runtime is per-isolate: a speed bump for
-  credential stuffing, not a wall.
+- **Cookies default to secure, and step down only for an origin positively known to be plain HTTP.** Better Auth derives `useSecureCookies` from the base URL, falling back to `NODE_ENV === "production"` — which is unset on Cloudflare Workers, so the library's own default produced non-`Secure`, unprefixed session cookies in exactly the place it matters. The one host that genuinely serves auth over plain HTTP is the local dev server, and it pins `BETTER_AUTH_URL` to its own origin so the answer is read rather than guessed.
+- **Rate limiting is on everywhere.** The library gates its own default on the same `NODE_ENV`, so the limit was off in production and off in development — a limit nobody ever finds out is broken. Storage is the in-memory default, which on a serverless runtime is per-isolate: a speed bump for credential stuffing, not a wall.
 
-A secure deployment names its cookies **`__Host-`**, not `__Secure-`
-([RFC 6265bis](https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-rfc6265bis) §4.1.3.2).
-`__Secure-` only promises the cookie was set with `Secure`; a page on a sibling origin can still
-overwrite it by setting a `Domain`. `__Host-` forbids `Domain` and pins `Path=/`, which Better
-Auth's defaults already satisfy — so the stronger prefix costs nothing.
+A secure deployment names its cookies **`__Host-`**, not `__Secure-` ([RFC 6265bis](https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-rfc6265bis) §4.1.3.2). `__Secure-` only promises the cookie was set with `Secure`; a page on a sibling origin can still overwrite it by setting a `Domain`. `__Host-` forbids `Domain` and pins `Path=/`, which Better Auth's defaults already satisfy — so the stronger prefix costs nothing.
 
-**`Partitioned` is not set, and must not default on.** CHIPS is for cookies in a _third-party_
-context; Jx auth cookies are first-party to the site that serves them. Setting it would force
-`SameSite=None; Secure` and partition the session per top-level site, signing a visitor out whenever
-the embedding page changed.
+**`Partitioned` is not set, and must not default on.** CHIPS is for cookies in a _third-party_ context; Jx auth cookies are first-party to the site that serves them. Setting it would force `SameSite=None; Secure` and partition the session per top-level site, signing a visitor out whenever the embedding page changed.
 
-Session lifetime (7 days, extended on activity after a day) is stated in the options rather than
-inherited, so it shows up in a diff when it changes. A session lifetime that lives only in a
-dependency's default is one nobody chose.
+Session lifetime (7 days, extended on activity after a day) is stated in the options rather than inherited, so it shows up in a diff when it changes. A session lifetime that lives only in a dependency's default is one nobody chose.
 
 ---
 
@@ -1171,50 +706,23 @@ A project enables it with one line:
 }
 ```
 
-With that entry in place: the content loader discovers and loads `.toml`
-entries through the class, `ContentCollection`/`ContentEntry` queries work
-unchanged, pages can declare `{ "$prototype": "Toml", "src": "./x.toml" }`
-state for runtime access, and the studio lists `.toml` files with the class's
-`$studio` hints. No host package changes.
+With that entry in place: the content loader discovers and loads `.toml` entries through the class, `ContentCollection`/`ContentEntry` queries work unchanged, pages can declare `{ "$prototype": "Toml", "src": "./x.toml" }` state for runtime access, and the studio lists `.toml` files with the class's `$studio` hints. No host package changes.
 
 ---
 
 ## 15. Worked example: a guestbook extension
 
-`@acme/jx-guestbook` demonstrates the full surface: a dynamic table, a studio
-form, a server mount, and an auth gate — using the connector and auth
-extensions as dependencies.
+`@acme/jx-guestbook` demonstrates the full surface: a dynamic table, a studio form, a server mount, and an auth gate — using the connector and auth extensions as dependencies.
 
-1. **Manifest + fragment** — the package contributes a `guestbook` section
-   whose fragment schema defines `{ table, moderation }`; the section class
-   declares `project: { "key": "guestbook" }` with a `$studio.settings` form
-   (`layout: "form"`).
-2. **Table** — the section class declares a section-owner `deploySchema`
-   capability (§11.1) contributing the guestbook table's migration steps
-   (columns `name`, `message`) to `jx db push` — the same channel the auth
-   extension uses for its Better Auth system tables; the steps land as
-   `kind: "guestbook"` in the push plan.
+1. **Manifest + fragment** — the package contributes a `guestbook` section whose fragment schema defines `{ table, moderation }`; the section class declares `project: { "key": "guestbook" }` with a `$studio.settings` form (`layout: "form"`).
+2. **Table** — the section class declares a section-owner `deploySchema` capability (§11.1) contributing the guestbook table's migration steps (columns `name`, `message`) to `jx db push` — the same channel the auth extension uses for its Better Auth system tables; the steps land as `kind: "guestbook"` in the push plan.
 
-   > **Open design note.** There is no registry hook yet by which a
-   > non-connector section could _materialize_ a `data`-section table
-   > definition — one that would ride the connector's own DDL sync,
-   > standard data mount, and permission rules (`permissions: { read:
-"public", insert: "authenticated" }`) without declaring its own
-   > `deploySchema`. Until that hook is designed, the section-owner
-   > `deploySchema` channel is today's supported mechanism for
-   > extension-owned tables.
+   > **Open design note.** There is no registry hook yet by which a non-connector section could _materialize_ a `data`-section table definition — one that would ride the connector's own DDL sync, standard data mount, and permission rules (`permissions: { read: "public", insert: "authenticated" }`) without declaring its own `deploySchema`. Until that hook is designed, the section-owner `deploySchema` channel is today's supported mechanism for extension-owned tables.
 
-3. **Mount** — a `server` block (`/_jx/guestbook`, order 30) with a `mount`
-   returning a fetch handler that reads `ctx.auth` for session lookups and
-   performs moderated guestbook reads/writes against the connection through
-   the shared connector providers (`options.connectors`).
-4. **Page** — a form posting via a lowered `TableInsert` action; a
-   `TableQuery` state entry listing approved entries.
+3. **Mount** — a `server` block (`/_jx/guestbook`, order 30) with a `mount` returning a fetch handler that reads `ctx.auth` for session lookups and performs moderated guestbook reads/writes against the connection through the shared connector providers (`options.connectors`).
+4. **Page** — a form posting via a lowered `TableInsert` action; a `TableQuery` state entry listing approved entries.
 
-A project adds `"@acme/jx-guestbook"` to `extensions`, runs `jx schema && jx
-db push`, and has a moderated, auth-gated guestbook — with project.json
-validation, a studio settings section, and dev-server parity, none of it
-requiring changes to any core package.
+A project adds `"@acme/jx-guestbook"` to `extensions`, runs `jx schema && jx db push`, and has a moderated, auth-gated guestbook — with project.json validation, a studio settings section, and dev-server parity, none of it requiring changes to any core package.
 
 ## 16. Standards Alignment
 

@@ -1,9 +1,6 @@
 # @jxsuite/import
 
-Clone a live website into a Jx project: capture the rendered DOM with headless Chrome, diff
-computed styles against UA defaults, extract design tokens and responsive breakpoints, download
-assets, detect the shared layout across pages, componentize recurring subtrees (optionally refined
-by an OpenAI-compatible LLM), and emit a ready-to-edit Jx project.
+Clone a live website into a Jx project: capture the rendered DOM with headless Chrome, diff computed styles against UA defaults, extract design tokens and responsive breakpoints, download assets, detect the shared layout across pages, componentize recurring subtrees (optionally refined by an OpenAI-compatible LLM), and emit a ready-to-edit Jx project.
 
 ## CLI
 
@@ -32,31 +29,15 @@ jx-import <url> [options]
 
 ### What `--verify` can fail on
 
-`--verify` builds the emitted project, serves it, screenshots every page and pixel-diffs each
-against a reference captured during the import. The run exits non-zero when any of three things is
-true: the project did not build cleanly, a page could not be rendered, or the average fidelity is
-below `--min-fidelity`.
+`--verify` builds the emitted project, serves it, screenshots every page and pixel-diffs each against a reference captured during the import. The run exits non-zero when any of three things is true: the project did not build cleanly, a page could not be rendered, or the average fidelity is below `--min-fidelity`.
 
-`--verify-threshold` is **not** that bar. It is pixelmatch's per-pixel colour tolerance: it decides
-when two pixels count as the same colour, so it moves the score without ever deciding the outcome.
-`--min-fidelity` is the bar, and it defaults to a deliberately low `25`, a floor for "this is not a
-clone of anything" rather than a quality target. A faithful import of a complicated site still
-lands well under 100 for reasons no importer can fix (a rotating hero, a font rendering a hair
-differently).
+`--verify-threshold` is **not** that bar. It is pixelmatch's per-pixel colour tolerance: it decides when two pixels count as the same colour, so it moves the score without ever deciding the outcome. `--min-fidelity` is the bar, and it defaults to a deliberately low `25`, a floor for "this is not a clone of anything" rather than a quality target. A faithful import of a complicated site still lands well under 100 for reasons no importer can fix (a rotating hero, a font rendering a hair differently).
 
-`verify/report.json` carries the whole picture: per-page fidelity, the console errors and failed or
-404'd requests each rendered page produced, and any build errors. When a page scores badly, read
-`failedRequests` first, because a percentage cannot tell you that fifteen images 404'd and that
-list can.
+`verify/report.json` carries the whole picture: per-page fidelity, the console errors and failed or 404'd requests each rendered page produced, and any build errors. When a page scores badly, read `failedRequests` first, because a percentage cannot tell you that fifteen images 404'd and that list can.
 
-**Comparing two runs.** The reference screenshot is captured fresh each time, so two runs of the
-same URL are not directly comparable. On a site with a rotating hero the spread across identical
-runs has been measured at around 4 points, which is wide enough to hide a small regression. Compare
-a fidelity number against another run of the same code, not against one from a different session.
+**Comparing two runs.** The reference screenshot is captured fresh each time, so two runs of the same URL are not directly comparable. On a site with a rotating hero the spread across identical runs has been measured at around 4 points, which is wide enough to hide a small regression. Compare a fidelity number against another run of the same code, not against one from a different session.
 
-Environment: `CHROME_PATH` (explicit browser binary; otherwise `google-chrome-stable`,
-`google-chrome`, `chromium-browser`, or `chromium` is discovered on PATH), `OPENAI_API_KEY` and
-`OPENAI_BASE_URL` for `--ai-components`.
+Environment: `CHROME_PATH` (explicit browser binary; otherwise `google-chrome-stable`, `google-chrome`, `chromium-browser`, or `chromium` is discovered on PATH), `OPENAI_API_KEY` and `OPENAI_BASE_URL` for `--ai-components`.
 
 ## Programmatic API
 
@@ -77,9 +58,6 @@ const result = await importSite(
 );
 ```
 
-Lower-level building blocks (capture, style diffing, crawling, layout detection, componentization,
-emit, verify) are exported from the package root; `./capture`, `./to-jx`, `./emit`, `./run` and
-`./verify` are also addressable as subpaths. See `src/index.ts`.
+Lower-level building blocks (capture, style diffing, crawling, layout detection, componentization, emit, verify) are exported from the package root; `./capture`, `./to-jx`, `./emit`, `./run` and `./verify` are also addressable as subpaths. See `src/index.ts`.
 
-Verification (`verify` option / `--verify`) additionally needs `@jxsuite/compiler` (an optional
-dependency) to build the emitted project before screenshot-diffing it.
+Verification (`verify` option / `--verify`) additionally needs `@jxsuite/compiler` (an optional dependency) to build the emitted project before screenshot-diffing it.

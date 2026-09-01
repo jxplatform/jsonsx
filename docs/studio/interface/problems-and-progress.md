@@ -66,8 +66,7 @@ Problems belong to the project you have open. Closing the project clears them, s
 
 ### Checks over your own content
 
-Some Problems are about the document rather than about Studio. Saving a file checks its
-[popovers](/docs/framework/concepts/overlays) and files what it finds under **Popover**: a panel whose base style sets `display`, which cancels the browser's own hiding and lays the panel out on every page; `popovertarget` on an element that cannot invoke one; a target naming no popover; an exit animation that will be cut short.
+Some Problems are about the document rather than about Studio. Saving a file checks its [popovers](/docs/framework/concepts/overlays) and files what it finds under **Popover**: a panel whose base style sets `display`, which cancels the browser's own hiding and lays the panel out on every page; `popovertarget` on an element that cannot invoke one; a target naming no popover; an exit animation that will be cut short.
 
 Where the fix is mechanical the row carries a **Fix** button that performs it in one step you can undo with one press: moving `display` into `:popover-open`, removing attributes that do nothing where they are, writing `popover="auto"`. Where it is not, the row is a sentence with no button, because a button that does not do what it says is worse than none. Which panel a control should point at is your decision, not something Studio can guess.
 

@@ -119,35 +119,15 @@ Content types come from Bun's own inference, with two corrections: a `.md` file 
 
 ## The live site preview
 
-Studio's **Open in Browser** doesn't compile anything. It asks this server to stand up a second
-loopback address, one per project, that serves your working tree as a site: each page is composed as
-it's asked for, at the route it will really have, and assembled in the reader's browser by
-`@jxsuite/runtime`. That's why it opens at once and why it can show you the document you're editing
-rather than the last one you saved, which is the whole point of it. Studio sends the unsaved bytes
-over and this server prefers them over the file at every read.
+Studio's **Open in Browser** doesn't compile anything. It asks this server to stand up a second loopback address, one per project, that serves your working tree as a site: each page is composed as it's asked for, at the route it will really have, and assembled in the reader's browser by `@jxsuite/runtime`. That's why it opens at once and why it can show you the document you're editing rather than the last one you saved, which is the whole point of it. Studio sends the unsaved bytes over and this server prefers them over the file at every read.
 
-The address is separate from this one on purpose, and not because the paths would clash. A browser
-tab belongs to a _project_, and this server belongs to a _window_: a tab pointed here would die with
-the window that opened it. The other reason is that a previewed page runs your project's own
-JavaScript, and giving it an origin of its own keeps it away from anything the editor keeps in the
-browser. What it will serve is an allowlist that defaults closed, so `project.json`, a lockfile and
-every dotfile are unreachable from a page.
+The address is separate from this one on purpose, and not because the paths would clash. A browser tab belongs to a _project_, and this server belongs to a _window_: a tab pointed here would die with the window that opened it. The other reason is that a previewed page runs your project's own JavaScript, and giving it an origin of its own keeps it away from anything the editor keeps in the browser. What it will serve is an allowlist that defaults closed, so `project.json`, a lockfile and every dotfile are unreachable from a page.
 
-Your own components render without being listed anywhere. The preview walks the page it composed,
-finds the tags your `components/` directory defines, and registers those, following each component
-into the components it uses in turn. You only need `$elements` for what your project does not
-define, such as a component from an npm package.
+Your own components render without being listed anywhere. The preview walks the page it composed, finds the tags your `components/` directory defines, and registers those, following each component into the components it uses in turn. You only need `$elements` for what your project does not define, such as a component from an npm package.
 
-Markdown pages preview too, and so does anything else one of your extensions can parse. The preview
-reads the `extensions` list in your `project.json` and builds the same format registry a build does,
-so `pages/index.md` renders here the way it will in production. It reads that file the same way it
-reads the rest of your tree, unsaved bytes first, so adding an extension in Studio takes effect on
-the next reload rather than after a save. A page whose format nothing installed can parse says so by
-name instead of rendering blank.
+Markdown pages preview too, and so does anything else one of your extensions can parse. The preview reads the `extensions` list in your `project.json` and builds the same format registry a build does, so `pages/index.md` renders here the way it will in production. It reads that file the same way it reads the rest of your tree, unsaved bytes first, so adding an extension in Studio takes effect on the next reload rather than after a save. A page whose format nothing installed can parse says so by name instead of rendering blank.
 
-It reloads the same way this server does, over the same stream, and one save is one reload however
-many things it changed. Press **Open in Browser** again and you get the same tab, moved to whatever
-page you're on now.
+It reloads the same way this server does, over the same stream, and one save is one reload however many things it changed. Press **Open in Browser** again and you get the same tab, moved to whatever page you're on now.
 
 ## Related
 

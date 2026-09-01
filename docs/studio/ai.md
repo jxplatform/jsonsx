@@ -72,10 +72,7 @@ Fetch models tests the key and endpoint **currently in the form**, not the ones 
 :::
 
 :::doc-note
-**Reasoning models work.** When a model streams its thinking beside its answer, Studio keeps that
-thinking with the turn and hands it back to the provider on the next round, which providers like
-DeepSeek require once the assistant starts calling tools. You never see it in the chat; it is part
-of what the model is owed, not part of the reply.
+**Reasoning models work.** When a model streams its thinking beside its answer, Studio keeps that thinking with the turn and hands it back to the provider on the next round, which providers like DeepSeek require once the assistant starts calling tools. You never see it in the chat; it is part of what the model is owed, not part of the reply.
 :::
 
 :::doc-note

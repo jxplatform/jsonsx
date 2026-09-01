@@ -134,9 +134,7 @@ Use `@--name` keys in any style object:
 }
 ```
 
-`@--name` references named breakpoints. `@(condition)` is a literal inline media query, and the
-parentheses are the query's own: a feature query keeps them (`@(min-width: 1280px)`), while a
-bare media type does not, so `@(print)` emits `@media print`.
+`@--name` references named breakpoints. `@(condition)` is a literal inline media query, and the parentheses are the query's own: a feature query keeps them (`@(min-width: 1280px)`), while a bare media type does not, so `@(print)` emits `@media print`.
 
 ## Color-scheme variants
 

@@ -2,9 +2,9 @@
 
 ## JSON Schema 2020-12 Meta-Schema Generator
 
-**Version:** 0.4.8-draft
-**Status:** Partial
-**Updated:** 2026-08-16
+**Version:** 0.4.8-draft\
+**Status:** Partial\
+**Updated:** 2026-08-16\
 **License:** MIT
 
 ---
@@ -84,51 +84,14 @@ All 13 built-in prototypes with their specific configuration properties:
 - All standard HTML DOM properties derived from `@webref/idl`
 - CSSOM camelCase style properties derived from `@webref/css`
 - All `EventHandler` names (onclick, oninput, etc.) derived from IDL
-- Every `on*` handler accepts a `$ref` binding, an inline `$expression`, or an
-  inline `FunctionDef` (`$prototype: "Function"` with `body` and
-  `parameters`/legacy `arguments`)
-- `StyleObject` is recursive: selector and at-rule groups nest to arbitrary
-  depth (spec.md §9.2); the project-level `style` shares the same contract
-- `ChildrenValue` accepts a `${…}` template string resolving at build time to
-  an array of child definitions (spec.md §8.4), alongside the array and
-  Array-namespace forms
-- Element-level `$switch`/`cases`: the discriminant is a `StateRef`
-  (`#/state/…`), and `cases` maps case values to element definitions or
-  external component refs (spec.md §14.1). `SwitchNode` is admitted **as a
-  child**, under `ChildrenValue`'s item alternatives — which are `anyOf`, not
-  `oneOf`, because a switch child may also carry the `tagName` of its own
-  container and would otherwise match two branches and be rejected for
-  matching both. It was defined and referenced from nowhere until 2026-08-09,
-  so every document with a `$switch` child failed validation while the
-  compiler rendered it correctly.
-- **`TagName` is a name, never an expression** — `pattern`
-  `^[a-zA-Z][a-zA-Z0-9._-]*$`.
-- **`ElementTagName` = `TagName` | `{ $expression: TagExpression }`**, wired into `ElementDef`
-  alone. `TagExpression` is a closed two-branch def (`?:` and `switch`) whose every RESULT operand
-  `$ref`s `TagName` — so the pattern above is kept rather than relocated, and the candidate set is
-  readable straight out of the JSON without evaluating anything. The document root and
-  `SwitchNode`'s container keep the bare `TagName`; `HeadEntry` declares its own. `default` and
-  `initial` are required here, unlike the expression-level `switch`, because an element with no tag
-  cannot exist. Resolved once, at element creation — see spec.md §19.6.
-- **`$head` items are `HeadEntry`, not `ElementDef`.** They had been elements, which was harmless
-  only while an element's tag was a plain name: the moment one could be chosen, a head tag could be
-  too, and `head-merger.ts` splices it into the built page as `<${tag} …>`. This also un-orphaned
-  `HeadEntry`, whose only inbound `$ref` had been its own recursive `children`. No position in the pipeline evaluates a
-  `${…}` in tag position, and each consumer failed differently and silently
-  when one was written: the runtime threw `InvalidCharacterError` from
-  `createElement`, the compiler emitted a lit binding in tag position, and the
-  static renderer re-resolved the emitted HTML against the _page_ scope — where
-  a component's own `state` does not exist — so a built page collapsed to the
-  fallback branch's tag carrying the other branch's attributes. Vary an element
-  with `$switch`.
-- **`ExternalClassDef` is one flat property set shared by every state
-  `$prototype`**, so a property name it defines for a built-in constrains every
-  extension class that declares the same name. `filter` and `sort` are
-  therefore unions (reactive `$ref`, single object, ordered rule array) rather
-  than the `$ref`-only shape the built-in `Array` prototype wants: both
-  `@jxsuite/parser`'s ContentCollection and `@jxsuite/connector`'s TableQuery
-  declare `filter` as a rule array, and the narrower core shape silently
-  overrode the class's own declaration.
+- Every `on*` handler accepts a `$ref` binding, an inline `$expression`, or an inline `FunctionDef` (`$prototype: "Function"` with `body` and `parameters`/legacy `arguments`)
+- `StyleObject` is recursive: selector and at-rule groups nest to arbitrary depth (spec.md §9.2); the project-level `style` shares the same contract
+- `ChildrenValue` accepts a `${…}` template string resolving at build time to an array of child definitions (spec.md §8.4), alongside the array and Array-namespace forms
+- Element-level `$switch`/`cases`: the discriminant is a `StateRef` (`#/state/…`), and `cases` maps case values to element definitions or external component refs (spec.md §14.1). `SwitchNode` is admitted **as a child**, under `ChildrenValue`'s item alternatives — which are `anyOf`, not `oneOf`, because a switch child may also carry the `tagName` of its own container and would otherwise match two branches and be rejected for matching both. It was defined and referenced from nowhere until 2026-08-09, so every document with a `$switch` child failed validation while the compiler rendered it correctly.
+- **`TagName` is a name, never an expression** — `pattern` `^[a-zA-Z][a-zA-Z0-9._-]*$`.
+- **`ElementTagName` = `TagName` | `{ $expression: TagExpression }`**, wired into `ElementDef` alone. `TagExpression` is a closed two-branch def (`?:` and `switch`) whose every RESULT operand `$ref`s `TagName` — so the pattern above is kept rather than relocated, and the candidate set is readable straight out of the JSON without evaluating anything. The document root and `SwitchNode`'s container keep the bare `TagName`; `HeadEntry` declares its own. `default` and `initial` are required here, unlike the expression-level `switch`, because an element with no tag cannot exist. Resolved once, at element creation — see spec.md §19.6.
+- **`$head` items are `HeadEntry`, not `ElementDef`.** They had been elements, which was harmless only while an element's tag was a plain name: the moment one could be chosen, a head tag could be too, and `head-merger.ts` splices it into the built page as `<${tag} …>`. This also un-orphaned `HeadEntry`, whose only inbound `$ref` had been its own recursive `children`. No position in the pipeline evaluates a `${…}` in tag position, and each consumer failed differently and silently when one was written: the runtime threw `InvalidCharacterError` from `createElement`, the compiler emitted a lit binding in tag position, and the static renderer re-resolved the emitted HTML against the _page_ scope — where a component's own `state` does not exist — so a built page collapsed to the fallback branch's tag carrying the other branch's attributes. Vary an element with `$switch`.
+- **`ExternalClassDef` is one flat property set shared by every state `$prototype`**, so a property name it defines for a built-in constrains every extension class that declares the same name. `filter` and `sort` are therefore unions (reactive `$ref`, single object, ordered rule array) rather than the `$ref`-only shape the built-in `Array` prototype wants: both `@jxsuite/parser`'s ContentCollection and `@jxsuite/connector`'s TableQuery declare `filter` as a rule array, and the narrower core shape silently overrode the class's own declaration.
 
 #### CEM Annotations
 
@@ -142,9 +105,7 @@ All 13 built-in prototypes with their specific configuration properties:
 
 ### 3.2 Project Schema (`project-schema.json`)
 
-> **Status: Implemented.** Every declared key is described, and the language-tag keys carry a
-> pattern, so `jx validate` and the build no longer disagree about the same value. See §7 for
-> exactly how much of BCP 47 a `pattern` can carry.
+> **Status: Implemented.** Every declared key is described, and the language-tag keys carry a pattern, so `jx validate` and the build no longer disagree about the same value. See §7 for exactly how much of BCP 47 a `pattern` can carry.
 
 **`$id`:** `https://jxsuite.com/schema/project/v1`
 
@@ -163,17 +124,9 @@ Validates `project.json` files with:
 - `build` — build configuration (`outDir`, `format`, `trailingSlash`, `adapter`)
 - `i18n` — internationalization (`defaultLocale`, `locales`, `routing`)
 
-**Language-tag keys carry a `pattern`.** `i18n.defaultLocale`, `i18n.locales[]` and
-`securityTxt.preferredLanguages[]` are all BCP 47 tags, and all three are validated at author time
-against `LANGUAGE_TAG_PATTERN` — one exported constant in `packages/schema/src/locale.ts`, so the
-schema and the build read the same source.
+**Language-tag keys carry a `pattern`.** `i18n.defaultLocale`, `i18n.locales[]` and `securityTxt.preferredLanguages[]` are all BCP 47 tags, and all three are validated at author time against `LANGUAGE_TAG_PATTERN` — one exported constant in `packages/schema/src/locale.ts`, so the schema and the build read the same source.
 
-The pattern is deliberately looser than the build's `Intl.Locale` parse, and the direction of that
-inequality is the contract: **the pattern accepts every tag the build accepts**, so a project that
-compiles can never fail `jx validate`. It catches the class of mistake an author makes — an
-underscore for a hyphen, an empty subtag, a one-letter primary language — and leaves subtag ordering
-and registry membership to the build, which is where a full RFC 5646 parse already lives. A test
-asserts the inequality against a corpus rather than restating it as prose.
+The pattern is deliberately looser than the build's `Intl.Locale` parse, and the direction of that inequality is the contract: **the pattern accepts every tag the build accepts**, so a project that compiles can never fail `jx validate`. It catches the class of mistake an author makes — an underscore for a hyphen, an empty subtag, a one-letter primary language — and leaves subtag ordering and registry membership to the build, which is where a full RFC 5646 parse already lives. A test asserts the inequality against a corpus rather than restating it as prose.
 
 ### 3.3 Class Schema (`class-schema.json`)
 
@@ -194,59 +147,33 @@ Validates `.class.json` files with:
 
 ### 3.4 I-JSON at the Parse Boundary
 
-> **Status: Implemented.** `ijson.ts`, enforced by `parse.ts` for every document, project config
-> and class definition.
+> **Status: Implemented.** `ijson.ts`, enforced by `parse.ts` for every document, project config and class definition.
 
-`JSON.parse` accepts documents that mean something other than what they say, and RFC 7493 names the
-two that matter here:
+`JSON.parse` accepts documents that mean something other than what they say, and RFC 7493 names the two that matter here:
 
-- **A repeated name** (§2.3). `JSON.parse` keeps the last and says nothing, so a document with two
-  `state` keys — a bad merge, most often — loses the first one's contents silently.
-- **An integer outside what a double holds** (§2.2). `9007199254740993` parses as
-  `9007199254740992`, and the next serialization writes the wrong number back to disk.
+- **A repeated name** (§2.3). `JSON.parse` keeps the last and says nothing, so a document with two `state` keys — a bad merge, most often — loses the first one's contents silently.
+- **An integer outside what a double holds** (§2.2). `9007199254740993` parses as `9007199254740992`, and the next serialization writes the wrong number back to disk.
 
-Both are **parse failures**, not warnings. They are silent data loss, and neither has a reading
-under which the author got what they wrote. The whole repository — 375 JSON documents — was already
-clean when this landed, so the rule rejects mistakes rather than existing work.
+Both are **parse failures**, not warnings. They are silent data loss, and neither has a reading under which the author got what they wrote. The whole repository — 375 JSON documents — was already clean when this landed, so the rule rejects mistakes rather than existing work.
 
-This matters more in Jx than it would elsewhere. A Jx document does not stay JSON: it round-trips
-through markdown frontmatter (`parser.md`) and through a Yjs CRDT (`collab.md`), and each crossing
-rebuilds the object from the **parsed value**. Whatever `JSON.parse` discarded at the boundary is
-discarded for good, and the file the author reopens is not the file they wrote.
+This matters more in Jx than it would elsewhere. A Jx document does not stay JSON: it round-trips through markdown frontmatter (`parser.md`) and through a Yjs CRDT (`collab.md`), and each crossing rebuilds the object from the **parsed value**. Whatever `JSON.parse` discarded at the boundary is discarded for good, and the file the author reopens is not the file they wrote.
 
-Detection is a scan of the source text rather than a `JSON.parse` reviver, because by the time a
-reviver runs the duplicate is already gone. **Fractions are never judged**: `0.1` is not exactly
-representable either, so flagging them would flag most real documents while saying nothing about
-whether the author's value survived.
+Detection is a scan of the source text rather than a `JSON.parse` reviver, because by the time a reviver runs the duplicate is already gone. **Fractions are never judged**: `0.1` is not exactly representable either, so flagging them would flag most real documents while saying nothing about whether the author's value survived.
 
 ### 3.5 Unicode Normalization at the Parse Boundary
 
-> **Status: Implemented.** `parse.ts` puts every key and every string value into NFC, for documents,
-> project configs and class definitions alike.
+> **Status: Implemented.** `parse.ts` puts every key and every string value into NFC, for documents, project configs and class definitions alike.
 
-A state name is an **identifier**: declared as a key in `state`, referenced as `${state.état}` in a
-template and as `#/state/état` in a `$ref`. Typed on macOS it arrives decomposed (`e` + U+0301);
-typed on Windows, or pasted from most of the web, it arrives precomposed (U+00E9).
+A state name is an **identifier**: declared as a key in `state`, referenced as `${state.état}` in a template and as `#/state/état` in a `$ref`. Typed on macOS it arrives decomposed (`e` + U+0301); typed on Windows, or pasted from most of the web, it arrives precomposed (U+00E9).
 
-Those are two different JavaScript property names. A document whose declaration and reference were
-typed on different machines therefore **builds cleanly, emits a valid bundle, and renders nothing** —
-`state.état` is `undefined`, there is no error, and no search finds the problem because both
-spellings look identical in every editor. UAX #31 §R4 exists for this case, and NFC is the form the
-rest of the web platform assumes.
+Those are two different JavaScript property names. A document whose declaration and reference were typed on different machines therefore **builds cleanly, emits a valid bundle, and renders nothing** — `state.état` is `undefined`, there is no error, and no search finds the problem because both spellings look identical in every editor. UAX #31 §R4 exists for this case, and NFC is the form the rest of the web platform assumes.
 
 Two consequences are worth stating, because both look like overreach until the reason is given:
 
-- **String values are normalized too, and that is not a content change.** Two canonically equivalent
-  strings are the same text by UAX #15's own definition: a conforming renderer must display them
-  identically and no process may distinguish them. It is also unavoidable — Jx has no syntactic
-  boundary between content and code, since `"Café ${state.été}"` is one string carrying both, and
-  normalizing "only identifier positions" would mean parsing every template to find them.
-- **It runs on the parsed value, not on the source text.** `"état"` is pure ASCII until
-  `JSON.parse` turns the escapes into a combining mark, so normalizing the text would miss exactly
-  the documents a generator wrote.
+- **String values are normalized too, and that is not a content change.** Two canonically equivalent strings are the same text by UAX #15's own definition: a conforming renderer must display them identically and no process may distinguish them. It is also unavoidable — Jx has no syntactic boundary between content and code, since `"Café ${state.été}"` is one string carrying both, and normalizing "only identifier positions" would mean parsing every template to find them.
+- **It runs on the parsed value, not on the source text.** `"état"` is pure ASCII until `JSON.parse` turns the escapes into a combining mark, so normalizing the text would miss exactly the documents a generator wrote.
 
-NFC composes; it does not fold or strip. Scripts with no composed forms, CJK and emoji all survive
-byte for byte, and a test asserts it.
+NFC composes; it does not fold or strip. Scripts with no composed forms, CJK and emoji all survive byte for byte, and a test asserts it.
 
 ---
 

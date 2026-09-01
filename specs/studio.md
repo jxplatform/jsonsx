@@ -2,9 +2,9 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.10.6-draft
-**Status:** Partial
-**Updated:** 2026-09-01
+**Version:** 0.10.6-draft\
+**Status:** Partial\
+**Updated:** 2026-09-01\
 **License:** MIT
 
 ---
@@ -40,20 +40,11 @@ Four-column layout:
 | Center    | Canvas (live preview) + Command Bar                     |
 | Inspector | Four tabs: Content · Style · Logic · Assistant          |
 
-**There is no assistant column.** The AI chat is the Inspector dock's fourth tab, so it shares that
-dock's cell and its width: showing it costs zero additional pixels, and the two docks are the only
-things that carry a width, a collapse flag and a resize handle. Two states that a separate column
-made expressible — "assistant open over a collapsed inspector", and "assistant open at 0px" — are
-unreachable by construction rather than by a rule.
+**There is no assistant column.** The AI chat is the Inspector dock's fourth tab, so it shares that dock's cell and its width: showing it costs zero additional pixels, and the two docks are the only things that carry a width, a collapse flag and a resize handle. Two states that a separate column made expressible — "assistant open over a collapsed inspector", and "assistant open at 0px" — are unreachable by construction rather than by a rule.
 
-Each dock's collapsed state and width persist to `localStorage` under one record, written by one
-writer, and are adopted at boot in both directions, so a remembered "open" reopens a dock against a
-closed default. A stale `chat` entry from an older build is ignored, not resurrected.
+Each dock's collapsed state and width persist to `localStorage` under one record, written by one writer, and are adopted at boot in both directions, so a remembered "open" reopens a dock against a closed default. A stale `chat` entry from an older build is ignored, not resurrected.
 
-An AI provider key is an application-level setting configured once, so it is not edited from the
-assistant at all: it lives in **Preferences › Assistant** (§15). With no provider connected, the tab
-still renders a chat inviting a conversation, with one line and the action that fixes it beneath —
-it is never replaced by a credentials form.
+An AI provider key is an application-level setting configured once, so it is not edited from the assistant at all: it lives in **Preferences › Assistant** (§15). With no provider connected, the tab still renders a chat inviting a conversation, with one line and the action that fixes it beneath — it is never replaced by a credentials form.
 
 ### 3.2 Data Flow
 
@@ -120,29 +111,17 @@ Studio uses a platform abstraction (`src/platform.ts`) to decouple UI from backe
 | `clearPreviewOverlay?`   | Retract one document's unsaved bytes, or every one of this project's (§10.1)                               |
 | `buildSite?()`           | Compile the site and name where the output is browsable → `SiteBuildResult` (§10.2)                        |
 
-**`assetSpace` is about the ORIGIN, not the backend.** A document references media by site URL
-(`/hero.jpg`) or relative to itself (`./images/hero.png`), and neither is a URL the canvas can use
-unless something on the canvas document's own origin serves the published site. A local editing
-server is that thing, so it declares nothing and `assetSpace` defaults to `"site"`: the origin
-already answers, and the only mapping Studio owes is the content-mount one in §4.1.
+**`assetSpace` is about the ORIGIN, not the backend.** A document references media by site URL (`/hero.jpg`) or relative to itself (`./images/hero.png`), and neither is a URL the canvas can use unless something on the canvas document's own origin serves the published site. A local editing server is that thing, so it declares nothing and `assetSpace` defaults to `"site"`: the origin already answers, and the only mapping Studio owes is the content-mount one in §4.1.
 
-A multi-tenant editor origin is not, and there a site URL reaches the editor's application shell —
-behind a single-page-app fallback, at **HTTP 200**, so the image renders broken and nothing is
-logged. Such a host declares `assetSpace: "repo"` together with `documentBaseUrl`, and Studio then
-resolves every authored reference to the **project file** it names and addresses that file under
-that base (`site-architecture.md` §9.3). `"repo"` without a base is inert: a host that says its
-site URLs are wrong without saying what is right has told Studio nothing it can act on.
+A multi-tenant editor origin is not, and there a site URL reaches the editor's application shell — behind a single-page-app fallback, at **HTTP 200**, so the image renders broken and nothing is logged. Such a host declares `assetSpace: "repo"` together with `documentBaseUrl`, and Studio then resolves every authored reference to the **project file** it names and addresses that file under that base (`site-architecture.md` §9.3). `"repo"` without a base is inert: a host that says its site URLs are wrong without saying what is right has told Studio nothing it can act on.
 
-The two declarations MUST be made together or not at all. A session-less shell has no base to give,
-and half a declaration is worse than none — it would put every reference on a resolution path
-ending nowhere.
+The two declarations MUST be made together or not at all. A session-less shell has no base to give, and half a declaration is worse than none — it would put every reference on a resolution path ending nowhere.
 
 Three platform targets:
 
 - **DevServer** (`platforms/devserver.ts`) — Wraps `/__studio/*` fetch calls for Chrome-based development.
 - **Desktop** (`@jxsuite/desktop`) — ElectroBun app with RPC to Bun process for native file I/O.
-- **Cloud** (`platforms/cloud.ts`) — Hosted sessions over the platform's session API; the backend
-  composes per-project schemas in-Worker (extensions.md §5.5), so §4.2.1 holds there too.
+- **Cloud** (`platforms/cloud.ts`) — Hosted sessions over the platform's session API; the backend composes per-project schemas in-Worker (extensions.md §5.5), so §4.2.1 holds there too.
 
 Registration: `registerPlatform(impl)` at startup, `getPlatform()` for access.
 
@@ -206,167 +185,57 @@ Resolution is render-only in either space: the tab's source document keeps the a
 | Diff      | A comparison of the document against HEAD (§21)                     |
 | Media     | An image, video, audio file, font or PDF, shown rather than edited  |
 
-**Media is a mode because a media file is not a document.** Every other mode above draws a document
-tree; there is no tree behind a PNG, and the open path used to prove it by throwing — a file that
-matched no format class and was not `.json` produced _"No format class imported for … — add one to
-project.json imports"_, which is not advice about a binary asset. Video, audio, fonts and PDFs failed
-identically, as did every tile in the Library, which opens through the same function. So a media file
-opens a real tab keyed by its path, in a mode that shows the file and says three things about it: its
-kind and dimensions, the site URL a document would reference it by — `public/hero.jpg` is written
-`/hero.jpg`, a string sharing no segment with the file — and which documents use it. It is read-only:
-rename, delete and reveal belong to the file tree, and a second set of them here would be a second
-place to keep right. `.svg` keeps a Source alternate, being the one media format that is also text.
+**Media is a mode because a media file is not a document.** Every other mode above draws a document tree; there is no tree behind a PNG, and the open path used to prove it by throwing — a file that matched no format class and was not `.json` produced _"No format class imported for … — add one to project.json imports"_, which is not advice about a binary asset. Video, audio, fonts and PDFs failed identically, as did every tile in the Library, which opens through the same function. So a media file opens a real tab keyed by its path, in a mode that shows the file and says three things about it: its kind and dimensions, the site URL a document would reference it by — `public/hero.jpg` is written `/hero.jpg`, a string sharing no segment with the file — and which documents use it. It is read-only: rename, delete and reveal belong to the file tree, and a second set of them here would be a second place to keep right. `.svg` keeps a Source alternate, being the one media format that is also text.
 
-**Diff is a mode because a comparison is not one document but two.** Every other mode above draws a
-single tree; a comparison draws the committed text beside the working copy, so the mode's subject is
-a pair rather than a document — which is also why it is the one mode a file with no document at all
-can still offer (§21.4). It is read-only in both halves: the artboards route no mutation and the code
-editor holds two read-only models, because one of them is a git object with no place on disk to be
-written back to.
+**Diff is a mode because a comparison is not one document but two.** Every other mode above draws a single tree; a comparison draws the committed text beside the working copy, so the mode's subject is a pair rather than a document — which is also why it is the one mode a file with no document at all can still offer (§21.4). It is read-only in both halves: the artboards route no mutation and the code editor holds two read-only models, because one of them is a git object with no place on disk to be written back to.
 
-Design and Content are both **editable modes** and behave identically for text: the canvas carries a
-live caret (§8.2). They differ only in what the document is — Content mode opens a format-backed
-document (`.md` via its format class, §8.1), Design mode a native `.json` one.
+Design and Content are both **editable modes** and behave identically for text: the canvas carries a live caret (§8.2). They differ only in what the document is — Content mode opens a format-backed document (`.md` via its format class, §8.1), Design mode a native `.json` one.
 
-**Preview does not edit, and it scrolls for real.** Preview is the fidelity view, so every editing
-affordance is gated off it: a click selects nothing, no hover or selection box is drawn, the
-insertion "+" is withheld, the canvas context menu gives way to the browser's own, nothing may be
-dropped onto it, and the destructive keyboard chords (duplicate, cut, paste, Delete, Backspace,
-Enter) are refused. A selection carried in from an editable mode survives in the model — returning
-restores it — but is not actionable while Preview is shown. Both realms enforce this: the frame
-withholds the messages, and the host refuses them, because the canvas bundle ships prebuilt and
-neither side may assume the other's build is current.
+**Preview does not edit, and it scrolls for real.** Preview is the fidelity view, so every editing affordance is gated off it: a click selects nothing, no hover or selection box is drawn, the insertion "+" is withheld, the canvas context menu gives way to the browser's own, nothing may be dropped onto it, and the destructive keyboard chords (duplicate, cut, paste, Delete, Backspace, Enter) are refused. A selection carried in from an editable mode survives in the model — returning restores it — but is not actionable while Preview is shown. Both realms enforce this: the frame withholds the messages, and the host refuses them, because the canvas bundle ships prebuilt and neither side may assume the other's build is current.
 
-Preview also renders on its own surface rather than the pan/zoom artboard. Editable modes grow the
-canvas iframe to its full content height so the parent overlay can reach every node, and pan a
-transform in place of scrolling; both are incompatible with fidelity, because a frame that is as
-tall as its document never scrolls, so `position: sticky`, scroll-driven animation and
-`IntersectionObserver` reveals can never fire. Preview therefore mounts ONE frame at the pane's own
-height, which scrolls its own document. It has no zoom control and no pan.
+Preview also renders on its own surface rather than the pan/zoom artboard. Editable modes grow the canvas iframe to its full content height so the parent overlay can reach every node, and pan a transform in place of scrolling; both are incompatible with fidelity, because a frame that is as tall as its document never scrolls, so `position: sticky`, scroll-driven animation and `IntersectionObserver` reveals can never fire. Preview therefore mounts ONE frame at the pane's own height, which scrolls its own document. It has no zoom control and no pan.
 
-**The frame must actually be allowed to scroll**, which is a property of the canvas DOCUMENT and not
-only of the frame. `canvas.html` clips `html, body` because every editable mode needs it — the frame
-is content-height there and the parent is what pans — so preview lifts the clip and sizes the query
-container to the real viewport (`syncPreviewShell`). Without that, a pane-height frame around a
-clipped document showed the first screenful of every page and offered no way down: the frame was a
-viewport and the document refused to be longer than it.
+**The frame must actually be allowed to scroll**, which is a property of the canvas DOCUMENT and not only of the frame. `canvas.html` clips `html, body` because every editable mode needs it — the frame is content-height there and the parent is what pans — so preview lifts the clip and sizes the query container to the real viewport (`syncPreviewShell`). Without that, a pane-height frame around a clipped document showed the first screenful of every page and offered no way down: the frame was a viewport and the document refused to be longer than it.
 
-**Preview is a TOGGLE over an edit/design base, and the surface says so.** It has always been stored
-that way — a per-tab flag composed with `ui.canvasMode`, which is why `canvasModeOfPane` folds the
-two into one effective mode for the renderer. The View control nevertheless drew all three as one
-radio, so while previewing it could not report which mode was underneath or which one leaving would
-return to. It is a two-value radio (`Edit │ Design`) with a pressed toggle beside it; the base stays
-marked throughout. Arriving at a base still clears the flag, so "Design" means Design from any state.
+**Preview is a TOGGLE over an edit/design base, and the surface says so.** It has always been stored that way — a per-tab flag composed with `ui.canvasMode`, which is why `canvasModeOfPane` folds the two into one effective mode for the renderer. The View control nevertheless drew all three as one radio, so while previewing it could not report which mode was underneath or which one leaving would return to. It is a two-value radio (`Edit │ Design`) with a pressed toggle beside it; the base stays marked throughout. Arriving at a base still clears the flag, so "Design" means Design from any state.
 
-**Preview honours the chosen breakpoint**, at the width Edit gives its column and Design gives that
-artboard, so the same page at `md` is the same page whichever base the toggle is over. It ignored
-the size switcher entirely and filled the pane at every size — the same defect as the Edit column's,
-and the same rule decides it: a control that changes the rendering context has to change the
-rendering, or it is a control over a label. With no breakpoint chosen it fills the pane.
+**Preview honours the chosen breakpoint**, at the width Edit gives its column and Design gives that artboard, so the same page at `md` is the same page whichever base the toggle is over. It ignored the size switcher entirely and filled the pane at every size — the same defect as the Edit column's, and the same rule decides it: a control that changes the rendering context has to change the rendering, or it is a control over a label. With no breakpoint chosen it fills the pane.
 
-**Source is batched, so every way out of it settles first.** Parsing the buffer back into the
-document is debounced, which means at any instant the editor may hold text the document has not
-received. Leaving the mode, changing tab, switching pane, closing the tab and quitting all commit
-that text before they proceed — a teardown that merely cancelled the pending parse would discard the
-author's last keystrokes, and cancel it silently, because `dirty` had never been set. Text that
-cannot be parsed stays in the buffer and still counts as unsaved: the author is never made to choose
-between a broken document and the line they were writing. The same rule governs the Logic tab's
-function editor (§16.3), for the same reason and through the same mechanism.
+**Source is batched, so every way out of it settles first.** Parsing the buffer back into the document is debounced, which means at any instant the editor may hold text the document has not received. Leaving the mode, changing tab, switching pane, closing the tab and quitting all commit that text before they proceed — a teardown that merely cancelled the pending parse would discard the author's last keystrokes, and cancel it silently, because `dirty` had never been set. Text that cannot be parsed stays in the buffer and still counts as unsaved: the author is never made to choose between a broken document and the line they were writing. The same rule governs the Logic tab's function editor (§16.3), for the same reason and through the same mechanism.
 
-**Following a link in Preview leaves the canvas.** Editable modes de-link anchors — the runtime stamps
-`href` onto `data-jx-href`, so a click selects the element instead of navigating. Preview keeps them
-live, where a click would navigate the canvas iframe and destroy the render along with the editing
-session. So Preview intercepts the click and the shell opens the target in a **real browser tab**,
-resolved against the CANVAS's origin (the project's own), not the editor shell's — which may sit on an
-unrelated deep path. In-page fragments are left to the browser, since scrolling the previewed page is
-what Preview is for.
+**Following a link in Preview leaves the canvas.** Editable modes de-link anchors — the runtime stamps `href` onto `data-jx-href`, so a click selects the element instead of navigating. Preview keeps them live, where a click would navigate the canvas iframe and destroy the render along with the editing session. So Preview intercepts the click and the shell opens the target in a **real browser tab**, resolved against the CANVAS's origin (the project's own), not the editor shell's — which may sit on an unrelated deep path. In-page fragments are left to the browser, since scrolling the previewed page is what Preview is for.
 
-Only `http`, `https`, `mailto` and `tel` targets are followed. The shell is the opener, so handing a
-`javascript:` or `data:` URL to a new window would execute it in the EDITOR's origin.
+Only `http`, `https`, `mailto` and `tel` targets are followed. The shell is the opener, so handing a `javascript:` or `data:` URL to a new window would execute it in the EDITOR's origin.
 
-That browser tab is also the honest place to verify a project: routing, project JavaScript, server
-functions and live data all behave there exactly as they will on the built site, none of which the
-canvas promises. The shell exposes an override for this so a host can redirect it (the desktop app
-wants the user's own browser rather than a chrome-less webview); the default is a new tab.
+That browser tab is also the honest place to verify a project: routing, project JavaScript, server functions and live data all behave there exactly as they will on the built site, none of which the canvas promises. The shell exposes an override for this so a host can redirect it (the desktop app wants the user's own browser rather than a chrome-less webview); the default is a new tab.
 
 #### 4.2.1 Source-mode schema validation
 
-Source mode validates JSON against the ACTIVE project's generated entry documents
-(extensions.md §5.2), fetched pre-bundled through `fetchProjectSchemas` (§3.4) on project
-activation, after a `project.json` write, and on `extensions` changes. The bundled core schemas are
-the offline fallback, and the same payload feeds the AI assistant's schema gate (ai.md §3.1) — one
-fetch, so the two surfaces can never judge a file by different rules.
+Source mode validates JSON against the ACTIVE project's generated entry documents (extensions.md §5.2), fetched pre-bundled through `fetchProjectSchemas` (§3.4) on project activation, after a `project.json` write, and on `extensions` changes. The bundled core schemas are the offline fallback, and the same payload feeds the AI assistant's schema gate (ai.md §3.1) — one fetch, so the two surfaces can never judge a file by different rules.
 
-Resolution is entirely offline: Monaco's schema-request service stays disabled, and the schemas are
-registered as inline objects. Each registers under BOTH its canonical `https://jxsuite.com/…` URI
-(with the `pages|layouts|components|elements` fileMatch globs) and the `file:///project.schema.json`
-/ `file:///document.schema.json` id that a file's own relative `$schema` resolves to — an
-in-document `$schema` overrides fileMatch entirely, so without the second registration a bound file
-resolves to an empty schema and is not validated at all. Models mount at
-`file:///<project-relative-path>` so those pointers resolve against the file's own directory; the
-two generated entry documents mount under a reserved prefix instead, because a model URI equal to a
-registered id un-registers that schema when the model is disposed.
+Resolution is entirely offline: Monaco's schema-request service stays disabled, and the schemas are registered as inline objects. Each registers under BOTH its canonical `https://jxsuite.com/…` URI (with the `pages|layouts|components|elements` fileMatch globs) and the `file:///project.schema.json` / `file:///document.schema.json` id that a file's own relative `$schema` resolves to — an in-document `$schema` overrides fileMatch entirely, so without the second registration a bound file resolves to an empty schema and is not validated at all. Models mount at `file:///<project-relative-path>` so those pointers resolve against the file's own directory; the two generated entry documents mount under a reserved prefix instead, because a model URI equal to a registered id un-registers that schema when the model is disposed.
 
-Monaco's web workers are resolved relative to the studio bundle's own URL. No worker means no
-language service and therefore no diagnostics at all — silently — so each host must ship
-`workers/*.worker.js` beside the bundle it serves.
+Monaco's web workers are resolved relative to the studio bundle's own URL. No worker means no language service and therefore no diagnostics at all — silently — so each host must ship `workers/*.worker.js` beside the bundle it serves.
 
 #### 4.2.2 Popovers, and the top layer the canvas cannot use
 
 > **Status: Implemented.**
 
-An OPEN popover is in the **top layer**, and CSS Position 4 §3.1 gives a top-layer element the
-viewport as its containing block whatever its ancestors say. In an editable mode that viewport is a
-fiction: the frame is sized to its own content height, so a drawer pinned with `inset: 0` lands
-halfway down a long page, and a panel taller than a short component frame is clipped by the
-`overflow: hidden` the canvas document needs. Worse, a top-layer box contributes to no ancestor's
-scrollable overflow, so the artboard can never grow to fit one.
+An OPEN popover is in the **top layer**, and CSS Position 4 §3.1 gives a top-layer element the viewport as its containing block whatever its ancestors say. In an editable mode that viewport is a fiction: the frame is sized to its own content height, so a drawer pinned with `inset: 0` lands halfway down a long page, and a panel taller than a short component frame is clipped by the `overflow: hidden` the canvas document needs. Worse, a top-layer box contributes to no ancestor's scrollable overflow, so the artboard can never grow to fit one.
 
-So editable modes **de-popover**: the runtime stamps `popover` onto `data-jx-popover` for nodes the
-studio can ADDRESS — those carrying a `data-jx-path` — exactly as it de-links `<a href>`. That drops
-every `[popover]` UA rule at once, and the one that matters is `position: fixed`: with it gone the
-panel lays out in normal flow at its document position, contributes to the content height, and the
-host grows the artboard by exactly its height. The canvas marks it **POPOVER · SHOWN IN PLACE**, and
-forces `position` and the flex/grid alignment so a panel declared inside a header's flex row is not
-centred on a 64px header with half of it above the artboard.
+So editable modes **de-popover**: the runtime stamps `popover` onto `data-jx-popover` for nodes the studio can ADDRESS — those carrying a `data-jx-path` — exactly as it de-links `<a href>`. That drops every `[popover]` UA rule at once, and the one that matters is `position: fixed`: with it gone the panel lays out in normal flow at its document position, contributes to the content height, and the host grows the artboard by exactly its height. The canvas marks it **POPOVER · SHOWN IN PLACE**, and forces `position` and the flex/grid alignment so a panel declared inside a header's flex row is not centred on a 64px header with half of it above the artboard.
 
-Two things do NOT rescue this, and both are the intuitive answer: `container-type: size` on the
-canvas's query container does not make it a containing block for fixed descendants (measured in
-Chrome 151: `contain` computes to `none`, and a fixed child measures the window), and leaving the
-top layer is necessary but not sufficient, because a fixed box contributes nothing to an ancestor's
-overflow either.
+Two things do NOT rescue this, and both are the intuitive answer: `container-type: size` on the canvas's query container does not make it a containing block for fixed descendants (measured in Chrome 151: `contain` computes to `none`, and a fixed child measures the window), and leaving the top layer is necessary but not sufficient, because a fixed box contributes nothing to an ancestor's overflow either.
 
-**The studio re-supplies one UA rule and no more** — `display: none` while closed — inside a cascade
-LAYER, so an author declaration still beats it exactly as it beats the real UA rule on the shipped
-page. That is deliberate rather than an oversight: a popover whose base rule sets `display` is laid
-out on every page whether open or not, and the canvas has to SHOW that defect. §16.6's report names
-it and offers the repair.
+**The studio re-supplies one UA rule and no more** — `display: none` while closed — inside a cascade LAYER, so an author declaration still beats it exactly as it beats the real UA rule on the shipped page. That is deliberate rather than an oversight: a popover whose base rule sets `display` is laid out on every page whether open or not, and the canvas has to SHOW that defect. §16.6's report names it and offers the repair.
 
-`:popover-open` is transposed to `[data-jx-popover-open]` — the same specificity, so a block still
-wins and loses against the same neighbours. **`::backdrop` is dropped rather than emitted inert**:
-there is no backdrop pseudo-element outside the top layer, synthesising one would paint a scrim over
-the document being edited, and a rule that can never match would mark the selector as styled in the
-Style tab while doing nothing. Preview renders all of it natively.
+`:popover-open` is transposed to `[data-jx-popover-open]` — the same specificity, so a block still wins and loses against the same neighbours. **`::backdrop` is dropped rather than emitted inert**: there is no backdrop pseudo-element outside the top layer, synthesising one would paint a scrim over the document being edited, and a rule that can never match would mark the selector as styled in the Style tab while doing nothing. Preview renders all of it natively.
 
-**Which popover is open is per-tab view state, and exactly one.** It writes nothing to the document,
-takes no undo entry, does not replicate over collaboration, and is not restored with a session.
-`canvas.setPopoverOpen` is the single verb — a setter rather than a toggle, because §13.3 clause 3
-requires a command to name the state it ends in, and a toggle could never drive a documentation
-screenshot. Three surfaces are renderings of it: the block action bar, the Style tab's selector
-segment (§6.2), and the trigger's own click in the canvas, which the frame reports because
-de-popovering removed the browser's invoker activation — leaving exactly one writer of open state
-instead of a race between the platform and the editor.
+**Which popover is open is per-tab view state, and exactly one.** It writes nothing to the document, takes no undo entry, does not replicate over collaboration, and is not restored with a session. `canvas.setPopoverOpen` is the single verb — a setter rather than a toggle, because §13.3 clause 3 requires a command to name the state it ends in, and a toggle could never drive a documentation screenshot. Three surfaces are renderings of it: the block action bar, the Style tab's selector segment (§6.2), and the trigger's own click in the canvas, which the frame reports because de-popovering removed the browser's invoker activation — leaving exactly one writer of open state instead of a race between the platform and the editor.
 
-**Selecting reveals.** A selection at or inside a popover opens it, from whichever surface made the
-selection — the canvas, the Outline, quick search, a Problem, or an undo. The rule is asymmetric on
-purpose: selecting outside every popover does NOT close the open one, because reaching a colour
-swatch in the Inspector is a selection change and a panel that shut on every one could never be
-styled.
+**Selecting reveals.** A selection at or inside a popover opens it, from whichever surface made the selection — the canvas, the Outline, quick search, a Problem, or an undo. The rule is asymmetric on purpose: selecting outside every popover does NOT close the open one, because reaching a colour swatch in the Inspector is a selection change and a panel that shut on every one could never be styled.
 
-Three exclusions, all consequences of the `data-jx-path` gate rather than special cases: a popover
-rendered inside a component's own template stays native (the studio cannot address it); a layout
-popover stays native while a page is open and becomes editable when the layout itself is; and
-`<dialog>` is refused, because its UA rules key off `open` rather than `popover`.
+Three exclusions, all consequences of the `data-jx-path` gate rather than special cases: a popover rendered inside a component's own template stays native (the studio cannot address it); a layout popover stays native while a page is open and becomes editable when the layout itself is; and `<dialog>` is refused, because its UA rules key off `open` rather than `popover`.
 
 ---
 
@@ -379,32 +248,13 @@ The design canvas supports pan and zoom:
 - **Fit to view**: Intelligent centering of documents on load and window resize
 - **Responsive presets**: Width presets matching `$media` breakpoints
 
-**The wheel belongs to whatever is under it.** A mode that mounts no pan/zoom surface — Grid,
-Library, Project Settings, the Entry form, Source and Preview — leaves the wheel to the scroll
-container under the pointer. Consuming it there is never harmless in only one direction: the pan
-lands on offsets no transform reads and suppresses the stage's next fit, while the surface the
-author is actually looking at (a section column, the `<pre>` of `project.json`, a virtualised
-table) cannot be scrolled with the wheel at all.
+**The wheel belongs to whatever is under it.** A mode that mounts no pan/zoom surface — Grid, Library, Project Settings, the Entry form, Source and Preview — leaves the wheel to the scroll container under the pointer. Consuming it there is never harmless in only one direction: the pan lands on offsets no transform reads and suppresses the stage's next fit, while the surface the author is actually looking at (a section column, the `<pre>` of `project.json`, a virtualised table) cannot be scrolled with the wheel at all.
 
-**Ctrl/⌘+wheel is a different gesture, and no surface hands it to the browser.** Studio blocks page
-zoom everywhere and exempts only a stage, because a stage answers the gesture with a zoom of its
-own; a stage with none to give — every mode named above, and a trackpad pinch arrives as exactly
-this event — blocks it like the rest of the chrome rather than scaling the whole window around a
-form. Preview blocks it in the FRAME: a cross-origin canvas frame's wheel never reaches the host,
-and preview is the one mode that forwards nothing, so the block has to be where the gesture lands.
+**Ctrl/⌘+wheel is a different gesture, and no surface hands it to the browser.** Studio blocks page zoom everywhere and exempts only a stage, because a stage answers the gesture with a zoom of its own; a stage with none to give — every mode named above, and a trackpad pinch arrives as exactly this event — blocks it like the rest of the chrome rather than scaling the whole window around a form. Preview blocks it in the FRAME: a cross-origin canvas frame's wheel never reaches the host, and preview is the one mode that forwards nothing, so the block has to be where the gesture lands.
 
-**Edit has no pan and no zoom of that kind, and now has a gesture of its own.** Its stage is a
-centred column, not a transformed surface, so what a drag on its edge changes is the page's real
-width (§6.2) rather than a scale — the two are not merged, and `ui.editZoom` keeps its own
-browser-page-zoom meaning beside it.
+**Edit has no pan and no zoom of that kind, and now has a gesture of its own.** Its stage is a centred column, not a transformed surface, so what a drag on its edge changes is the page's real width (§6.2) rather than a scale — the two are not merged, and `ui.editZoom` keeps its own browser-page-zoom meaning beside it.
 
-**Entering a pan/zoom mode fits the artboard.** Design and Stylebook apply a fit on the mode
-transition, capped at 100% so a narrow artboard is never magnified, and skipped when the pane has no
-measurable width (fitting an unlaid-out pane would land on the 5% floor). Without it a 1280px
-artboard opened at 100% in a ~700px pane and was cut off mid-word. The fit is a default, not a
-policy: any zoom the author sets by hand — the tab bar's −/+/100%/Fit controls, Ctrl+scroll, or the
-zoom chords — is recorded against that tab's document for the session, and re-entering the mode
-restores it instead of re-fitting. Preview takes no part in any of this (§4.2).
+**Entering a pan/zoom mode fits the artboard.** Design and Stylebook apply a fit on the mode transition, capped at 100% so a narrow artboard is never magnified, and skipped when the pane has no measurable width (fitting an unlaid-out pane would land on the 5% floor). Without it a 1280px artboard opened at 100% in a ~700px pane and was cut off mid-word. The fit is a default, not a policy: any zoom the author sets by hand — the tab bar's −/+/100%/Fit controls, Ctrl+scroll, or the zoom chords — is recorded against that tab's document for the session, and re-entering the mode restores it instead of re-fitting. Preview takes no part in any of this (§4.2).
 
 ### 4.4 Block Action Bar
 
@@ -418,31 +268,15 @@ Unified floating action bar (Gutenberg-style) attached to the selected element:
 | Move up/down      | Reorder within parent                                |
 | Inline formatting | Bold/italic/code/link, for blocks that accept markup |
 
-The bar has ONE shape. The formatting group is present whenever the selected block can carry inline
-markup — that is, whenever its element metadata declares `$inlineActions`. It is not gated on an
-editing session, because there is none (§8.2).
+The bar has ONE shape. The formatting group is present whenever the selected block can carry inline markup — that is, whenever its element metadata declares `$inlineActions`. It is not gated on an editing session, because there is none (§8.2).
 
-**It is gated on the author's attention.** A pointerdown in parent chrome outside the canvas hides
-the bar, and a selection change or a pointerdown back in the canvas brings it back. The bar is
-fixed-position and clamped into the window, so one left behind sits over the Document Header card,
-the pane context bar and the docks — the chrome the author has just reached for. Three rules make
-that safe:
+**It is gated on the author's attention.** A pointerdown in parent chrome outside the canvas hides the bar, and a selection change or a pointerdown back in the canvas brings it back. The bar is fixed-position and clamped into the window, so one left behind sits over the Document Header card, the pane context bar and the docks — the chrome the author has just reached for. Three rules make that safe:
 
-- **Hiding is not deselecting.** The selection is untouched, because the Inspector the author just
-  clicked into edits exactly that selection.
-- **The bar's own surfaces are exempt** — the bar, its `⋮` overflow, the link popover and the slash
-  menu act ON the bar rather than away from it, and so does the canvas stage around the artboard
-  (panning or zooming is not leaving the canvas). Its popovers close WITH it: they are anchored to
-  buttons that are about to disappear.
-- **Two doors back, because one is not enough.** A selection change reopens it, which is what makes
-  a click on an Outline row — chrome, and therefore a hide — still show the bar for the row it
-  selected. Clicking the already-selected element changes no selection, so the canvas's own
-  pointerdown is the second door.
+- **Hiding is not deselecting.** The selection is untouched, because the Inspector the author just clicked into edits exactly that selection.
+- **The bar's own surfaces are exempt** — the bar, its `⋮` overflow, the link popover and the slash menu act ON the bar rather than away from it, and so does the canvas stage around the artboard (panning or zooming is not leaving the canvas). Its popovers close WITH it: they are anchored to buttons that are about to disappear.
+- **Two doors back, because one is not enough.** A selection change reopens it, which is what makes a click on an Outline row — chrome, and therefore a hide — still show the bar for the row it selected. Clicking the already-selected element changes no selection, so the canvas's own pointerdown is the second door.
 
-Formatting applies to a range, so the buttons are disabled for a collapsed caret and for a block
-selected without a caret at all (from the layers panel, or by a structural edit moving the
-selection). Component instances and prop-bound blocks have no group: a component tag declares no
-inline actions, and prop-bound text is a single plain string.
+Formatting applies to a range, so the buttons are disabled for a collapsed caret and for a block selected without a caret at all (from the layers panel, or by a structural edit moving the selection). Component instances and prop-bound blocks have no group: a component tag declares no inline actions, and prop-bound text is a single plain string.
 
 ---
 
@@ -450,9 +284,7 @@ inline actions, and prop-bound text is a single plain string.
 
 ### 5.1 Activity Bar
 
-Vertical tab strip for switching panel views, drawn from the panel registry in two labelled
-groups. A panel's `level` decides its group, so the rail says what a panel writes to before you open
-it: **Project** panels change the project, **Document** panels change the open document.
+Vertical tab strip for switching panel views, drawn from the panel registry in two labelled groups. A panel's `level` decides its group, so the rail says what a panel writes to before you open it: **Project** panels change the project, **Document** panels change the open document.
 
 | Group    | Tab            | Id         | Icon            | Panel                                      |
 | -------- | -------------- | ---------- | --------------- | ------------------------------------------ |
@@ -463,46 +295,19 @@ it: **Project** panels change the project, **Document** panels change the open d
 | Document | Data           | `data`     | `data`          | State definitions AND what they resolve to |
 | Document | Packages       | `packages` | `box`           | Imported components and packages           |
 
-Three more panels are registered `rail: false` — **Search** (`search`, project level), **Insert**
-(`insert`, document level, the HTML element palette and the project's component library) and
-**Languages** (`i18n`, project level, §20.4). They have
-records, regions and `panel.focus.<id>` commands like any other panel; what they give up is a rail
-button, because the group is a glance and a glance does not scale.
+Three more panels are registered `rail: false` — **Search** (`search`, project level), **Insert** (`insert`, document level, the HTML element palette and the project's component library) and **Languages** (`i18n`, project level, §20.4). They have records, regions and `panel.focus.<id>` commands like any other panel; what they give up is a rail button, because the group is a glance and a glance does not scale.
 
-**The rail's foot holds one control: ⚙ Settings**, and it opens a **menu** rather than running a
-command. Its rows are `forPlacement("settings/menu")` — today `app.preferences` (⌘,),
-`settings.open` (⌘⇧,) and `styles.open` — ordered by level with a divider at the boundary, and each
-row with a `section` argument offers that argument's values as a submenu, so a section of
-Preferences or of Project Settings is one click deep.
+**The rail's foot holds one control: ⚙ Settings**, and it opens a **menu** rather than running a command. Its rows are `forPlacement("settings/menu")` — today `app.preferences` (⌘,), `settings.open` (⌘⇧,) and `styles.open` — ordered by level with a divider at the boundary, and each row with a `section` argument offers that argument's values as a submenu, so a section of Preferences or of Project Settings is one click deep.
 
-It is a menu because the two settings families sit at two levels. A **pinned slot** has room for one
-thing and must lie about the rest by omission: for a release the foot ran `app.preferences` alone,
-and project configuration was reachable only from the ⬢ menu and the palette, so the control most
-people press when looking for settings could not offer the project's. A menu prints each row's own
-name, chord and gate, so it can hold both and say which is which — the same reason
-`commandbar/overflow` admits three levels (`studio-ui-guidelines.md` §12.1). The rail's **panel**
-groups above it stay single-level, because a panel has no row to explain itself with.
+It is a menu because the two settings families sit at two levels. A **pinned slot** has room for one thing and must lie about the rest by omission: for a release the foot ran `app.preferences` alone, and project configuration was reachable only from the ⬢ menu and the palette, so the control most people press when looking for settings could not offer the project's. A menu prints each row's own name, chord and gate, so it can hold both and say which is which — the same reason `commandbar/overflow` admits three levels (`studio-ui-guidelines.md` §12.1). The rail's **panel** groups above it stay single-level, because a panel has no row to explain itself with.
 
-With no project open the two project rows render **disabled, carrying their `requires` sentence** —
-§12.3's rule, and the same thing the palette does. They gate on `enablement` rather than `when` for
-exactly this reason: hiding them left the gear holding one row on the welcome screen and saying
-nothing about the two surfaces most people open it looking for, so "why can't I" had no answer
-anywhere. The gate itself is unchanged; `registry.run` and the assistant's tool still refuse.
+With no project open the two project rows render **disabled, carrying their `requires` sentence** — §12.3's rule, and the same thing the palette does. They gate on `enablement` rather than `when` for exactly this reason: hiding them left the gear holding one row on the welcome screen and saying nothing about the two surfaces most people open it looking for, so "why can't I" had no answer anywhere. The gate itself is unchanged; `registry.run` and the assistant's tool still refuse.
 
 ⌘, is unchanged and still opens Preferences from anywhere; the menu's first row prints that chord.
 
-**The menu is anchored by its BOTTOM**, flush with the bottom of the region its trigger sits in —
-the rail, whose foot is the status bar's top — and grows upward. A control at the foot of a
-full-height rail has nothing below it, so "drop the menu under the button" is not available; and the
-region rather than the button is what makes it flush, because the rail's foot carries padding the
-status bar does not. Both levels of the stack share that floor, so a long submenu scrolls inside
-itself instead of running down over the status bar.
+**The menu is anchored by its BOTTOM**, flush with the bottom of the region its trigger sits in — the rail, whose foot is the status bar's top — and grows upward. A control at the foot of a full-height rail has nothing below it, so "drop the menu under the button" is not available; and the region rather than the button is what makes it flush, because the rail's foot carries padding the status bar does not. Both levels of the stack share that floor, so a long submenu scrolls inside itself instead of running down over the status bar.
 
-**A rail-less panel is a panel you have to already know about.** That is an acceptable price for a
-surface with another door — Insert is reachable from the canvas and the palette — and not an
-acceptable one for a surface that is the only way to do something. The State panel was rail-less for
-one release and its editor was the only place a state variable or a component property could be
-declared; the answer was to merge it into Data (§5.6), not to leave it findable by search.
+**A rail-less panel is a panel you have to already know about.** That is an acceptable price for a surface with another door — Insert is reachable from the canvas and the palette — and not an acceptable one for a surface that is the only way to do something. The State panel was rail-less for one release and its editor was the only place a state variable or a component property could be declared; the answer was to merge it into Data (§5.6), not to leave it findable by search.
 
 ### 5.2 Layers Panel
 
@@ -510,9 +315,7 @@ Flattened tree of all elements in the document with indentation representing nes
 
 **Drag and Drop** — The entire layer row is draggable via Atlassian Pragmatic Drag and Drop. Users can grab any part of the row to drag; a grip glyph appears on hover to advertise it. Drop indicators show reorder (above/below) and reparent (make-child) targets.
 
-**Move Action Buttons** — The row carrying the **primary** selection carries contextual move buttons.
-They stay single-target under a multiple selection (§6.7): moving several non-sibling nodes one slot
-has no single meaning, and each step is arithmetic against a parent the previous step renumbered. Selection rather than hover, because the buttons are Spectrum custom elements and building five of them for every visible row made the panel's render cost scale with document size; a click on a row both selects it and reveals its actions. The grab affordance is a plain glyph and therefore stays on every row.
+**Move Action Buttons** — The row carrying the **primary** selection carries contextual move buttons. They stay single-target under a multiple selection (§6.7): moving several non-sibling nodes one slot has no single meaning, and each step is arithmetic against a parent the previous step renumbered. Selection rather than hover, because the buttons are Spectrum custom elements and building five of them for every visible row made the panel's render cost scale with document size; a click on a row both selects it and reveals its actions. The grab affordance is a plain glyph and therefore stays on every row.
 
 | Button | Icon          | Action                                             | Shown when                                        |
 | ------ | ------------- | -------------------------------------------------- | ------------------------------------------------- |
@@ -530,10 +333,7 @@ Only applicable buttons render for each row's position in the tree. Clicking a m
 
 ### 5.3 Elements Panel
 
-**§5.3 and §5.4 are one panel — Insert (`insert`).** They were two rail tabs listing two kinds of
-thing you drag onto the canvas, and the question a user has ("what can I put here?") does not
-distinguish them. The sections stay separate because the two catalogues have different sources and
-different rules; the surface does not.
+**§5.3 and §5.4 are one panel — Insert (`insert`).** They were two rail tabs listing two kinds of thing you drag onto the canvas, and the question a user has ("what can I put here?") does not distinguish them. The sections stay separate because the two catalogues have different sources and different rules; the surface does not.
 
 HTML element palette organized by category using Spectrum accordions (`sp-accordion` with `allow-multiple`). Each element displays as a full-width card with:
 
@@ -567,18 +367,9 @@ Git-integrated source control panel providing commit, staging, branch management
 
 #### File Rows
 
-**Every row opens a comparison, and it opens the file it names.** Both halves of that sentence
-replaced a defect. The row used to refuse silently twice — once for any status that was not `M` or
-`A`, and again for any path that was neither `.json` nor claimed by a format class — so a changed
-`.ts`, `.css` or `.yaml`, and every deleted or untracked file, did nothing at all when clicked.
-Renderability now decides which VIEW opens (§21.3), never whether the row responds. And the mode is
-set on the tab keyed by the CLICKED path rather than on whatever tab happened to be focused: the
-former wrote `activeTab`, so opening one file's comparison flipped another file's tab into Diff and
-drew the wrong document under the right name, which is §14.1's identity rule broken from the panel.
+**Every row opens a comparison, and it opens the file it names.** Both halves of that sentence replaced a defect. The row used to refuse silently twice — once for any status that was not `M` or `A`, and again for any path that was neither `.json` nor claimed by a format class — so a changed `.ts`, `.css` or `.yaml`, and every deleted or untracked file, did nothing at all when clicked. Renderability now decides which VIEW opens (§21.3), never whether the row responds. And the mode is set on the tab keyed by the CLICKED path rather than on whatever tab happened to be focused: the former wrote `activeTab`, so opening one file's comparison flipped another file's tab into Diff and drew the wrong document under the right name, which is §14.1's identity rule broken from the panel.
 
-Two refusals remain, and both are stated rather than silent. A **rename** carries only its new path,
-so the old name is not in hand and there is nothing to compare against. A **binary file** has no text
-on either side; an image comparison is a real feature and a different one.
+Two refusals remain, and both are stated rather than silent. A **rename** carries only its new path, so the old name is not in hand and there is nothing to compare against. A **binary file** has no text on either side; an image comparison is a real feature and a different one.
 
 Each file row displays:
 
@@ -621,22 +412,13 @@ The branch picker lists all local branches and includes a "+ New branch..." opti
 
 Status is fetched on tab activation and after every git operation. A 30-second polling interval refreshes status while the tab is active.
 
-**An open comparison follows the working tree.** A comparison is two texts read once, so nothing
-about it notices a save or a commit — invisible while the artboards merely drew two documents, and a
-lie the moment change marks are drawn on them (§21). Every refresh bumps a revision that re-issues a
-Diff lens's read and re-reads the panel's own comparison; a save does the same for the file it wrote.
-A file that is no longer changed loses its comparison rather than keeping a stale one, and a read
-that fails leaves the last clean comparison on screen rather than blanking a review in progress.
+**An open comparison follows the working tree.** A comparison is two texts read once, so nothing about it notices a save or a commit — invisible while the artboards merely drew two documents, and a lie the moment change marks are drawn on them (§21). Every refresh bumps a revision that re-issues a Diff lens's read and re-reads the panel's own comparison; a save does the same for the file it wrote. A file that is no longer changed loses its comparison rather than keeping a stale one, and a read that fails leaves the last clean comparison on screen rather than blanking a review in progress.
 
 #### PAL Methods
 
 All git operations are exposed as PAL methods (`gitStatus()`, `gitCommit(message)`, `gitPush()`, etc.) so the desktop platform can implement them via native RPC instead of HTTP.
 
-**`gitDiff` is deliberately uncalled**, and the row above says so because the name invites reuse. It
-runs `git diff -- <path>`, which compares the working tree against the INDEX and answers the empty
-string for a file that has been staged. A comparison here is against HEAD, so the pair of texts comes
-from `gitShow({ path, ref: "HEAD" })` and `readFile(path)` instead; the code view computes its own
-line diff from those two.
+**`gitDiff` is deliberately uncalled**, and the row above says so because the name invites reuse. It runs `git diff -- <path>`, which compares the working tree against the INDEX and answers the empty string for a file that has been staged. A comparison here is against HEAD, so the pair of texts comes from `gitShow({ path, ref: "HEAD" })` and `readFile(path)` instead; the code view computes its own line diff from those two.
 
 ---
 
@@ -644,76 +426,31 @@ line diff from those two.
 
 One list of the open document's state entries: **how each is defined, and what it resolved to.**
 
-Each row carries the category badge, the entry name and one summary slot. The slot shows the
-definition hint until the canvas reports a scope, and what the entry resolved to once it has —
-because a panel opened before the canvas has rendered knows nothing about any entry, and labelling
-the whole list "pending" there would be a fact about the panel dressed up as a fact about the data.
-A 240px Navigator does not fit both summaries beside the name without eliding all three.
+Each row carries the category badge, the entry name and one summary slot. The slot shows the definition hint until the canvas reports a scope, and what the entry resolved to once it has — because a panel opened before the canvas has rendered knows nothing about any entry, and labelling the whole list "pending" there would be a fact about the panel dressed up as a fact about the data. A 240px Navigator does not fit both summaries beside the name without eliding all three.
 
-**An entry that cannot hold a value never gets the value slot.** A function, and an expression whose
-operator is an assignment, are things the page _does_; they are absent from the resolved scope for
-that reason, and labelling them `pending` reads as "still loading" for something that will never
-load. Those rows keep their definition hint permanently.
+**An entry that cannot hold a value never gets the value slot.** A function, and an expression whose operator is an assignment, are things the page _does_; they are absent from the resolved scope for that reason, and labelling them `pending` reads as "still loading" for something that will never load. Those rows keep their definition hint permanently.
 
-Expanding a row opens the entry's editor — name, type, prototype fields, expression or function
-body — with the resolved value rendered underneath it as a tree. Expansion is recorded per tab
-(`ui.dataRows`), and any number of rows may be open at once: comparing two entries means seeing
-both, and coming back to a tab means finding it as you left it.
+Expanding a row opens the entry's editor — name, type, prototype fields, expression or function body — with the resolved value rendered underneath it as a tree. Expansion is recorded per tab (`ui.dataRows`), and any number of rows may be open at once: comparing two entries means seeing both, and coming back to a tab means finding it as you left it.
 
-**Every truncation marker in the tree is a control.** The tree caps arrays at 20 entries, objects at
-30 keys and nesting at 5 levels; each cap ends in a button that raises that one marker's limit by
-50, recorded per tab alongside the expansions (`ui.dataLimits`). Inert "… 40 more" text is the panel
-saying it has the answer and will not show it, in the surface a reader opens _because_ item 40 is
-the surprising one. A limit never lowers itself, and raising one does not lengthen any other list.
+**Every truncation marker in the tree is a control.** The tree caps arrays at 20 entries, objects at 30 keys and nesting at 5 levels; each cap ends in a button that raises that one marker's limit by 50, recorded per tab alongside the expansions (`ui.dataLimits`). Inert "… 40 more" text is the panel saying it has the answer and will not show it, in the surface a reader opens _because_ item 40 is the surprising one. A limit never lowers itself, and raising one does not lengthen any other list.
 
-**Refresh reports the render it started, not a timer.** Automatic `Request` entries are suppressed
-while authoring — a full render re-resolves every entry, so editing would refetch constantly — so
-re-firing them is a verb. The button arms the fetches, marks the tab refreshing, and stays that way
-until the canvas posts the resolved scope (or fails to render). Repainting on a fixed delay instead
-reported "done" over the old values for anything slower than the delay, which is a Refresh that
-visibly did nothing.
+**Refresh reports the render it started, not a timer.** Automatic `Request` entries are suppressed while authoring — a full render re-resolves every entry, so editing would refetch constantly — so re-firing them is a verb. The button arms the fetches, marks the tab refreshing, and stays that way until the canvas posts the resolved scope (or fails to render). Repainting on a fixed delay instead reported "done" over the old values for anything slower than the delay, which is a Refresh that visibly did nothing.
 
-**Renaming is collision-checked, and every refusal says so.** An empty name or a name the document
-already defines leaves the document untouched and prints the reason under the field
-(`role="alert"`); an accepted rename carries the open row with it, so the editor being typed in is
-still the one on screen when the list repaints. A silent refusal here is worse than none: the field
-shows the new name, the document keeps the old one, and only the canvas can say which won.
+**Renaming is collision-checked, and every refusal says so.** An empty name or a name the document already defines leaves the document untouched and prints the reason under the field (`role="alert"`); an accepted rename carries the open row with it, so the editor being typed in is still the one on screen when the list repaints. A silent refusal here is worse than none: the field shows the new name, the document keeps the old one, and only the canvas can say which won.
 
-`data.expandRow` is the row verb — `{ name }` to open, `{ name, expanded: false }` to close, and a
-refusal listing the entries the document defines when the name is not one of them. It replaced a
-second verb that opened exactly one editor, from the second panel that listed the same names.
+`data.expandRow` is the row verb — `{ name }` to open, `{ name, expanded: false }` to close, and a refusal listing the entries the document defines when the name is not one of them. It replaced a second verb that opened exactly one editor, from the second panel that listed the same names.
 
 ## 6. Inspector (Right Panel)
 
-Four **text-labelled** tabs, in this order: **Content · Style · Logic · Assistant**. The tab ids
-(`properties`, `style`, `events`, `assistant`) are the values `view.setRightTab` accepts and the
-values `⌘⇧1`–`⌘⇧4` address, so the strip, the keymap and the automation surface cannot disagree
-about which tabs exist. Icon-only tabs are gone: a dock the author reads all day states its own
-names.
+Four **text-labelled** tabs, in this order: **Content · Style · Logic · Assistant**. The tab ids (`properties`, `style`, `events`, `assistant`) are the values `view.setRightTab` accepts and the values `⌘⇧1`–`⌘⇧4` address, so the strip, the keymap and the automation surface cannot disagree about which tabs exist. Icon-only tabs are gone: a dock the author reads all day states its own names.
 
-Every tab renders under a header naming the tab and **what it is pointed at** — the selected node,
-or the document when nothing is selected, or "no document" when nothing is open.
+Every tab renders under a header naming the tab and **what it is pointed at** — the selected node, or the document when nothing is selected, or "no document" when nothing is open.
 
-The tab selection is per-document (`session.ui.rightTab`), so the tab you were on returns with the
-file. With no document open there is nowhere per-document to keep it, and the Assistant is usable in
-exactly that state (the New Project hand-off sends a brief before any document exists), so the
-selection falls back to a single window-level value rather than being refused. An undeclared stored
-id coerces to Content.
+The tab selection is per-document (`session.ui.rightTab`), so the tab you were on returns with the file. With no document open there is nowhere per-document to keep it, and the Assistant is usable in exactly that state (the New Project hand-off sends a brief before any document exists), so the selection falls back to a single window-level value rather than being refused. An undeclared stored id coerces to Content.
 
-**The Assistant tab is where long agent work is watched, and where it stops to ask.** A site import
-runs for minutes and reports a line at a time; it renders under the tool call that started it, so the
-run and its chip are one thing and the account survives the run rather than dying with a dialog. A
-question the agent raises renders in the same transcript, as that call's own card, and the composer
-becomes its answer field — the next send answers the question instead of opening a new turn. Both
-contracts are `ai.md` §3.4–§3.5; what this section fixes is that they are drawn HERE, in a tab that
-is usable before any project exists.
+**The Assistant tab is where long agent work is watched, and where it stops to ask.** A site import runs for minutes and reports a line at a time; it renders under the tool call that started it, so the run and its chip are one thing and the account survives the run rather than dying with a dialog. A question the agent raises renders in the same transcript, as that call's own card, and the composer becomes its answer field — the next send answers the question instead of opening a new turn. Both contracts are `ai.md` §3.4–§3.5; what this section fixes is that they are drawn HERE, in a tab that is usable before any project exists.
 
-**A long run's log is a feed the reader owns, and it outlives the run.** It is a scroll region that
-follows the newest line until the reader scrolls away from it and stops following while they read —
-not a fixed tail, which showed six lines of a forty-line run and dropped every warning above the cut.
-When the run ends the panel collapses to its outcome and keeps the log behind it, because "the
-account survives the run" is not satisfied by an account that is discarded on success. That is the
-same failure the hand-off from the wizard to the assistant was made to fix, one layer in.
+**A long run's log is a feed the reader owns, and it outlives the run.** It is a scroll region that follows the newest line until the reader scrolls away from it and stops following while they read — not a fixed tail, which showed six lines of a forty-line run and dropped every warning above the cut. When the run ends the panel collapses to its outcome and keeps the log behind it, because "the account survives the run" is not satisfied by an account that is discarded on success. That is the same failure the hand-off from the wizard to the assistant was made to fix, one layer in.
 
 ### 6.1 Property Panel
 
@@ -735,137 +472,53 @@ When a Jx component is selected, the property panel renders its declared `state`
 | `"date"`  | Text field with `placeholder="YYYY-MM-DD"`                       |
 | `"color"` | Color picker (reuses style panel `renderColorSelector`)          |
 
-Each prop's value source is chosen from the shared ladder (§6.6) rather than a cycle button, and each
-prop row carries a provenance chip (§6.7) distinguishing a value set here from the component's own
-default — the same vocabulary the Style tab uses, because it is the same question asked of a second
-cascade.
+Each prop's value source is chosen from the shared ladder (§6.6) rather than a cycle button, and each prop row carries a provenance chip (§6.7) distinguishing a value set here from the component's own default — the same vocabulary the Style tab uses, because it is the same question asked of a second cascade.
 
-**A draft belongs to a node.** The in-progress text of a field that has not been committed yet is
-keyed by node path AND field name. Keyed by field name alone — as the Element rows were — every
-element shared one draft slot per field: typing a class name, clicking a sibling before blurring,
-and blurring there committed your text to the wrong element.
+**A draft belongs to a node.** The in-progress text of a field that has not been committed yet is keyed by node path AND field name. Keyed by field name alone — as the Element rows were — every element shared one draft slot per field: typing a class name, clicking a sibling before blurring, and blurring there committed your text to the wrong element.
 
-**An event name is typed, not picked.** The Logic tab's event rows use the same
-`jx-value-selector` combobox: the ten common `on*` names are SUGGESTIONS, and any handler name may
-be entered — a closed list of ten made `ondragover`, `onpointerdown`, `onwheel` and every custom
-event a component emits unbindable from the Inspector. The field is free-form, not unchecked: a name
-that is not an `on*` handler is refused, because the list that used to constrain it is gone.
+**An event name is typed, not picked.** The Logic tab's event rows use the same `jx-value-selector` combobox: the ten common `on*` names are SUGGESTIONS, and any handler name may be entered — a closed list of ten made `ondragover`, `onpointerdown`, `onwheel` and every custom event a component emits unbindable from the Inspector. The field is free-form, not unchecked: a name that is not an `on*` handler is refused, because the list that used to constrain it is gone.
 
 ### 6.2 Style Sidebar (Metadata-Driven)
 
-**The Target Line states the compound target before you type.** A style edit is addressed by a tuple
-— element, breakpoint, selector, colour-scheme variant — that the panel has always computed
-internally as its per-field key, and never showed. It is now one sentence at the top of the tab,
-region `inspector/target`, each segment a control:
+**The Target Line states the compound target before you type.** A style edit is addressed by a tuple — element, breakpoint, selector, colour-scheme variant — that the panel has always computed internally as its per-field key, and never showed. It is now one sentence at the top of the tab, region `inspector/target`, each segment a control:
 
 ```text
 ⌖  h1 · Base · Dark variant · :hover                   [ this element ]
 ```
 
-The segments are the element, the breakpoint, the colour-scheme variant when there is one, and the
-selector last. A scheme variant appears **only at Base**: scheme × breakpoint compound blocks are
-not supported (`spec.md` §9.5's pure-query limitation), so at a breakpoint the line reads
-`⌖ h1 · @md · :hover`.
+The segments are the element, the breakpoint, the colour-scheme variant when there is one, and the selector last. A scheme variant appears **only at Base**: scheme × breakpoint compound blocks are not supported (`spec.md` §9.5's pure-query limitation), so at a breakpoint the line reads `⌖ h1 · @md · :hover`.
 
-The trailing **scope chip** states the blast radius: _this element_, _all `<h1>` in this document_,
-or _all `<h1>` in this project_. The project case renders as a warning band with a count of affected
-files and a way to list them, and where the count cannot be answered it says **unknown** — never a
-confident zero. This is what makes Stylebook safe: entering it used to convert every subsequent edit
-from "this element" to "every element of this tag" with one line of after-the-fact text as the only
-signal.
+The trailing **scope chip** states the blast radius: _this element_, _all `<h1>` in this document_, or _all `<h1>` in this project_. The project case renders as a warning band with a count of affected files and a way to list them, and where the count cannot be answered it says **unknown** — never a confident zero. This is what makes Stylebook safe: entering it used to convert every subsequent edit from "this element" to "every element of this tag" with one line of after-the-fact text as the only signal.
 
-The Target Line **replaces** the breakpoint tab strip, the selector picker and the scheme badge.
-The breakpoint and scheme axes are selected on the pane context bar (§3.2 ⑦), whose definition site
-is Project Settings › Contexts (§16); the Style tab does not own a third selector and therefore
-cannot disagree with the one the canvas is rendering under.
+The Target Line **replaces** the breakpoint tab strip, the selector picker and the scheme badge. The breakpoint and scheme axes are selected on the pane context bar (§3.2 ⑦), whose definition site is Project Settings › Contexts (§16); the Style tab does not own a third selector and therefore cannot disagree with the one the canvas is rendering under.
 
-**The selector axis is element-aware.** The common set is every state any element can be in; beyond
-it, an element is offered only the states the platform actually gives it — `:popover-open`,
-`::backdrop` and `:popover-open::backdrop` on a popover, `[open]` and `:modal` on a `<dialog>`,
-`:checked` / `:invalid` / `:required` / `:user-invalid` on a form field. A rule that can never match
-is worse than a missing one: a menu that offers unmatchable states is a menu people stop reading.
-What the element already DECLARES is unioned in on top, so nothing an author has written can drop
-out of it.
+**The selector axis is element-aware.** The common set is every state any element can be in; beyond it, an element is offered only the states the platform actually gives it — `:popover-open`, `::backdrop` and `:popover-open::backdrop` on a popover, `[open]` and `:modal` on a `<dialog>`, `:checked` / `:invalid` / `:required` / `:user-invalid` on a form field. A rule that can never match is worse than a missing one: a menu that offers unmatchable states is a menu people stop reading. What the element already DECLARES is unioned in on top, so nothing an author has written can drop out of it.
 
-**Choosing `:popover-open` opens the popover on the canvas**, because this section's own rule says a
-control that selects a rendering context has to change the rendering or it is a control over a
-label. `:hover` gets away with not doing this — you can hover the element — and `:popover-open`
-cannot, because a closed popover is not on the screen to be put into that state by hand. It is
-therefore the ONE element state the canvas simulates (§4.2.2); extending that to `:hover` and
-`:focus` is a larger decision and is deliberately not taken here. `::backdrop` stays editable and is
-rendered in Preview only.
+**Choosing `:popover-open` opens the popover on the canvas**, because this section's own rule says a control that selects a rendering context has to change the rendering or it is a control over a label. `:hover` gets away with not doing this — you can hover the element — and `:popover-open` cannot, because a closed popover is not on the screen to be put into that state by hand. It is therefore the ONE element state the canvas simulates (§4.2.2); extending that to `:hover` and `:focus` is a larger decision and is deliberately not taken here. `::backdrop` stays editable and is rendered in Preview only.
 
-**Each axis is a command**, so the popover is one projection of it rather than the capability
-itself: `canvas.setBreakpoint { media, pane? }`, `canvas.setColorScheme { scheme, pane? }`,
-`canvas.setLayoutVisible { visible, pane? }` and — on a multilingual project — `i18n.switchLocale
-{ locale, pane? }` (§20.2). `pane` defaults to the focused pane and exists because
-the bar is drawn once per pane — the side bar's controls address the side pane's document, and a
-verb that could only reach the focused one would be narrower than the control it stands behind.
-`setBreakpoint` refuses a key the document cannot render under, listing the ones it can, and each
-verb repaints **the pane it wrote** — resolving the pane twice (once to write, once to render) is
-how the side bar came to change one stage and repaint the other.
+**Each axis is a command**, so the popover is one projection of it rather than the capability itself: `canvas.setBreakpoint { media, pane? }`, `canvas.setColorScheme { scheme, pane? }`, `canvas.setLayoutVisible { visible, pane? }` and — on a multilingual project — `i18n.switchLocale { locale, pane? }` (§20.2). `pane` defaults to the focused pane and exists because the bar is drawn once per pane — the side bar's controls address the side pane's document, and a verb that could only reach the focused one would be narrower than the control it stands behind. `setBreakpoint` refuses a key the document cannot render under, listing the ones it can, and each verb repaints **the pane it wrote** — resolving the pane twice (once to write, once to render) is how the side bar came to change one stage and repaint the other.
 
-**Choosing a size resizes the canvas, in every mode that draws one.** Design already draws every
-declared breakpoint side by side, so there the choice marks which artboard is active. Edit draws ONE
-column, and that column is as wide as the chosen breakpoint — the same artboard width Design gives
-it, so the same page at `md` is the same page in both modes. The iframe is really that wide, so the
-document's own media queries evaluate against it and the content reflows; it is not a scaled
-picture of a narrower page. A stored breakpoint the document no longer declares falls back to the
-base width rather than sizing the column from a query that does not exist.
+**Choosing a size resizes the canvas, in every mode that draws one.** Design already draws every declared breakpoint side by side, so there the choice marks which artboard is active. Edit draws ONE column, and that column is as wide as the chosen breakpoint — the same artboard width Design gives it, so the same page at `md` is the same page in both modes. The iframe is really that wide, so the document's own media queries evaluate against it and the content reflows; it is not a scaled picture of a narrower page. A stored breakpoint the document no longer declares falls back to the base width rather than sizing the column from a query that does not exist.
 
-A control that selects a rendering context has to change the rendering. It wrote
-`session.ui.activeMedia`, Design used it, and Edit ignored it — so in the mode where the switcher is
-most useful it was a control over a label.
+A control that selects a rendering context has to change the rendering. It wrote `session.ui.activeMedia`, Design used it, and Edit ignored it — so in the mode where the switcher is most useful it was a control over a label.
 
-**And the width chooses the size, not only the other way round.** Edit's column carries a drag
-handle on each side, symmetric about its centre, so the page can be resized to any width — including
-the widths between two declared breakpoints, which is where a responsive layout actually breaks and
-which the switcher's radio group could never reach. As the drag crosses a band the pane's active
-size follows it: one axis, one field, so the Context bar, the Target Line above and the block a
-style edit lands in all describe the width on screen. Of the sizes matching the current width, the
-one whose declared width is CLOSEST is the one named, ties going to the narrower — which reads as
-"the narrowest matching" for a desktop-first project and "the widest matching" for a mobile-first
-one, and is well defined for a project mixing the two.
+**And the width chooses the size, not only the other way round.** Edit's column carries a drag handle on each side, symmetric about its centre, so the page can be resized to any width — including the widths between two declared breakpoints, which is where a responsive layout actually breaks and which the switcher's radio group could never reach. As the drag crosses a band the pane's active size follows it: one axis, one field, so the Context bar, the Target Line above and the block a style edit lands in all describe the width on screen. Of the sizes matching the current width, the one whose declared width is CLOSEST is the one named, ties going to the narrower — which reads as "the narrowest matching" for a desktop-first project and "the widest matching" for a mobile-first one, and is well defined for a project mixing the two.
 
-The drag is magnetic within a few pixels of a declared width, so landing exactly on `md` costs no
-precision, and **Alt** passes through the magnets. It clamps at the pane's own width rather than
-scrolling or scaling: the column is as wide as it can be shown, and a size wider than the pane is
-chosen from the popover, which sizes it and lets CSS clamp it. Double-clicking a handle restores the
-chosen breakpoint's own width.
+The drag is magnetic within a few pixels of a declared width, so landing exactly on `md` costs no precision, and **Alt** passes through the magnets. It clamps at the pane's own width rather than scrolling or scaling: the column is as wide as it can be shown, and a size wider than the pane is chosen from the popover, which sizes it and lets CSS clamp it. Double-clicking a handle restores the chosen breakpoint's own width.
 
-**The width is an inspection; the size it lands on is the decision.** Nothing persists the dragged
-width — it is discarded whenever the canvas mode changes, so entering Edit always starts at the
-breakpoint the switcher names. `activeMedia` persists as it always has, so a relaunch reopens the
-document at that breakpoint's declared width. Preview does not read the dragged width either: it is
-the fidelity view, and "somewhere between `md` and `lg`" is a width no visitor will ever have.
+**The width is an inspection; the size it lands on is the decision.** Nothing persists the dragged width — it is discarded whenever the canvas mode changes, so entering Edit always starts at the breakpoint the switcher names. `activeMedia` persists as it always has, so a relaunch reopens the document at that breakpoint's declared width. Preview does not read the dragged width either: it is the fidelity view, and "somewhere between `md` and `lg`" is a width no visitor will ever have.
 
 #### resolving with
 
-The document DATA a render resolves against — a page's route params, a component's test props —
-sits in its own popover beside the rendering-context one, headed **resolving with**, one field per
-line. Its trigger counts the values that are set (`2 set`, else `Defaults`), because a chevron with
-no reading is a control you must open to learn whether it was worth opening.
+The document DATA a render resolves against — a page's route params, a component's test props — sits in its own popover beside the rendering-context one, headed **resolving with**, one field per line. Its trigger counts the values that are set (`2 set`, else `Defaults`), because a chevron with no reading is a control you must open to learn whether it was worth opening.
 
-A SECOND popover rather than a fourth group in the first: everything in the rendering-context
-popover is something you PICK from what the project defines, and these are values you TYPE. §2
-principle 5 draws that line — that control only selects.
+A SECOND popover rather than a fourth group in the first: everything in the rendering-context popover is something you PICK from what the project defines, and these are values you TYPE. §2 principle 5 draws that line — that control only selects.
 
-They were a row of fields open on the bar, on a 28px band that also carries the editor, the view and
-the rendering context. Moving them behind a click costs a gesture, which the screenshot contract
-(§13.1) is right to weigh — and the answer is that a transient surface opens by COMMAND (§13.2), so
-the camera spends a `cmd` step rather than a selector.
+They were a row of fields open on the bar, on a 28px band that also carries the editor, the view and the rendering context. Moving them behind a click costs a gesture, which the screenshot contract (§13.1) is right to weigh — and the answer is that a transient surface opens by COMMAND (§13.2), so the camera spends a `cmd` step rather than a selector.
 
-**Each field is a command too.** `canvas.setTestProp { name, value, pane? }` and
-`canvas.setRouteParam { name, value, pane? }`, each refusing a name the document does not declare.
-These two wrote `session.ui` inline while every control beside them ran a verb; behind a click that
-would have been a value reachable only by opening a popover and typing. Naming them moved the shot
-that types a test value off `input` entirely — `inputSteps` 14 → 13 and `nonDerivedRegions` 11 → 10,
-both budgets ratcheting down in the change that could have cost them.
+**Each field is a command too.** `canvas.setTestProp { name, value, pane? }` and `canvas.setRouteParam { name, value, pane? }`, each refusing a name the document does not declare. These two wrote `session.ui` inline while every control beside them ran a verb; behind a click that would have been a value reachable only by opening a popover and typing. Naming them moved the shot that types a test value off `input` entirely — `inputSteps` 14 → 13 and `nonDerivedRegions` 11 → 10, both budgets ratcheting down in the change that could have cost them.
 
-These are SETTERS. §5.3's keymap declares `⌘⌥↑`/`⌘⌥↓` and `⌘⌥⇧S` to _cycle_ the size and scheme
-axes; a chord carries no argument, so those need `next`/`prev` records of their own — each a delta,
-which §13's R1 forbids a screenshot from naming. Naming the state you end in works from every
-surface, and the cycle chords are a separate decision.
+These are SETTERS. §5.3's keymap declares `⌘⌥↑`/`⌘⌥↓` and `⌘⌥⇧S` to _cycle_ the size and scheme axes; a chord carries no argument, so those need `next`/`prev` records of their own — each a delta, which §13's R1 forbids a screenshot from naming. Naming the state you end in works from every surface, and the cycle chords are a separate decision.
 
 Organized, metadata-driven style sections. Metadata loaded from `css-meta.json` (JSON Schema definitions for each CSS property).
 
@@ -956,27 +609,15 @@ Properties conditionally appear based on other property values (e.g. flex proper
 
 #### The breakpoint and scheme axes
 
-Neither is chosen here. Both are selected on the pane context bar (§3.2 ⑦) and defined in Project
-Settings › Contexts (§16); the Target Line's segments **state** the resolved value and route to that
-definition site. While a scheme is forced, Base-context reads and commits target that scheme's
-`@--name` block through the same media-style mutations, and base values are reported by the
-provenance chip as inherited **from Base** rather than as a placeholder indistinguishable from the
-CSS initial value.
+Neither is chosen here. Both are selected on the pane context bar (§3.2 ⑦) and defined in Project Settings › Contexts (§16); the Target Line's segments **state** the resolved value and route to that definition site. While a scheme is forced, Base-context reads and commits target that scheme's `@--name` block through the same media-style mutations, and base values are reported by the provenance chip as inherited **from Base** rather than as a placeholder indistinguishable from the CSS initial value.
 
 #### Nested Selector Context
 
-Nested CSS selectors (`:hover`, `:focus`, `:active`, `& childTag`) are editable as separate style
-contexts, and the active one is the Target Line's last segment. Naming a new selector opens a prompt
-dialog (`studio-ui-guidelines.md` §8.7) with validation; accepting it **points the tab at that
-selector without writing anything** — the rule is created by the first property set, so an abandoned
-selector leaves no empty rule behind.
+Nested CSS selectors (`:hover`, `:focus`, `:active`, `& childTag`) are editable as separate style contexts, and the active one is the Target Line's last segment. Naming a new selector opens a prompt dialog (`studio-ui-guidelines.md` §8.7) with validation; accepting it **points the tab at that selector without writing anything** — the rule is created by the first property set, so an abandoned selector leaves no empty rule behind.
 
 #### Property Filter
 
-One control: a search input filtering CSS properties by name or label (case-insensitive substring),
-which force-opens matching sections and hides empty ones. There is deliberately **no second control
-isolating properties that have values** — that is what the provenance tally on each collapsed
-section header now says, continuously, without the author having to toggle a mode to find out.
+One control: a search input filtering CSS properties by name or label (case-insensitive substring), which force-opens matching sections and hides empty ones. There is deliberately **no second control isolating properties that have values** — that is what the provenance tally on each collapsed section header now says, continuously, without the author having to toggle a mode to find out.
 
 ### 6.3 State Editor
 
@@ -1011,9 +652,7 @@ For custom element definitions:
 
 ### 6.6 The value-source ladder
 
-Six vocabularies asked "how is this value produced" in six different words — the dynamic-slot ring,
-the events picker, the expression operand picker, the schema-form source select. They are one
-vocabulary now, and the provenance chip **is** the control:
+Six vocabularies asked "how is this value produced" in six different words — the dynamic-slot ring, the events picker, the expression operand picker, the schema-form source select. They are one vocabulary now, and the provenance chip **is** the control:
 
 | Rung            | Means                     |
 | --------------- | ------------------------- |
@@ -1024,26 +663,12 @@ vocabulary now, and the provenance chip **is** the control:
 
 Three rules the ladder must keep:
 
-1.  **Any rung is one action away.** The control opens a picker; it does not cycle. A ring forced
-    `$ref → literal` to pass through `${}`, which is an edit the author did not ask for.
-2.  **Which rungs exist is derived from what the schema permits**, never from a hand-written list.
-    Hand-written lists are how the `Formula` rung came to be drawn on fields where `$expression` was
-    not legal and reachable on none.
-3.  **Switching rungs remembers the representation it left**, so a switch is never destructive, and
-    typing a `${…}` literal does not swap the widget underneath the author mid-keystroke.
-4.  **A position may seed its own rung.** The generic `Formula` seed is a bare `??` node, which is a
-    sensible start almost everywhere and an INVALID document wherever the schema narrows which
-    operators the position takes — clicking the chip would write something that fails its own
-    validator. A position that narrows supplies the seed instead.
+1.  **Any rung is one action away.** The control opens a picker; it does not cycle. A ring forced `$ref → literal` to pass through `${}`, which is an edit the author did not ask for.
+2.  **Which rungs exist is derived from what the schema permits**, never from a hand-written list. Hand-written lists are how the `Formula` rung came to be drawn on fields where `$expression` was not legal and reachable on none.
+3.  **Switching rungs remembers the representation it left**, so a switch is never destructive, and typing a `${…}` literal does not swap the widget underneath the author mid-keystroke.
+4.  **A position may seed its own rung.** The generic `Formula` seed is a bare `??` node, which is a sensible start almost everywhere and an INVALID document wherever the schema narrows which operators the position takes — clicking the chip would write something that fails its own validator. A position that narrows supplies the seed instead.
 
-**An element's `tagName` is one of these positions**, and is the ladder's own argument made twice
-over. Its rungs derive to **Fixed value** and **Formula** and no `Mixed text`: `TagName` carries a
-`pattern`, so the derivation refuses a template rung — and a `${…}` in tag position is precisely
-what that pattern exists to reject (`specs/schema.md` §3.1). It also narrows the operators to `?:`
-and `switch`, which is what rule 4 is for. Before it joined the ladder the row was a hand-written
-control, and it did both things rule 2 warns about: it rendered `[object Object]` for a value it did
-not expect, and its one text input would have replaced an author's whole expression on the first
-keystroke.
+**An element's `tagName` is one of these positions**, and is the ladder's own argument made twice over. Its rungs derive to **Fixed value** and **Formula** and no `Mixed text`: `TagName` carries a `pattern`, so the derivation refuses a template rung — and a `${…}` in tag position is precisely what that pattern exists to reject (`specs/schema.md` §3.1). It also narrows the operators to `?:` and `switch`, which is what rule 4 is for. Before it joined the ladder the row was a hand-written control, and it did both things rule 2 warns about: it rendered `[object Object]` for a value it did not expect, and its one text input would have replaced an author's whole expression on the first keystroke.
 
 ### 6.7 Provenance, and multiple selection
 
@@ -1056,43 +681,23 @@ keystroke.
 | **Default**   | renders nothing; absence is the ghost state                                                                |
 | **Bound**     | names the signal or formula, and clicking opens it — the Data panel, and that entry's row                  |
 
-**Bound means every tab.** The Style tab's chip has opened its source since P5; the Content tab's
-two bound branches returned a donor and a title and no handler, so the same row of this table was
-kept on one tab and merely printed on the other. A chip only offers the jump when the document
-actually defines the entry: a `$ref` left over from a rename names its donor and does nothing else,
-because opening a row that is not there is a worse answer than not opening one.
+**Bound means every tab.** The Style tab's chip has opened its source since P5; the Content tab's two bound branches returned a donor and a title and no handler, so the same row of this table was kept on one tab and merely printed on the other. A chip only offers the jump when the document actually defines the entry: a `$ref` left over from a rename names its donor and does nothing else, because opening a row that is not there is a worse answer than not opening one.
 
-The inheritance walk already knew the donor and discarded it, leaving inherited values rendered as
-an input placeholder — visually identical to the CSS initial value. Collapsed section headers carry
-the same states as a tally, which is why there is no separate "show only active properties" toggle:
-that toggle existed only because provenance was invisible.
+The inheritance walk already knew the donor and discarded it, leaving inherited values rendered as an input placeholder — visually identical to the CSS initial value. Collapsed section headers carry the same states as a tally, which is why there is no separate "show only active properties" toggle: that toggle existed only because provenance was invisible.
 
-**`session.selection` is a `JxPath[]`.** `[]` means nothing is selected — it is no longer a legal
-spelling of the root path, which is `[[]]`. The first entry is the range anchor and the last is the
-**primary**; every surface that addresses a single node resolves it through one function, so at
-`length === 1` each receives exactly what a single-path field handed it. Multi-selection cases are
-additions beside that path, never a rewrite of it.
+**`session.selection` is a `JxPath[]`.** `[]` means nothing is selected — it is no longer a legal spelling of the root path, which is `[[]]`. The first entry is the range anchor and the last is the **primary**; every surface that addresses a single node resolves it through one function, so at `length === 1` each receives exactly what a single-path field handed it. Multi-selection cases are additions beside that path, never a rewrite of it.
 
 Three consequences are normative:
 
-1.  **A structural command over a selection is ONE transaction and therefore one undo step.** Splices
-    are applied in descending document order, so no step renumbers a coordinate a later step needs,
-    and paths contained by another selected path are dropped rather than spliced twice.
-2.  **A value that differs across the selection renders as Mixed**, in the same chip vocabulary,
-    rather than showing the primary's value as though it were everyone's.
-3.  **A selection is replaced, never mutated in place.** Effects track the set, not the array
-    identity; an in-place push would move the selection without repainting the panel drawing it.
+1.  **A structural command over a selection is ONE transaction and therefore one undo step.** Splices are applied in descending document order, so no step renumbers a coordinate a later step needs, and paths contained by another selected path are dropped rather than spliced twice.
+2.  **A value that differs across the selection renders as Mixed**, in the same chip vocabulary, rather than showing the primary's value as though it were everyone's.
+3.  **A selection is replaced, never mutated in place.** Effects track the set, not the array identity; an in-place push would move the selection without repainting the panel drawing it.
 
 ### 6.8 The `From data…` picker addresses only what it can list
 
-> **Status: Partial.** The picker lists the document's state signals and writes a `$ref` to the one
-> chosen. A pointer the picker cannot construct is not rejected anywhere — it is simply unreachable
-> from the UI, and an author who hand-writes one gets a field that renders correctly and cannot be
-> edited back.
+> **Status: Partial.** The picker lists the document's state signals and writes a `$ref` to the one chosen. A pointer the picker cannot construct is not rejected anywhere — it is simply unreachable from the UI, and an author who hand-writes one gets a field that renders correctly and cannot be edited back.
 
-The rung writes a JSON Pointer (`spec.md` §7.1), and JSON Pointer addresses strictly more than a
-flat list of signals. RFC 6901 §3 excludes exactly two characters from a reference token, `/` and
-`~`; every other character is ordinary. Three consequences the picker does not yet cover:
+The rung writes a JSON Pointer (`spec.md` §7.1), and JSON Pointer addresses strictly more than a flat list of signals. RFC 6901 §3 excludes exactly two characters from a reference token, `/` and `~`; every other character is ordinary. Three consequences the picker does not yet cover:
 
 | Pointer                     | Addresses                              | Picker |
 | --------------------------- | -------------------------------------- | ------ |
@@ -1101,44 +706,24 @@ flat list of signals. RFC 6901 §3 excludes exactly two characters from a refere
 | `#/state/user.name`         | one signal whose name contains a dot   | ❌     |
 | `#/state/a~1b`              | one signal whose name contains a slash | ❌     |
 
-The first gap is the common one: 3 of the repository's 227 `#/state/` refs walk into a signal's
-value, and the docs site's own layout is one of them. The other two are legal and unused — no
-document here has such a key — but "unused" is not "invalid", and the picker currently makes them
-authorable only by editing JSON by hand.
+The first gap is the common one: 3 of the repository's 227 `#/state/` refs walk into a signal's value, and the docs site's own layout is one of them. The other two are legal and unused — no document here has such a key — but "unused" is not "invalid", and the picker currently makes them authorable only by editing JSON by hand.
 
 Two rules for whatever closes this:
 
-1.  **The picker must never write a pointer it cannot read back.** A control that can produce a ref
-    it then renders as blank or as `[object Object]` is the failure §6.6 rule 2 already names.
-2.  **Escaping is the writer's job, not the author's.** An author who names a signal `a/b` types
-    `a/b`; `~1` is an encoding detail of the pointer and must not surface in the UI. The encoder
-    exists — `escapeToken` in `@jxsuite/runtime/pointer` — and is what any path-aware picker builds
-    its segments with.
+1.  **The picker must never write a pointer it cannot read back.** A control that can produce a ref it then renders as blank or as `[object Object]` is the failure §6.6 rule 2 already names.
+2.  **Escaping is the writer's job, not the author's.** An author who names a signal `a/b` types `a/b`; `~1` is an encoding detail of the pointer and must not surface in the UI. The encoder exists — `escapeToken` in `@jxsuite/runtime/pointer` — and is what any path-aware picker builds its segments with.
 
-Until then the gap is stated rather than hidden, because the alternative is a picker that silently
-implies the pointer grammar is flatter than it is.
+Until then the gap is stated rather than hidden, because the alternative is a picker that silently implies the pointer grammar is flatter than it is.
 
 ## 7. Project Styles
 
 ### 7.1 Overview
 
-The project's design tokens and element defaults, edited as a **document** (§17) with the live
-canvas beside them: every HTML element and project component rendered under the project's root
-styles, so tuning a token shows the page changing rather than describing it.
+The project's design tokens and element defaults, edited as a **document** (§17) with the live canvas beside them: every HTML element and project component rendered under the project's root styles, so tuning a token shows the page changing rather than describing it.
 
-**The user-facing name is Project Styles; `"stylebook"` remains the wire value.** It is a member of
-`CANVAS_MODES` and therefore of the `ParentToIframe` union, so renaming it would require the studio
-bundle and `dist/iframe-entry.js` rebuilt in lockstep. The id and the name are different things, and
-the code says which is which. Tokens are pickable as chips from any Style field, and a colour scheme
-is declared as a row in Contexts (§16) rather than by a control that exists only here.
+**The user-facing name is Project Styles; `"stylebook"` remains the wire value.** It is a member of `CANVAS_MODES` and therefore of the `ParentToIframe` union, so renaming it would require the studio bundle and `dist/iframe-entry.js` rebuilt in lockstep. The id and the name are different things, and the code says which is which. Tokens are pickable as chips from any Style field, and a colour scheme is declared as a row in Contexts (§16) rather than by a control that exists only here.
 
-**`styles.open` is how it is reached by name** (project level, `requires: "an open project"`). Until
-it existed, Project Styles had no command at all: the pane's Editor control can only re-mode a tab
-that is already open, and the only other door was a button inside Project Settings › Overview that
-wrote `session.ui.canvasMode` itself. So from a closed configuration tab there was no way to ask for
-it — `canvas.setMode` is document level and requires an open document. It is a peer of
-`settings.open` over the same `project.json` tab and declares the same availability rule (§17.1),
-and it renders in the rail foot's Settings menu and the palette.
+**`styles.open` is how it is reached by name** (project level, `requires: "an open project"`). Until it existed, Project Styles had no command at all: the pane's Editor control can only re-mode a tab that is already open, and the only other door was a button inside Project Settings › Overview that wrote `session.ui.canvasMode` itself. So from a closed configuration tab there was no way to ask for it — `canvas.setMode` is document level and requires an open document. It is a peer of `settings.open` over the same `project.json` tab and declares the same availability rule (§17.1), and it renders in the rail foot's Settings menu and the palette.
 
 ### 7.2 Canvas
 
@@ -1160,9 +745,7 @@ Editing styles in stylebook mode writes nested CSS rules (`& tag`) to the docume
 
 The site-settings design-token editor is scheme-aware for color tokens: each color row carries a per-scheme override field writing into the project style's scheme block. Declaring a scheme is not done here — the token editor links to Project Settings › Contexts (§16), which is the single definition site for breakpoints and colour schemes, and which is why adding one no longer costs the author their element selection. Token edits push to live page canvases as an in-place site-style sheet replace (no re-render).
 
-Stylebook's own compound target is stated by the Target Line (§6.2), whose scope chip is what tells
-the author, before the first keystroke, that an edit here lands on every element of a tag rather
-than on one.
+Stylebook's own compound target is stated by the Target Line (§6.2), whose scope chip is what tells the author, before the first keystroke, that an edit here lands on every element of a tag rather than on one.
 
 ---
 
@@ -1172,13 +755,7 @@ than on one.
 
 The studio holds no format knowledge: `.json` is native, and every other extension dispatches through the project's **format registry** (see `specs/extensions.md`), built from the project-level `imports` map and fetched via the PAL (`listFormats`). Opening a format file invokes the class's `parse` capability; saving invokes `serialize` (`formatAction` → `POST /__studio/format` on the dev server, RPC on desktop).
 
-The registry answers three more questions, all derived from the same declarations and none of them a
-list this app maintains: which formats a new file may be created as (§9.1.1), which pairs a document
-may be converted between (§8.4), and which extensions the rename refactor can write back. `.json` is
-the endpoint every one of them shares, because a registry never claims it. A format extension that
-declares `parse` and `serialize` therefore reaches all three with no edit to the studio. The refactor
-alone also accepts `rewrite` in place of `serialize`, which is how a format that is read but never
-round-tripped still has its references repaired.
+The registry answers three more questions, all derived from the same declarations and none of them a list this app maintains: which formats a new file may be created as (§9.1.1), which pairs a document may be converted between (§8.4), and which extensions the rename refactor can write back. `.json` is the endpoint every one of them shares, because a registry never claims it. A format extension that declares `parse` and `serialize` therefore reaches all three with no edit to the studio. The refactor alone also accepts `rewrite` in place of `serialize`, which is how a format that is read but never round-tripped still has its references repaired.
 
 The format's `$studio` block drives the control surface:
 
@@ -1189,30 +766,15 @@ The format's `$studio` block drives the control surface:
 
 ### 8.2 Fluid Document Editing
 
-The canvas carries a **live caret**. There is no editing session to enter and no modal state: a caret
-inside a block _is_ the edit. Clicking anywhere in text places the caret at the clicked character;
-the arrow keys, Home/End and word motion move it through the whole document, across block
-boundaries; and a selection may span any number of blocks.
+The canvas carries a **live caret**. There is no editing session to enter and no modal state: a caret inside a block _is_ the edit. Clicking anywhere in text places the caret at the clicked character; the arrow keys, Home/End and word motion move it through the whole document, across block boundaries; and a selection may span any number of blocks.
 
-This is achieved by making the canvas render container a single `contenteditable`, rather than
-toggling `contenteditable` on one block at a time. The browser then owns caret placement,
-line-wrap-aware vertical motion, word and line motion, IME composition, and cross-block selection —
-none of which the studio implements.
+This is achieved by making the canvas render container a single `contenteditable`, rather than toggling `contenteditable` on one block at a time. The browser then owns caret placement, line-wrap-aware vertical motion, word and line motion, IME composition, and cross-block selection — none of which the studio implements.
 
-Component instances are `contenteditable="false"` islands: the caret treats each as one atomic unit
-and never enters its internals. Prop-bound text inside a component (§8.2.5) is the exception.
+Component instances are `contenteditable="false"` islands: the caret treats each as one atomic unit and never enters its internals. Prop-bound text inside a component (§8.2.5) is the exception.
 
-**An island covers a component's internals, never the document slotted into it.** A component's
-children are page content — in a markdown class-directive page they are the author's own prose, and
-as §4.1 notes those pages place _every_ editable block inside a component. Each such block is
-stamped with its own `data-jx-path` and re-opened with `contenteditable="true"`, so the island
-freezes only what the component renders for itself. A **nested** component instance is an island in
-its own right and stays frozen, even though it is also a child of one; internals rendered by a
-component's own `connectedCallback` never carry a stamped path, so they are never re-opened.
+**An island covers a component's internals, never the document slotted into it.** A component's children are page content — in a markdown class-directive page they are the author's own prose, and as §4.1 notes those pages place _every_ editable block inside a component. Each such block is stamped with its own `data-jx-path` and re-opened with `contenteditable="true"`, so the island freezes only what the component renders for itself. A **nested** component instance is an island in its own right and stays frozen, even though it is also a child of one; internals rendered by a component's own `connectedCallback` never carry a stamped path, so they are never re-opened.
 
-Text reaches the document on a **~500 ms typing pause** and whenever the caret leaves a block. Any
-operation that reads the document as authoritative — chiefly saving — first flushes what the caret
-has typed but not yet committed.
+Text reaches the document on a **~500 ms typing pause** and whenever the caret leaves a block. Any operation that reads the document as authoritative — chiefly saving — first flushes what the caret has typed but not yet committed.
 
 #### 8.2.1 The `beforeinput` chokepoint
 
@@ -1228,128 +790,62 @@ The browser may edit text; it may not restructure the document. Every `beforeinp
 | Native formatting, native history, text drag      | Prevented; the studio owns these     |
 | Any edit in a prop-bound host (§8.2.5)            | Applied natively; splits prevented   |
 
-**A prop-bound host is classified before positions are resolved.** It is editable text with no
-document path of its own — it commits as a prop VALUE, not as a block — so its position always
-resolves to nothing, and the rule that suppresses an unresolvable position would otherwise reject
-every keystroke in it. That is not hypothetical: it is what made a component slot show a caret and
-silently swallow everything typed into it. Nothing in such a host is structural, so nothing is
-re-expressed; the only intents prevented are the paragraph split and the line break, because a prop
-is one plain string.
+**A prop-bound host is classified before positions are resolved.** It is editable text with no document path of its own — it commits as a prop VALUE, not as a block — so its position always resolves to nothing, and the rule that suppresses an unresolvable position would otherwise reject every keystroke in it. That is not hypothetical: it is what made a component slot show a caret and silently swallow everything typed into it. Nothing in such a host is structural, so nothing is re-expressed; the only intents prevented are the paragraph split and the line break, because a prop is one plain string.
 
-A structural intent with no handler is **suppressed**, never delegated back to the browser: an
-unimplemented operation must leave the document untouched rather than let the engine restructure the
-DOM behind the model.
+A structural intent with no handler is **suppressed**, never delegated back to the browser: an unimplemented operation must leave the document untouched rather than let the engine restructure the DOM behind the model.
 
-A **collapsed selection outranks `getTargetRanges()`**. For a boundary Backspace the browser reports
-the range it would delete — reaching out of the block and into the previous one, because joining
-them is how it implements the keystroke. The caret says what the author meant; the target range says
-what the browser would have done about it.
+A **collapsed selection outranks `getTargetRanges()`**. For a boundary Backspace the browser reports the range it would delete — reaching out of the block and into the previous one, because joining them is how it implements the keystroke. The caret says what the author meant; the target range says what the browser would have done about it.
 
-**IME composition suspends every commit.** A composition is a multi-keystroke transaction the browser
-owns: the DOM holds provisional text and the input engine holds a selection tied to it. So between
-`compositionstart` and `compositionend` the idle tick is cancelled and not re-armed, an explicit flush
-is a no-op, and exactly one commit runs when the composition ends. Committing inside one would capture
-half-formed text and — because a commit restores the selection — cancel the composition outright. The
-editing host exposes its composition state so nothing else rewrites the editable subtree mid-input
-either.
+**IME composition suspends every commit.** A composition is a multi-keystroke transaction the browser owns: the DOM holds provisional text and the input engine holds a selection tied to it. So between `compositionstart` and `compositionend` the idle tick is cancelled and not re-armed, an explicit flush is a no-op, and exactly one commit runs when the composition ends. Committing inside one would capture half-formed text and — because a commit restores the selection — cancel the composition outright. The editing host exposes its composition state so nothing else rewrites the editable subtree mid-input either.
 
 #### 8.2.8 Accessibility
 
-The editable region carries `role="textbox"`, `aria-multiline="true"` and a label, added and removed
-with `contenteditable` itself. A bare `contenteditable` div announces as an unlabelled group, and the
-canvas lives in a cross-origin iframe, so a screen reader traversing in has no surrounding context to
-infer the region's purpose from.
+The editable region carries `role="textbox"`, `aria-multiline="true"` and a label, added and removed with `contenteditable` itself. A bare `contenteditable` div announces as an unlabelled group, and the canvas lives in a cross-origin iframe, so a screen reader traversing in has no surrounding context to infer the region's purpose from.
 
-This describes the REGION only. Per-block landmarks and a keyboard-reachable block action bar
-(§4.4) are not yet implemented.
+This describes the REGION only. Per-block landmarks and a keyboard-reachable block action bar (§4.4) are not yet implemented.
 
 #### 8.2.2 Which tags hold a caret
 
-A tag holds a caret when its element vocabulary says it accepts inline children. This is DERIVED,
-never a hand-maintained list, from two sources resolved PER TAG:
+A tag holds a caret when its element vocabulary says it accepts inline children. This is DERIVED, never a hand-maintained list, from two sources resolved PER TAG:
 
-1. **The document's format class** (`$studio.elements`, §8.1) for the tags it declares:
-   `nesting[tag].inline === true` holds a caret; a container (`inline: false`, or an `only: [...]`
-   rule) does not; and a tag in the format's `inline` list is markup within a block, never a block.
-2. **The studio's element metadata** for every tag the format does not mention — HTML reaching the
-   canvas through a directive, and native documents, which have no format class at all. The rule is
-   the same: a non-empty `$inlineChildren` declaration.
+1. **The document's format class** (`$studio.elements`, §8.1) for the tags it declares: `nesting[tag].inline === true` holds a caret; a container (`inline: false`, or an `only: [...]` rule) does not; and a tag in the format's `inline` list is markup within a block, never a block.
+2. **The studio's element metadata** for every tag the format does not mention — HTML reaching the canvas through a directive, and native documents, which have no format class at all. The rule is the same: a non-empty `$inlineChildren` declaration.
 
-Per-tag resolution rather than a union, because the format's verdict must be able to say NO. Under
-Markdown a `blockquote` holds paragraphs, so the caret belongs in the `<p>` inside it; and an `<a>`
-is inline, so clicking a link puts the caret in the enclosing paragraph rather than making the link
-itself the edited block.
+Per-tag resolution rather than a union, because the format's verdict must be able to say NO. Under Markdown a `blockquote` holds paragraphs, so the caret belongs in the `<p>` inside it; and an `<a>` is inline, so clicking a link puts the caret in the enclosing paragraph rather than making the link itself the edited block.
 
-`pre` is excluded throughout: its content is preformatted code, where whitespace is significant and
-the inline-markup path does not apply.
+`pre` is excluded throughout: its content is preformatted code, where whitespace is significant and the inline-markup path does not apply.
 
-The format's verdicts are computed per render and cross to the canvas frame with it, because the
-answer belongs to the document, not to the frame.
+The format's verdicts are computed per render and cross to the canvas frame with it, because the answer belongs to the document, not to the frame.
 
 #### 8.2.3 Caret positions
 
-A caret position is a **block path plus a character offset into that block's rendered text**. The
-offset counts rendered characters, not DOM child indices, so it is agnostic to inline markup: in
-`<p>a<strong>bc</strong>d</p>` offset 3 sits between "c" and "d" however the bold run is nested.
+A caret position is a **block path plus a character offset into that block's rendered text**. The offset counts rendered characters, not DOM child indices, so it is agnostic to inline markup: in `<p>a<strong>bc</strong>d</p>` offset 3 sits between "c" and "d" however the bold run is nested.
 
-Expressed this way a caret survives the DOM underneath it being rebuilt, which is what lets a
-surgical patch — including a co-author's edit — land without moving the author's cursor.
+Expressed this way a caret survives the DOM underneath it being rebuilt, which is what lets a surgical patch — including a co-author's edit — land without moving the author's cursor.
 
 #### 8.2.4 Structural edits
 
 - **Split** — `Enter` divides the block at the caret; the caret lands at the start of the new block.
-- **Merge** — Backspace at a block's start and Delete at its end are the same join from either side.
-  The earlier block survives, keeps its own tag, and the caret lands at the seam. A container the
-  removal empties is pruned.
-- **Range collapse** — a selection spanning blocks collapses to a merge with both ends clipped: the
-  first block keeps what precedes the selection, the last keeps what follows, and every block
-  between is removed. Typing over the selection inserts at the join.
+- **Merge** — Backspace at a block's start and Delete at its end are the same join from either side. The earlier block survives, keeps its own tag, and the caret lands at the seam. A container the removal empties is pruned.
+- **Range collapse** — a selection spanning blocks collapses to a merge with both ends clipped: the first block keeps what precedes the selection, the last keeps what follows, and every block between is removed. Typing over the selection inserts at the join.
 
-Document order for "the previous block" comes from the **rendered DOM**, not the document tree: a
-range or a boundary may cross list items, table cells and nested containers, none of which is a flat
-index walk.
+Document order for "the previous block" comes from the **rendered DOM**, not the document tree: a range or a boundary may cross list items, table cells and nested containers, none of which is a flat index walk.
 
 #### 8.2.5 Dragging
 
-Reordering on the canvas is initiated **only** from the block action bar's drag handle (§4.4).
-Pressing and dragging within text selects text. Native drag inside the editable region is
-suppressed.
+Reordering on the canvas is initiated **only** from the block action bar's drag handle (§4.4). Pressing and dragging within text selects text. Native drag inside the editable region is suppressed.
 
 #### 8.2.6 Prop-bound text
 
-Text inside a component instance that is an invertible prop binding opens a nested, plaintext-only
-editing host on press. It commits to the instance's `$props`, and takes no rich formatting, split or
-slash menu.
+Text inside a component instance that is an invertible prop binding opens a nested, plaintext-only editing host on press. It commits to the instance's `$props`, and takes no rich formatting, split or slash menu.
 
-**Only a string is text.** A prop whose stored value is a number or a boolean renders as text and
-would read as editable, but the session commits `textContent` — so editing it retypes the value, and
-`${count * 2}` becomes string concatenation. Those props are refused here and edited in the
-properties panel, which knows their type. An expression (`${…}`) and an object were already refused.
+**Only a string is text.** A prop whose stored value is a number or a boolean renders as text and would read as editable, but the session commits `textContent` — so editing it retypes the value, and `${count * 2}` becomes string concatenation. Those props are refused here and edited in the properties panel, which knows their type. An expression (`${…}`) and an object were already refused.
 
-**`$props` is not the only place a value lives.** An instance may deliver a prop by any route the
-property bridge reads (`compiler.md` §4.4), and each of them renders through the marker while
-`$props` holds nothing — so reading `$props` alone reports the prop as unset and offers to edit it.
-Four routes do this: a `data-jx-props` payload; the JSON shorthand `attributes: {"props.<name>"}`; an
-`attributes` name that collides with a reflected DOM property such as `title` or `role`; and a
-**top-level key on the instance node** (`{"tagName": "x-card", "heading": "Local"}`), which is the
-property-first interface addressed straight at the element and which touches `attributes` not at
-all. Committing would write `$props` and leave the other value standing: two sources for one
-rendered value. For a reflected attribute name the attribute wins, so the edit is invisible;
-otherwise `$props` wins and the stale value waits until the prop is cleared, when it resurrects. All
-four are refused, and the properties panel edits the real source.
+**`$props` is not the only place a value lives.** An instance may deliver a prop by any route the property bridge reads (`compiler.md` §4.4), and each of them renders through the marker while `$props` holds nothing — so reading `$props` alone reports the prop as unset and offers to edit it. Four routes do this: a `data-jx-props` payload; the JSON shorthand `attributes: {"props.<name>"}`; an `attributes` name that collides with a reflected DOM property such as `title` or `role`; and a **top-level key on the instance node** (`{"tagName": "x-card", "heading": "Local"}`), which is the property-first interface addressed straight at the element and which touches `attributes` not at all. Committing would write `$props` and leave the other value standing: two sources for one rendered value. For a reflected attribute name the attribute wins, so the edit is invisible; otherwise `$props` wins and the stale value waits until the prop is cleared, when it resurrects. All four are refused, and the properties panel edits the real source.
 
-The match is by name against that one prop, so an unrelated `class` or `className` beside it changes
-nothing — and a **reserved** key (`spec.md` §3: `name`, `items`, `children`, …) at the top level is
-not a delivery at all, because the runtime never lowers one to a DOM property. Refusing on a
-reserved name would block a prop the key never supplied.
+The match is by name against that one prop, so an unrelated `class` or `className` beside it changes nothing — and a **reserved** key (`spec.md` §3: `name`, `items`, `children`, …) at the top level is not a delivery at all, because the runtime never lowers one to a DOM property. Refusing on a reserved name would block a prop the key never supplied.
 
-**A session that changes nothing writes nothing.** The commit is compared against the text the
-session opened with, not only against the stored prop: an _unset_ prop's stored value is `undefined`
-while the marker renders the definition's default, so a comparison against storage alone treats a
-bare click as a change and writes the default onto the instance — dirtying the document and
-detaching that instance from its definition. Escape is a real cancel on the same rule, and when an
-idle commit has already written during the session it writes the original back rather than leaving
-the tick standing.
+**A session that changes nothing writes nothing.** The commit is compared against the text the session opened with, not only against the stored prop: an _unset_ prop's stored value is `undefined` while the marker renders the definition's default, so a comparison against storage alone treats a bare click as a change and writes the default onto the instance — dirtying the document and detaching that instance from its definition. Escape is a real cancel on the same rule, and when an idle commit has already written during the session it writes the original back rather than leaving the tick standing.
 
 #### 8.2.7 Serialization
 
@@ -1366,61 +862,29 @@ The studio loads any registered format file (e.g. `.md` with the `Markdown` clas
 
 ### 8.4 Converting a Document Between Formats
 
-> **Status: Implemented.** A page drafted as JSON that wants to be prose, or a markdown page that
-> needs `state`, was a manual re-type. The registry already knows how to read one and write the
-> other; a conversion is that pair, applied to a file.
+> **Status: Implemented.** A page drafted as JSON that wants to be prose, or a markdown page that needs `state`, was a manual re-type. The registry already knows how to read one and write the other; a conversion is that pair, applied to a file.
 
 **Which pairs are offered is DERIVED**, from five conditions that must all hold:
 
-1. The file sits under `pages/` or `components/`. Both are conventions the build hard-codes rather
-   than reads, so a convert may lean on them — and the alternative is offering a conversion for
-   `package.json`, `tsconfig.json` and every `nav.json` that no format and no schema claims.
-2. The source reads as a Jx document: `.json`, or an extension whose `parse`-capable format declares
-   `page` or `component` in `documentKinds`. Membership of those kinds already ENTAILS that `parse`
-   returns a document — the compiler builds its page and component globs from
-   `documentExtensions("page"|"component")` and casts every `parse` result — so no new declaration
-   is needed, and a `content`-only format (whose `parse` may return entries rather than a document)
-   is excluded by the same test.
+1. The file sits under `pages/` or `components/`. Both are conventions the build hard-codes rather than reads, so a convert may lean on them — and the alternative is offering a conversion for `package.json`, `tsconfig.json` and every `nav.json` that no format and no schema claims.
+2. The source reads as a Jx document: `.json`, or an extension whose `parse`-capable format declares `page` or `component` in `documentKinds`. Membership of those kinds already ENTAILS that `parse` returns a document — the compiler builds its page and component globs from `documentExtensions("page"|"component")` and casts every `parse` result — so no new declaration is needed, and a `content`-only format (whose `parse` may return entries rather than a document) is excluded by the same test.
 3. The target writes one: `.json`, or a `serialize`-capable format declaring `page` or `component`.
 4. The target format differs from the source's, compared by format rather than by extension.
 5. Neither the file nor its directory belongs to a content collection, and the file is not a layout.
 
-**A layout is JSON, and that clause is hand-written.** Both readers of a layout parse it as JSON and
-neither dispatches through the registry, and there is no `"layout"` document kind for a format to
-declare — so unlike every other clause here, this one cannot be derived and says so where it is
-written.
+**A layout is JSON, and that clause is hand-written.** Both readers of a layout parse it as JSON and neither dispatches through the registry, and there is no `"layout"` document kind for a format to declare — so unlike every other clause here, this one cannot be derived and says so where it is written.
 
-**A collection's files refuse in BOTH directions.** Converting an entry drops it out of its
-collection's discovery glob; converting a file that merely sits beside the entries INTO the
-collection's format enlists it as an entry nobody seeded. Source and target share a directory, so one
-rule covers both sides.
+**A collection's files refuse in BOTH directions.** Converting an entry drops it out of its collection's discovery glob; converting a file that merely sits beside the entries INTO the collection's format enlists it as an entry nobody seeded. Source and target share a directory, so one rule covers both sides.
 
-**The conversion is in place.** `about.md` becomes `about.json`; the original is gone and the rename
-refactor rewrites every reference that pointed at it. Being a rename is what makes it safe — the
-backend's refactor pass is reachable no other way, and writing a new file beside the old one would
-leave every reference dangling.
+**The conversion is in place.** `about.md` becomes `about.json`; the original is gone and the rename refactor rewrites every reference that pointed at it. Being a rename is what makes it safe — the backend's refactor pass is reachable no other way, and writing a new file beside the old one would leave every reference dangling.
 
-**The converted bytes are written to the OLD path, and the rename follows.** The refactor pass runs
-after the move and re-reads every document in the project, the moved one included. The other order
-hands it markdown at a `.json` path: it throws, silently skips the component tag pass, and leaves the
-moved file's own references unrewritten. If the rename then fails, the original text is restored, so
-a failed conversion cannot leave target-format bytes at the source extension.
+**The converted bytes are written to the OLD path, and the rename follows.** The refactor pass runs after the move and re-reads every document in the project, the moved one included. The other order hands it markdown at a `.json` path: it throws, silently skips the component tag pass, and leaves the moved file's own references unrewritten. If the rename then fails, the original text is restored, so a failed conversion cannot leave target-format bytes at the source extension.
 
-**Refusals fire before anything moves**, each carrying the path: a pair no rule allows, a destination
-that already exists (checked fail-CLOSED, because the parent provably exists and `rename(2)` replaces
-without a word), a file open with unsaved changes, a serializer that throws, and a result the
-document schema rejects.
+**Refusals fire before anything moves**, each carrying the path: a pair no rule allows, a destination that already exists (checked fail-CLOSED, because the parent provably exists and `rename(2)` replaces without a word), a file open with unsaved changes, a serializer that throws, and a result the document schema rejects.
 
-**Consequences are stated before the button** (§9.1.1): the reference count in the CONVERT wording —
-those references are repaired, but the rename's closing "nothing else changes" would be false about
-the file itself — plus the count of referrers in a format the refactor cannot write back, a stability
-verdict when the result does not read back identically, and the move sentence. The schema check is
-three-state: valid, invalid, or **could not be checked**, which is never reported as valid.
+**Consequences are stated before the button** (§9.1.1): the reference count in the CONVERT wording — those references are repaired, but the rename's closing "nothing else changes" would be false about the file itself — plus the count of referrers in a format the refactor cannot write back, a stability verdict when the result does not read back identically, and the move sentence. The schema check is three-state: valid, invalid, or **could not be checked**, which is never reported as valid.
 
-**An open tab is rebuilt, not reloaded.** A reload sets the document and never the source format, so
-the tab would keep the old format's modes and the next save would write the wrong format. It is
-re-keyed to the new path and reopened under it, which disposes the stale tab while keeping its pane
-slot.
+**An open tab is rebuilt, not reloaded.** A reload sets the document and never the source format, so the tab would keep the old format's modes and the next save would write the wrong format. It is re-keyed to the new path and reopened under it, which disposes the stale tab while keeping its pane slot.
 
 ---
 
@@ -1438,8 +902,7 @@ The studio tracks:
 
 ### 9.1.1 Create, Rename, Delete
 
-Every name the user supplies is collected through the Spectrum dialogs in §8.7 of
-studio-ui-guidelines.md — no native browser prompts:
+Every name the user supplies is collected through the Spectrum dialogs in §8.7 of studio-ui-guidelines.md — no native browser prompts:
 
 | Action                                                        | Dialog                                                                                                                          |
 | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
@@ -1453,42 +916,23 @@ Blank input is rejected in place: the dialog stays open with negative help text 
 
 ##### The extension is chosen, not typed
 
-> **Status: Implemented.** The project already declares which formats it understands. A creation
-> dialog that asks the author to type `.md` from memory is asking them to know something the app
-> knows, and to be punished for a typo with a file no format claims.
+> **Status: Implemented.** The project already declares which formats it understands. A creation dialog that asks the author to type `.md` from memory is asking them to know something the app knows, and to be punished for a typo with a file no format claims.
 
-The picker's rows are DERIVED: `.json` first, because it is the one native shape no registry ever
-claims, then every extension for which some registered class declares **both `parse` and
-`serialize`**. Both halves are load-bearing — without `parse` the file cannot be opened after it is
-created, and without `serialize` its first save falls through to the default content format and
-writes another format's bytes into it. The lookup is per `(extension, capability)` rather than per
-class, because a split claim across two classes is legal (§8.1).
+The picker's rows are DERIVED: `.json` first, because it is the one native shape no registry ever claims, then every extension for which some registered class declares **both `parse` and `serialize`**. Both halves are load-bearing — without `parse` the file cannot be opened after it is created, and without `serialize` its first save falls through to the default content format and writes another format's bytes into it. The lookup is per `(extension, capability)` rather than per class, because a split claim across two classes is legal (§8.1).
 
 Three naming modes follow from what the caller already knows, and they are not interchangeable:
 
-- **A picker mode** asks for a NAME and appends the picked extension **verbatim** — never slugified.
-  `pages/[slug].json` is a route eight starters ship, and a slugifier lowercases and strips the
-  brackets, so slugifying here would make a dynamic route uncreatable and say nothing about it.
+- **A picker mode** asks for a NAME and appends the picked extension **verbatim** — never slugified. `pages/[slug].json` is a route eight starters ship, and a slugifier lowercases and strips the brackets, so slugifying here would make a dynamic route uncreatable and say nothing about it.
 - **A fixed extension** (a content collection's) asks for a DISPLAY NAME and slugifies it.
-- **No picker at all** takes the whole file name verbatim — what a caller that already knows the
-  name wants.
+- **No picker at all** takes the whole file name verbatim — what a caller that already knows the name wants.
 
-The last picker row is **Other…**, which returns the field to a whole file name. It is not a
-courtesy: New File is the only generic creation affordance in the app and both backends create
-intermediate directories on write, so without it `styles/main.css`, `public/robots.txt` and a
-`credits.txt` beside a collection's images all become uncreatable, and the picker would have taken
-away more than it gave.
+The last picker row is **Other…**, which returns the field to a whole file name. It is not a courtesy: New File is the only generic creation affordance in the app and both backends create intermediate directories on write, so without it `styles/main.css`, `public/robots.txt` and a `credits.txt` beside a collection's images all become uncreatable, and the picker would have taken away more than it gave.
 
-A name is refused in the field when it is blank, when it collides (compared case-insensitively,
-because the filesystem often is), when it escapes the destination, and when its typed extension
-CONTRADICTS the pick — naming both sides. A name whose extension matches the pick is composed once
-rather than doubled; a name ending in an extension no format claims is a stem with a dot in it.
+A name is refused in the field when it is blank, when it collides (compared case-insensitively, because the filesystem often is), when it escapes the destination, and when its typed extension CONTRADICTS the pick — naming both sides. A name whose extension matches the pick is composed once rather than doubled; a name ending in an extension no format claims is a stem with a dot in it.
 
 ##### Creating inside a content collection
 
-> **Status: Implemented.** A collection already fixes its entries' format. Offering a free choice
-> there produces a file matched by no format and therefore an entry of the collection it was created
-> in only by accident.
+> **Status: Implemented.** A collection already fixes its entries' format. Offering a free choice there produces a file matched by no format and therefore an entry of the collection it was created in only by accident.
 
 The destination decides, and there are four answers:
 
@@ -1499,24 +943,15 @@ The destination decides, and there are four answers:
 | A collection whose declared `format` is not registered              | The full picker, plus a Problem naming the format class that is missing                                           |
 | Anywhere else                                                       | The full picker                                                                                                   |
 
-A subdirectory is **constrained but not rerouted**. Entry discovery is recursive, so a document there
-really is an entry — but co-located media lives there too (site-architecture.md §6.5) and the New
-Entry flow writes to one directory, so rerouting would silently relocate the file. A schema-less
-collection is constrained for the same reason in reverse: there is no shape to seed and no form to
-draw. Under a lock, **Other…** still refuses a name whose extension is a document extension other
-than the collection's, so the escape hatch cannot smuggle a `post.json` into a Markdown collection
-while leaving `credits.txt` creatable.
+A subdirectory is **constrained but not rerouted**. Entry discovery is recursive, so a document there really is an entry — but co-located media lives there too (site-architecture.md §6.5) and the New Entry flow writes to one directory, so rerouting would silently relocate the file. A schema-less collection is constrained for the same reason in reverse: there is no shape to seed and no form to draw. Under a lock, **Other…** still refuses a name whose extension is a document extension other than the collection's, so the escape hatch cannot smuggle a `post.json` into a Markdown collection while leaving `credits.txt` creatable.
 
-The menu label does not change for a collection folder. The tree's own verbs are what the TREE does;
-the dialog names the destination.
+The menu label does not change for a collection folder. The tree's own verbs are what the TREE does; the dialog names the destination.
 
 #### Consequences, stated before the action
 
 > **Status: Implemented.** A destructive dialog states **what it breaks**, not only whether it can be undone. Deleting a component used on seven pages must not look like deleting an unused one.
 
-Every delete and rename confirmation carries the reference count from `findReferences` (§9.6 of
-UX-REDESIGN-PLAN; the PAL member in `desktop.md` §3.1), resolved **before** the dialog opens — a
-sentence that becomes true after the user has already confirmed is the same defect as no sentence.
+Every delete and rename confirmation carries the reference count from `findReferences` (§9.6 of UX-REDESIGN-PLAN; the PAL member in `desktop.md` §3.1), resolved **before** the dialog opens — a sentence that becomes true after the user has already confirmed is the same defect as no sentence.
 
 | Action     | The sentence states                                                                                     |
 | ---------- | ------------------------------------------------------------------------------------------------------- |
@@ -1526,98 +961,43 @@ sentence that becomes true after the user has already confirmed is the same defe
 Three states, three different sentences, and they are never collapsed:
 
 - **Counted** — the number, with the wording above.
-- **Uncountable** (the query failed) — the dialog says the references could not be counted and that
-  this is not the same as "unused". It never renders 0.
-- **Unsupported** (`capability.findReferences` is false, i.e. the backend has no
-  `/__studio/references` route) — the dialog carries **no** consequence line at all, rather than one
-  that implies a count it does not have.
+- **Uncountable** (the query failed) — the dialog says the references could not be counted and that this is not the same as "unused". It never renders 0.
+- **Unsupported** (`capability.findReferences` is false, i.e. the backend has no `/__studio/references` route) — the dialog carries **no** consequence line at all, rather than one that implies a count it does not have.
 
-The same query backs the inspector's **Used on N pages** line for a selected component instance and
-the `selection.findUsages` command; all three read one cache, invalidated by the filesystem rather
-than by a timer, so they cannot disagree. A local rename, delete or **drag-move** drops that cache
-itself: those writes suppress the watcher echo that would otherwise announce them, so a gesture that
-did not invalidate would leave every count in the session answering about a path that no longer
-exists.
+The same query backs the inspector's **Used on N pages** line for a selected component instance and the `selection.findUsages` command; all three read one cache, invalidated by the filesystem rather than by a timer, so they cannot disagree. A local rename, delete or **drag-move** drops that cache itself: those writes suppress the watcher echo that would otherwise announce them, so a gesture that did not invalidate would leave every count in the session answering about a path that no longer exists.
 
-**A promise made must be a promise reported on.** The rename sentence commits the refactor pass to
-rewriting the references it counted, and the pass can fail to keep that for a nameable reason — a
-document that does not parse, or a tag rename inside a format with no serializer. A format that is
-read but never round-tripped is NOT such a reason: a CSV collection declares the narrower `rewrite`
-capability (`extensions.md` §8), so a reference inside one is repaired cell by cell. Where the pass
-genuinely cannot write, the engine names those files rather than dropping them
-(`site-architecture.md` §9.3), and Studio MUST surface the naming: a move whose report carries them
-reports a **warning** identifying them, not the plain success. This binds the drag-move most of all, since it shows no dialog and therefore makes
-its promise only in retrospect.
+**A promise made must be a promise reported on.** The rename sentence commits the refactor pass to rewriting the references it counted, and the pass can fail to keep that for a nameable reason — a document that does not parse, or a tag rename inside a format with no serializer. A format that is read but never round-tripped is NOT such a reason: a CSV collection declares the narrower `rewrite` capability (`extensions.md` §8), so a reference inside one is repaired cell by cell. Where the pass genuinely cannot write, the engine names those files rather than dropping them (`site-architecture.md` §9.3), and Studio MUST surface the naming: a move whose report carries them reports a **warning** identifying them, not the plain success. This binds the drag-move most of all, since it shows no dialog and therefore makes its promise only in retrospect.
 
 ### 9.1.2 The Library
 
-Every page, layout, component, content entry and asset in one browsable tab, with live previews.
-Reached by `⌘⇧E`, by name from the palette, from the Command Bar's overflow, and from the Files
-tree's context menu — four doors, because it is the content surface for a site with a collection and
-a palette search is not a door a reader finds.
+Every page, layout, component, content entry and asset in one browsable tab, with live previews. Reached by `⌘⇧E`, by name from the palette, from the Command Bar's overflow, and from the Files tree's context menu — four doors, because it is the content surface for a site with a collection and a palette search is not a door a reader finds.
 
 ### 9.1.3 Importing a component
 
-A document's `$elements` — and the project's — is written through **one service**: `hasElement`
-answers whether a component is already imported, `enableElement` and `disableElement` return the new
-list, and every surface that changes it goes through them. Four surfaces did it their own way, and
-they disagreed:
+A document's `$elements` — and the project's — is written through **one service**: `hasElement` answers whether a component is already imported, `enableElement` and `disableElement` return the new list, and every surface that changes it goes through them. Four surfaces did it their own way, and they disagreed:
 
-- A local component was matched by its FILE NAME by the canvas drop, so a page importing
-  `../shared/card.json` counted `./components/card.json` as already imported and the drop produced
-  an element the page could not resolve. Paths are compared resolved.
+- A local component was matched by its FILE NAME by the canvas drop, so a page importing `../shared/card.json` counted `./components/card.json` as already imported and the drop produced an element the page could not resolve. Paths are compared resolved.
 - The "Add component…" picker checked nothing and appended a duplicate `$ref` per use.
-- Only the cherry-pick checkbox knew that a whole-package entry (`@acme/ui`) satisfies a subpath one
-  (`@acme/ui/card`), and only it dropped the package entry when a subpath import superseded it.
-- Uninstalling a package removed its `@acme/ui/…` entries and left `@acme/ui` behind, importing a
-  package that was gone.
+- Only the cherry-pick checkbox knew that a whole-package entry (`@acme/ui`) satisfies a subpath one (`@acme/ui/card`), and only it dropped the package entry when a subpath import superseded it.
+- Uninstalling a package removed its `@acme/ui/…` entries and left `@acme/ui` behind, importing a package that was gone.
 
-The functions are pure and return the list. The two levels persist differently and should: a
-document's `$elements` goes through `transact` and is undoable, the project's through
-`updateSiteConfig` and is not. What they must not differ on is which entries the list holds.
+The functions are pure and return the list. The two levels persist differently and should: a document's `$elements` goes through `transact` and is undoable, the project's through `updateSiteConfig` and is not. What they must not differ on is which entries the list holds.
 
 ### 9.1.4 Files masked by `.gitignore`
 
 > **Status: Implemented.** A project root is a working directory, and a working directory holds two populations: the files the author wrote, and the files a tool wrote for them. The tree draws the first. The author has already stated which is which, in the one file every project of this shape carries.
 
-`node_modules`, `dist`, `coverage`, `.next` and the rest of a build's output draw no rows, so a
-project of forty documents opens as a tree of forty rows rather than forty thousand. Dotfiles are
-absent from every backend's listing already, so `.gitignore` itself is not a row either.
+`node_modules`, `dist`, `coverage`, `.next` and the rest of a build's output draw no rows, so a project of forty documents opens as a tree of forty rows rather than forty thousand. Dotfiles are absent from every backend's listing already, so `.gitignore` itself is not a row either.
 
-The rules come from **`.gitignore` files at every level** — the project root's, and one in every
-directory on the way down to the entry being judged. Each is read once per directory and cached,
-the absences included, so a directory without a `.gitignore` costs one read and never another.
-Studio implements `gitignore(5)`: comments, `!` negation, trailing-space and `#`/`!` escapes,
-directory-only patterns, anchoring on a slash, `**`, character classes, and both precedence rules —
-a later line beats an earlier one, and a deeper file beats a shallower one. An excluded directory
-cannot be re-included from within it, which is what makes `node_modules/pkg/index.js` ignored when
-the only pattern anybody wrote named `node_modules`.
+The rules come from **`.gitignore` files at every level** — the project root's, and one in every directory on the way down to the entry being judged. Each is read once per directory and cached, the absences included, so a directory without a `.gitignore` costs one read and never another. Studio implements `gitignore(5)`: comments, `!` negation, trailing-space and `#`/`!` escapes, directory-only patterns, anchoring on a slash, `**`, character classes, and both precedence rules — a later line beats an earlier one, and a deeper file beats a shallower one. An excluded directory cannot be re-included from within it, which is what makes `node_modules/pkg/index.js` ignored when the only pattern anybody wrote named `node_modules`.
 
-**The filter is applied where rows are built, not where entries are stored.** `projectState.dirs`
-goes on mirroring the filesystem, so the tree cache stays faithful for everything else that reads
-it, the show/hide toggle is a repaint rather than a refetch, and the file-event path needs no case
-for a file arriving inside an ignored directory — it lands in the cache and is simply not drawn.
+**The filter is applied where rows are built, not where entries are stored.** `projectState.dirs` goes on mirroring the filesystem, so the tree cache stays faithful for everything else that reads it, the show/hide toggle is a repaint rather than a refetch, and the file-event path needs no case for a file arriving inside an ignored directory — it lands in the cache and is simply not drawn.
 
-**The rules live in Studio rather than behind the PAL.** `listDirectory` has three implementations
-— the dev server's route, the desktop session's `readdir`, and a cloud backend that is not in this
-repository at all — and a rule written three times is a rule that disagrees with itself. Written
-once here, it is true on every host the moment it ships, and it costs one `readFile` per directory,
-which is the round trip the listing beside it already makes.
+**The rules live in Studio rather than behind the PAL.** `listDirectory` has three implementations — the dev server's route, the desktop session's `readdir`, and a cloud backend that is not in this repository at all — and a rule written three times is a rule that disagrees with itself. Written once here, it is true on every host the moment it ships, and it costs one `readFile` per directory, which is the round trip the listing beside it already makes.
 
-The Files toolbar carries the toggle, beside New File and Refresh: **Show ignored files** /
-**Hide ignored files**, labelled for what it will do. It **defaults to hiding**, and the preference
-is per user rather than per project or per window, because "show me everything" is a way of working
-rather than a property of a window. Editing a `.gitignore` re-reads every rule set the tree has
-already consulted and repaints — the watcher reports the file like any other, and the tree never
-listed it to begin with, dotfiles being absent from every backend's listing. The fresh rules are swapped in
-together rather than cleared first: an empty rule set means "nothing is ignored", so a repaint
-landing between the two would draw a `node_modules` and then take it away again. **Refresh**
-re-reads them too, because it is what an author reaches for after editing a `.gitignore` by hand.
+The Files toolbar carries the toggle, beside New File and Refresh: **Show ignored files** / **Hide ignored files**, labelled for what it will do. It **defaults to hiding**, and the preference is per user rather than per project or per window, because "show me everything" is a way of working rather than a property of a window. Editing a `.gitignore` re-reads every rule set the tree has already consulted and repaints — the watcher reports the file like any other, and the tree never listed it to begin with, dotfiles being absent from every backend's listing. The fresh rules are swapped in together rather than cleared first: an empty rule set means "nothing is ignored", so a repaint landing between the two would draw a `node_modules` and then take it away again. **Refresh** re-reads them too, because it is what an author reaches for after editing a `.gitignore` by hand.
 
-Two sources are deliberately NOT read: **`.git/info/exclude`** and **`core.excludesFile`**. Both
-live outside the project directory, neither is reachable through the PAL's project-rooted
-`readFile`, and a rule the author cannot see in their own repository is a poor explanation for a
-missing row. A row the tree withholds is always one that some `.gitignore` in the project names.
+Two sources are deliberately NOT read: **`.git/info/exclude`** and **`core.excludesFile`**. Both live outside the project directory, neither is reachable through the PAL's project-rooted `readFile`, and a rule the author cannot see in their own repository is a poor explanation for a missing row. A row the tree withholds is always one that some `.gitignore` in the project names.
 
 ### 9.2 Server Integration
 
@@ -1691,13 +1071,7 @@ A declared limit is different. Studio refuses an oversized file before spending 
 | `Cmd+Shift+O` / `Ctrl+Shift+O` | Open in Browser (§10.1)                       |
 | `Cmd+0` / `Cmd+=` / `Cmd+-`    | Zoom reset / in / out                         |
 
-**Whether a caret is active is a bridge fact, not a local one.** The editing session runs inside the
-canvas iframe, so the shell cannot see the caret in its own realm — it derives `caret.active` from
-the session messages the bridge already carries (`editStart` opens it, `selectionChanged` proves it
-is still live, `editEnd` closes it), and treats a frame that has left the document as having no
-caret, since a frame torn down mid-session never posts `editEnd`. Reading a shell-local editing flag
-instead is what let the element-level clipboard handlers steal `Cmd+C` / `Cmd+X` / `Cmd+V` from a
-live caret: copying a phrase copied the whole block, and cutting mid-sentence deleted the paragraph.
+**Whether a caret is active is a bridge fact, not a local one.** The editing session runs inside the canvas iframe, so the shell cannot see the caret in its own realm — it derives `caret.active` from the session messages the bridge already carries (`editStart` opens it, `selectionChanged` proves it is still live, `editEnd` closes it), and treats a frame that has left the document as having no caret, since a frame torn down mid-session never posts `editEnd`. Reading a shell-local editing flag instead is what let the element-level clipboard handlers steal `Cmd+C` / `Cmd+X` / `Cmd+V` from a live caret: copying a phrase copied the whole block, and cutting mid-sentence deleted the paragraph.
 
 **With a caret in the canvas** — the caret owns the editing and navigation keys, and the clipboard:
 
@@ -1717,14 +1091,7 @@ live caret: copying a phrase copied the whole block, and cutting mid-sentence de
 | `/`                                       | Slash menu (at a block start or after a space)                 |
 | `Escape`                                  | Dismiss the caret                                              |
 
-**The slash menu has two doors, and the gesture is recognised at the EDITING HOST.** `/` at a block
-start or after a space opens it; so does `insert.openSlashMenu`, which is what puts it in the
-palette, under a rebindable chord, and in reach of the automation runner and the assistant. Opened
-by name there is no `/` in the document to filter against, so the menu carries its own filter field
-and choosing a block deletes nothing — the anchored gesture still strips the `/…` run it opened
-with. The trigger listens on the canvas container rather than on the block: for an ordinary block
-the container is the editing host, so it is the focused element and every keystroke's target, and a
-listener anywhere below it never fires.
+**The slash menu has two doors, and the gesture is recognised at the EDITING HOST.** `/` at a block start or after a space opens it; so does `insert.openSlashMenu`, which is what puts it in the palette, under a rebindable chord, and in reach of the automation runner and the assistant. Opened by name there is no `/` in the document to filter against, so the menu carries its own filter field and choosing a block deletes nothing — the anchored gesture still strips the `/…` run it opened with. The trigger listens on the canvas container rather than on the block: for an ordinary block the container is the editing host, so it is the focused element and every keystroke's target, and a listener anywhere below it never fires.
 
 **With a block selected but no caret** (from the layers panel, or after a structural edit):
 
@@ -1744,92 +1111,36 @@ listener anywhere below it never fires.
 
 ### 10.1 Open in Browser
 
-Studio closes the loop from "I changed something" to "I looked at the real page": **Open in Browser**
-(toolbar, beside Save; `Cmd+Shift+O`) hands the active page's route to the user's own browser through
-the same seam Preview link clicks use (`canvas/preview-navigate.ts`, §4.2), so on desktop it reaches
-the real browser rather than a webview.
+Studio closes the loop from "I changed something" to "I looked at the real page": **Open in Browser** (toolbar, beside Save; `Cmd+Shift+O`) hands the active page's route to the user's own browser through the same seam Preview link clicks use (`canvas/preview-navigate.ts`, §4.2), so on desktop it reaches the real browser rather than a webview.
 
-**What opens is the working tree, not a build.** The action calls `platform.previewSite({ route })`,
-and a backend answers by serving the project's own files as a site: it composes each page from the
-tree on demand — route, layout, `$elements`, `$site`/`$page`, `<head>` — and hands the document to
-`@jxsuite/runtime`, which assembles the DOM in the reader's browser exactly as the canvas does. No
-compiler runs. That is what makes the page appear at once, carry edits nobody has saved, and reload
-as the author keeps typing.
+**What opens is the working tree, not a build.** The action calls `platform.previewSite({ route })`, and a backend answers by serving the project's own files as a site: it composes each page from the tree on demand — route, layout, `$elements`, `$site`/`$page`, `<head>` — and hands the document to `@jxsuite/runtime`, which assembles the DOM in the reader's browser exactly as the canvas does. No compiler runs. That is what makes the page appear at once, carry edits nobody has saved, and reload as the author keeps typing.
 
-It used to build first, and the build was the problem rather than the price. A full compile runs the
-bundler, the image pipeline and every emitter before anything opens; what then opened was the last
-SAVE rather than the canvas; and it was inert once open, so a second look meant pressing the button
-again and getting a second tab. Only the first of those is about speed. "Does my site build?" is a
-real question and it keeps a command — **Build Site** (§10.2) — but it is not the question this
-action asks.
+It used to build first, and the build was the problem rather than the price. A full compile runs the bundler, the image pipeline and every emitter before anything opens; what then opened was the last SAVE rather than the canvas; and it was inert once open, so a second look meant pressing the button again and getting a second tab. Only the first of those is about speed. "Does my site build?" is a real question and it keeps a command — **Build Site** (§10.2) — but it is not the question this action asks.
 
-**The URL is the page's ROUTE, not a file's path**, and the difference is the whole feature. A page
-is written for its published origin: it links to `/blog/hello/` and pulls `/components/demo.css`,
-both root-absolute. Handed `…/dist/blog/hello/index.html` — an output path, which is what this said
-and what shipped — a browser resolves those two against the server ROOT, so the HTML arrives, every
-stylesheet and script 404s, and the first link the reader clicks leaves the site. The page loads and
-nothing else works. So the address is `<route>`, with the trailing slash `build.trailingSlash`
-decides — the URL the page will have when it is published, which is also the one its own links
-already point at.
+**The URL is the page's ROUTE, not a file's path**, and the difference is the whole feature. A page is written for its published origin: it links to `/blog/hello/` and pulls `/components/demo.css`, both root-absolute. Handed `…/dist/blog/hello/index.html` — an output path, which is what this said and what shipped — a browser resolves those two against the server ROOT, so the HTML arrives, every stylesheet and script 404s, and the first link the reader clicks leaves the site. The page loads and nothing else works. So the address is `<route>`, with the trailing slash `build.trailingSlash` decides — the URL the page will have when it is published, which is also the one its own links already point at.
 
-**The preview is served on an origin of its own**, and the origin comes back from the backend rather
-than being assumed to be the editor's. Not because the paths would collide — a live preview's paths
-mean the project's SOURCES, which is exactly what an editing server serves — but for two reasons the
-editing server cannot satisfy:
+**The preview is served on an origin of its own**, and the origin comes back from the backend rather than being assumed to be the editor's. Not because the paths would collide — a live preview's paths mean the project's SOURCES, which is exactly what an editing server serves — but for two reasons the editing server cannot satisfy:
 
-- **Lifetime.** One tab per project needs one origin per project, and an editing server is per
-  WINDOW: a tab pointed at it dies when that window closes, and two windows on one project would
-  produce two tabs. `@jxsuite/server`'s origin is keyed by project root and lives for the process
-  (`live-preview.ts`, specs/server.md §3.4), so no single window's teardown may close it.
-- **Isolation.** A previewed page runs the project's own JavaScript, third-party script included. On
-  the chromium build the Studio shell is served BY the editing server, so a preview mounted there
-  would share `localStorage`, IndexedDB and service-worker scope with the editor.
+- **Lifetime.** One tab per project needs one origin per project, and an editing server is per WINDOW: a tab pointed at it dies when that window closes, and two windows on one project would produce two tabs. `@jxsuite/server`'s origin is keyed by project root and lives for the process (`live-preview.ts`, specs/server.md §3.4), so no single window's teardown may close it.
+- **Isolation.** A previewed page runs the project's own JavaScript, third-party script included. On the chromium build the Studio shell is served BY the editing server, so a preview mounted there would share `localStorage`, IndexedDB and service-worker scope with the editor.
 
-The rules differ too, and that is the third reason. An editing server serves the whole project root,
-which is Studio addressing files it already holds paths for; on an origin running project script the
-same latitude is a way to read `.dev.vars`. A preview origin serves an allowlist that defaults
-closed.
+The rules differ too, and that is the third reason. An editing server serves the whole project root, which is Studio addressing files it already holds paths for; on an origin running project script the same latitude is a way to read `.dev.vars`. A preview origin serves an allowlist that defaults closed.
 
-**Unsaved documents travel as an overlay.** A live preview composes from the tree, and the tree is
-what has been SAVED — so without this, the one thing a live preview is for would be the one thing it
-could not show. Studio publishes `platform.setPreviewOverlay(path, contents)` for each document that
-is dirty and has a path, and a backend prefers those bytes over the file at every read.
+**Unsaved documents travel as an overlay.** A live preview composes from the tree, and the tree is what has been SAVED — so without this, the one thing a live preview is for would be the one thing it could not show. Studio publishes `platform.setPreviewOverlay(path, contents)` for each document that is dirty and has a path, and a backend prefers those bytes over the file at every read.
 
 Three properties of that are contractual:
 
-- **The bytes are exactly what a save would write.** Studio serializes through the same function
-  `writeFile` receives, so "what the reader sees" and "what saving would produce" are one answer
-  rather than two that drift. A document object would bypass the format layer, and a `.md` page's
-  bytes are not `JSON.stringify(doc)`.
-- **Every dirty document publishes, not only the previewed one.** The layout a page wraps in and the
-  component it uses live in other tabs, and an unsaved edit to either changes the page.
-- **A backend holds them in memory and writes them nowhere.** There is no file to go stale, so a
-  crash leaves a preview showing the saved state, which is right. `clearPreviewOverlay(path?)`
-  retracts one or all of them; Studio owns that lifecycle, because it is what knows when a save, a
-  close or a discard ends it.
+- **The bytes are exactly what a save would write.** Studio serializes through the same function `writeFile` receives, so "what the reader sees" and "what saving would produce" are one answer rather than two that drift. A document object would bypass the format layer, and a `.md` page's bytes are not `JSON.stringify(doc)`.
+- **Every dirty document publishes, not only the previewed one.** The layout a page wraps in and the component it uses live in other tabs, and an unsaved edit to either changes the page.
+- **A backend holds them in memory and writes them nowhere.** There is no file to go stale, so a crash leaves a preview showing the saved state, which is right. `clearPreviewOverlay(path?)` retracts one or all of them; Studio owns that lifecycle, because it is what knows when a save, a close or a discard ends it.
 
-**One tab per project, and it is retargeted rather than reopened.** A second `Open in Browser` —
-from any page of the project — points the tab that is already showing it at the new route.
-`SitePreviewResult.reused` reports that this happened, and a caller MUST honour it: opening a tab
-anyway leaves the author with two on one project, which is what retargeting exists to prevent.
+**One tab per project, and it is retargeted rather than reopened.** A second `Open in Browser` — from any page of the project — points the tab that is already showing it at the new route. `SitePreviewResult.reused` reports that this happened, and a caller MUST honour it: opening a tab anyway leaves the author with two on one project, which is what retargeting exists to prevent.
 
-The retarget is ACKNOWLEDGED, not assumed. A closed tab's channel drops promptly, but a frozen or
-back/forward-cached one looks connected and will not act, so a backend answers `reused: true` only
-once a client says it took the route. When that loses the race the reader gets a second tab, which
-is the visible failure and the deliberate choice over the invisible one.
+The retarget is ACKNOWLEDGED, not assumed. A closed tab's channel drops promptly, but a frozen or back/forward-cached one looks connected and will not act, so a backend answers `reused: true` only once a client says it took the route. When that loses the race the reader gets a second tab, which is the visible failure and the deliberate choice over the invisible one.
 
-**What this costs, stated rather than filed as a bug: the browser does not come forward.** No page
-can raise a background tab — Chrome does not honour `focus()` across tabs, and under Wayland the
-compositor arbitrates — and handing the URL to the OS again opens a DUPLICATE rather than switching
-to the existing one. So a reused preview reports where to look instead of opening anything. A reader
-who closed their tab is not stuck: the channel closes with it, `reused` comes back false, and a
-fresh tab opens.
+**What this costs, stated rather than filed as a bug: the browser does not come forward.** No page can raise a background tab — Chrome does not honour `focus()` across tabs, and under Wayland the compositor arbitrates — and handing the URL to the OS again opens a DUPLICATE rather than switching to the existing one. So a reused preview reports where to look instead of opening anything. A reader who closed their tab is not stuck: the channel closes with it, `reused` comes back false, and a fresh tab opens.
 
-**A backend that cannot preview may still build, and says which it did.** `previewSite` is optional;
-without it the action falls back to `buildSite`, whose `SiteBuildResult.mode` reports `built` (the
-default, and what an absent field means) or `live`. A hosted backend executes no project JS and has
-no bundler, image pipeline or filesystem, so it answers `buildSite` by rendering rather than
-compiling. The report the author reads says which, because the two differ in ways they can see:
+**A backend that cannot preview may still build, and says which it did.** `previewSite` is optional; without it the action falls back to `buildSite`, whose `SiteBuildResult.mode` reports `built` (the default, and what an absent field means) or `live`. A hosted backend executes no project JS and has no bundler, image pipeline or filesystem, so it answers `buildSite` by rendering rather than compiling. The report the author reads says which, because the two differ in ways they can see:
 
 |               | `built`                                     | live                                     |
 | ------------- | ------------------------------------------- | ---------------------------------------- |
@@ -1838,18 +1149,11 @@ compiling. The report the author reads says which, because the two differ in way
 | Emitted files | sitemap, headers, redirects, service worker | none                                     |
 | Freshness     | the last build                              | the working tree, unsaved edits included |
 
-That last row is the reason a live preview is not merely a degraded build: it is the only one of the
-two that can show an author what they are looking at right now, including a collaborator's edits
-mid-keystroke.
+That last row is the reason a live preview is not merely a degraded build: it is the only one of the two that can show an author what they are looking at right now, including a collaborator's edits mid-keystroke.
 
-**Content, `$src` classes and `timing: "server"` resolve when the backend can reach a resolver, and
-this is a property of the BACKEND rather than of the mode.** A hosted one cannot run project code at
-any price, so a content collection renders as an empty list there. A desktop or dev-server backend
-can, and mounts the resolver on the preview origin behind a credential of its own (specs/server.md
-§3.4) — without which a preview of a blog is a preview of its chrome.
+**Content, `$src` classes and `timing: "server"` resolve when the backend can reach a resolver, and this is a property of the BACKEND rather than of the mode.** A hosted one cannot run project code at any price, so a content collection renders as an empty list there. A desktop or dev-server backend can, and mounts the resolver on the preview origin behind a credential of its own (specs/server.md §3.4) — without which a preview of a blog is a preview of its chrome.
 
-The action is never hidden: when a page cannot be resolved it renders **disabled with the reason in
-its tooltip**, one of —
+The action is never hidden: when a page cannot be resolved it renders **disabled with the reason in its tooltip**, one of —
 
 | Condition                       | Reason                                                            |
 | ------------------------------- | ----------------------------------------------------------------- |
@@ -1865,27 +1169,13 @@ Invoked by chord while blocked, the reason goes to the status bar instead of ope
 
 ### 10.2 Build Site
 
-The compiler, kept reachable under its own verb. **Build Site** (`project.buildSite`, the rail foot's
-menu and the palette, no default chord) runs `platform.buildSite()` and reports what it produced:
-routes, files, and any errors by name.
+The compiler, kept reachable under its own verb. **Build Site** (`project.buildSite`, the rail foot's menu and the palette, no default chord) runs `platform.buildSite()` and reports what it produced: routes, files, and any errors by name.
 
-It is a separate command rather than a mode of §10.1 because the two questions are separate. A build
-answers "does my site build?" — it runs the bundler, resolves `timing: "server"` at build time,
-optimizes images into responsive variants, and emits the sitemap, headers, redirects and service
-worker. A live preview runs none of those and does not pretend to. Coupling them meant every look at
-a page paid for a full compile, and the compile's own answer arrived as a side effect of asking
-something else.
+It is a separate command rather than a mode of §10.1 because the two questions are separate. A build answers "does my site build?" — it runs the bundler, resolves `timing: "server"` at build time, optimizes images into responsive variants, and emits the sitemap, headers, redirects and service worker. A live preview runs none of those and does not pretend to. Coupling them meant every look at a page paid for a full compile, and the compile's own answer arrived as a side effect of asking something else.
 
-It is project-level and sits in the overflow menu rather than the Command Bar's primary row, which is
-budgeted at five and is document-level by frequency (studio-ui-guidelines §12). A build is neither
-frequent nor about the document in front of you.
+It is project-level and sits in the overflow menu rather than the Command Bar's primary row, which is budgeted at five and is document-level by frequency (studio-ui-guidelines §12). A build is neither frequent nor about the document in front of you.
 
-Where the built site is browsable is unchanged: a loopback origin rooted AT the output directory
-(`site-preview.ts`, one per project, reused), where every path has exactly the meaning the published
-site gives it, nothing is injected, and a miss is the site's own `404.html` at 404. Neither editing
-server serves the built output at any position in its chain. `jx dev`'s `createDistMiddleware` is
-separate and unchanged — a site project's own dev server is showing the built site rather than
-visiting it, so there it runs FIRST and injects live reload.
+Where the built site is browsable is unchanged: a loopback origin rooted AT the output directory (`site-preview.ts`, one per project, reused), where every path has exactly the meaning the published site gives it, nothing is injected, and a miss is the site's own `404.html` at 404. Neither editing server serves the built output at any position in its chain. `jx dev`'s `createDistMiddleware` is separate and unchanged — a site project's own dev server is showing the built site rather than visiting it, so there it runs FIRST and injects live reload.
 
 ---
 
@@ -1918,26 +1208,11 @@ Two facts the list cannot state about itself, both measured rather than reasoned
 - **The suggest widget does not come from the suggest register.** `features/suggest/register` registers the provider that renders suggest items as inline text; the widget is `contrib/suggest/browser/suggestController.js`, and `features/inlineCompletions/register` is the only public entry that reaches it. Omitting it leaves JSON schema completion and the Logic tab's `state.*` completion registered and invisible.
 - **The exclusions do not yet take effect.** In monaco 0.56.0 the contribution modules import one another densely and the suggest stack reaches nearly all of them, so every feature the list declines is still bundled and still registers itself. The declaration is a statement of intent and the place the saving lands if that graph is ever untangled; it is not evidence that a feature is absent. Only the metafile answers that.
 
-**Both build paths share one contract.** The release build (`scripts/build.ts`) and the repo dev
-server's watcher (`server.js` → `@jxsuite/server`'s `builds`) spread the same options from
-`scripts/build-config.ts`. They diverged once, and the failure mode is instructive: the watcher had its
-own inline config with no de-duplication and no splitting, and because it overwrites `dist/` on the
-next keystroke, a developer never saw the built output at all — `bun run dev` served 18.8 MB while
-`bun run build` produced 3.3 MB. A `@jxsuite/server` build entry forwards every unrecognised key to
-`Bun.build`, which is what makes one shared contract possible.
+**Both build paths share one contract.** The release build (`scripts/build.ts`) and the repo dev server's watcher (`server.js` → `@jxsuite/server`'s `builds`) spread the same options from `scripts/build-config.ts`. They diverged once, and the failure mode is instructive: the watcher had its own inline config with no de-duplication and no splitting, and because it overwrites `dist/` on the next keystroke, a developer never saw the built output at all — `bun run dev` served 18.8 MB while `bun run build` produced 3.3 MB. A `@jxsuite/server` build entry forwards every unrecognised key to `Bun.build`, which is what makes one shared contract possible.
 
-**One importer, so no de-duplication step.** That shared contract used to include a resolver plugin
-forcing every `monaco-editor` specifier through the studio package, because a second importer —
-`y-monaco`, with a bare specifier — resolved to a physically separate copy of the same version and
-the bundler emitted Monaco twice. Replacing that dependency with the first-party binding
-(`src/collab/monaco-binding`) left one importer and the plugin became an identity transform;
-it is gone. **A second `monaco-editor` consumer would bring the hazard back**, and the check is the
-metafile, which must show exactly one physical `monaco-editor` root in the input graph.
+**One importer, so no de-duplication step.** That shared contract used to include a resolver plugin forcing every `monaco-editor` specifier through the studio package, because a second importer — `y-monaco`, with a bare specifier — resolved to a physically separate copy of the same version and the bundler emitted Monaco twice. Replacing that dependency with the first-party binding (`src/collab/monaco-binding`) left one importer and the plugin became an identity transform; it is gone. **A second `monaco-editor` consumer would bring the hazard back**, and the check is the metafile, which must show exactly one physical `monaco-editor` root in the input graph.
 
-**Nothing may fetch Monaco at startup, including via a dynamic import.** `import()` defers evaluation,
-not payload: an `import()` that RUNS during activation still puts the editor on the critical path.
-Per-project JSON schemas arrive at project activation and used to be applied that way; they are now
-held (`services/monaco-lazy`) and registered when an editor is first created.
+**Nothing may fetch Monaco at startup, including via a dynamic import.** `import()` defers evaluation, not payload: an `import()` that RUNS during activation still puts the editor on the critical path. Per-project JSON schemas arrive at project activation and used to be applied that way; they are now held (`services/monaco-lazy`) and registered when an editor is first created.
 
 ---
 
@@ -1945,74 +1220,27 @@ held (`services/monaco-lazy`) and registered when an editor is first created.
 
 > **Status:** Implemented
 
-A host serves the tree and supplies a platform. Both halves are the package's to describe, and
-before they were, four hosts described them instead — the desktop's staging, its bundler's copy
-block, its bundle verifier, and the cloud's asset build all carried the same list, and every one of
-them was missing `dist/codicon.ttf`.
+A host serves the tree and supplies a platform. Both halves are the package's to describe, and before they were, four hosts described them instead — the desktop's staging, its bundler's copy block, its bundle verifier, and the cloud's asset build all carried the same list, and every one of them was missing `dist/codicon.ttf`.
 
-**The manifest is the list.** `@jxsuite/studio/hosting/layout` exports `STUDIO_ASSETS`: what ships,
-whether it is a directory copied wholesale, whether absence is fatal, and _why_ — the `why` is what
-a staging failure prints, because "a file is missing" and "the code view will silently have no
-schema validation" are different things to be told. `dist/manifest.json` carries the same data for
-a host that cannot import TypeScript.
+**The manifest is the list.** `@jxsuite/studio/hosting/layout` exports `STUDIO_ASSETS`: what ships, whether it is a directory copied wholesale, whether absence is fatal, and _why_ — the `why` is what a staging failure prints, because "a file is missing" and "the code view will silently have no schema validation" are different things to be told. `dist/manifest.json` carries the same data for a host that cannot import TypeScript.
 
-**Two layouts, one rule.** `assetUrl(base, path)` maps a package path to a host URL. `nested` keeps
-the package's shape; `flat` strips exactly one leading `dist/` segment and nothing else. That single
-rule is what makes flattening a contract rather than a rewrite: every reference inside `dist/` is
-dist-relative, so stripping one segment moves all of them together. `styles/` and `fonts/` are
-untouched in both modes, which is why `tokens.css`'s `url("../fonts/…")` holds either way.
+**Two layouts, one rule.** `assetUrl(base, path)` maps a package path to a host URL. `nested` keeps the package's shape; `flat` strips exactly one leading `dist/` segment and nothing else. That single rule is what makes flattening a contract rather than a rewrite: every reference inside `dist/` is dist-relative, so stripping one segment moves all of them together. `styles/` and `fonts/` are untouched in both modes, which is why `tokens.css`'s `url("../fonts/…")` holds either way.
 
-**The documents are generated, not rewritten.** `studioShellHtml({ base, boot })` emits the editor
-document for a given mount point: a `<link rel="icon">` to `STUDIO_FAVICON`, then the chrome
-stylesheets linked in `STUDIO_STYLESHEETS` order — `forced-colors.css` last, because it redraws what
-Windows High Contrast deletes. The favicon link exists for a host whose window chrome has no icon of
-its own to fall back on — a packaged desktop shell running a bare browser engine in app mode reads
-the page's favicon for its title bar, where a full browser would use the OS-level app icon instead.
-`canvasShellHtml`
-rebases the canvas document's single entry reference; that document stays hand-authored, because its
-`<style>` block establishes the query container the runtime transposes viewport units against and
-has to apply before the first paint. Hosts used to rewrite the shipped HTML with a prefix list, and
-when 2.1.0 split the chrome into `./styles/*.css` the cloud's list missed it: seven dead stylesheet
-links, an unstyled editor, and a build that exited 0.
+**The documents are generated, not rewritten.** `studioShellHtml({ base, boot })` emits the editor document for a given mount point: a `<link rel="icon">` to `STUDIO_FAVICON`, then the chrome stylesheets linked in `STUDIO_STYLESHEETS` order — `forced-colors.css` last, because it redraws what Windows High Contrast deletes. The favicon link exists for a host whose window chrome has no icon of its own to fall back on — a packaged desktop shell running a bare browser engine in app mode reads the page's favicon for its title bar, where a full browser would use the OS-level app icon instead. `canvasShellHtml` rebases the canvas document's single entry reference; that document stays hand-authored, because its `<style>` block establishes the query container the runtime transposes viewport units against and has to apply before the first paint. Hosts used to rewrite the shipped HTML with a prefix list, and when 2.1.0 split the chrome into `./styles/*.css` the cloud's list missed it: seven dead stylesheet links, an unstyled editor, and a build that exited 0.
 
-**A host declares what its origin serves.** Serving the tree is one half; the other is saying
-whether the canvas document's own origin answers a SITE URL. A host that mounts the studio beside
-the project it edits answers yes by construction and declares nothing. A host that mounts it on a
-shared origin does not, and must declare `assetSpace: "repo"` with `documentBaseUrl` (§3.4) — the
-canvas cannot discover this, because a single-page-app fallback answers a missing asset with the
-shell at HTTP 200 and there is nothing for it to detect.
+**A host declares what its origin serves.** Serving the tree is one half; the other is saying whether the canvas document's own origin answers a SITE URL. A host that mounts the studio beside the project it edits answers yes by construction and declares nothing. A host that mounts it on a shared origin does not, and must declare `assetSpace: "repo"` with `documentBaseUrl` (§3.4) — the canvas cannot discover this, because a single-page-app fallback answers a missing asset with the shell at HTTP 200 and there is nothing for it to detect.
 
-**`boot` is the PAL seam.** Module URLs evaluated before the studio entry, in order. The runtime
-half is unchanged (§3.3 of `desktop.md`): a boot module sets `globalThis.__jxPlatform`, or publishes
-the `__jxCloud` signal for the entry to build the adapter from, and must do so **synchronously** —
-a module script with top-level await does not block a later script tag. Both hosts previously
-obtained this seam by string-replacing the entry's script tag, and only one of them checked that the
-replace had matched.
+**`boot` is the PAL seam.** Module URLs evaluated before the studio entry, in order. The runtime half is unchanged (§3.3 of `desktop.md`): a boot module sets `globalThis.__jxPlatform`, or publishes the `__jxCloud` signal for the entry to build the adapter from, and must do so **synchronously** — a module script with top-level await does not block a later script tag. Both hosts previously obtained this seam by string-replacing the entry's script tag, and only one of them checked that the replace had matched.
 
-**The package names no backend.** `@jxsuite/studio` may contain PAL adapters — `platforms/cloud.ts`
-ships inside the bundle because it owns the collab client's `Y.Doc`, and a second bundled `yjs`
-breaks cross-module `instanceof` — but it must not depend on a backend _package_. A dependency on
-`@jxsuite/server` would make the abstraction depend on one of its implementations, and would put the
-compiler, the scaffolder and the starters into every studio install, the cloud's included.
-`scripts/check-dep-rules.ts` cannot see this (it forbids only core-to-extension edges, and both are
-core), so `scripts/check-studio-package.ts` enforces it, along with the rule that only the staging
-module may import `node:` — the manifest and the document generators are pure so a Worker build, a
-Vite plugin or a Deno host can read them.
+**The package names no backend.** `@jxsuite/studio` may contain PAL adapters — `platforms/cloud.ts` ships inside the bundle because it owns the collab client's `Y.Doc`, and a second bundled `yjs` breaks cross-module `instanceof` — but it must not depend on a backend _package_. A dependency on `@jxsuite/server` would make the abstraction depend on one of its implementations, and would put the compiler, the scaffolder and the starters into every studio install, the cloud's included. `scripts/check-dep-rules.ts` cannot see this (it forbids only core-to-extension edges, and both are core), so `scripts/check-studio-package.ts` enforces it, along with the rule that only the staging module may import `node:` — the manifest and the document generators are pure so a Worker build, a Vite plugin or a Deno host can read them.
 
-**`canvasUrl` may be deferred.** A platform that resolves it asynchronously — electrobun fetches
-this window's loopback port over RPC inside `activate()` — declares `canvasUrlDeferred`, and the
-iframe host shows `about:blank` until the real URL lands. Without it the bundle-relative fallback
-resolves to a `canvas.html` the packaged app really stages, and an early frame would boot the canvas
-inside the shell's app-privileged origin, which is what the cross-origin loopback canvas exists to
-prevent.
+**`canvasUrl` may be deferred.** A platform that resolves it asynchronously — electrobun fetches this window's loopback port over RPC inside `activate()` — declares `canvasUrlDeferred`, and the iframe host shows `about:blank` until the real URL lands. Without it the bundle-relative fallback resolves to a `canvas.html` the packaged app really stages, and an early frame would boot the canvas inside the shell's app-privileged origin, which is what the cross-origin loopback canvas exists to prevent.
 
 ---
 
 ## 12. Content-Management Feature Status
 
-Six of these nine rows were still marked **Pending** long after they shipped — the table was written
-when §11 was a plan and never re-read against the code. Each status below names the module that
-answers for it, so the next reader can check rather than trust.
+Six of these nine rows were still marked **Pending** long after they shipped — the table was written when §11 was a plan and never re-read against the code. Each status below names the module that answers for it, so the next reader can check rather than trust.
 
 | Feature                      | Description                                                    | Status                                                                                                                                                                                                                                                                             |
 | ---------------------------- | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -2032,17 +1260,11 @@ See the [Site Architecture Specification](site-architecture.md) for full design 
 
 ## 13. Command Registry and Context Keys
 
-> **Status: Partial.** The registry, the keymap and the CI checks ship; the surfaces are being
-> ported onto them.
+> **Status: Partial.** The registry, the keymap and the CI checks ship; the surfaces are being ported onto them.
 
-Every capability Studio has is one **command record**. The Command Bar, the palette, the Navigator
-rail, the context menus, the block action bar, the keymap, `__jxAutomation` and the assistant's tool
-surface are **renderings** of those records. A rendering may choose _whether_ to show a command; it
-may never decide what it is called, when it is available, or what it does. A second hand-maintained
-list of actions is a defect.
+Every capability Studio has is one **command record**. The Command Bar, the palette, the Navigator rail, the context menus, the block action bar, the keymap, `__jxAutomation` and the assistant's tool surface are **renderings** of those records. A rendering may choose _whether_ to show a command; it may never decide what it is called, when it is available, or what it does. A second hand-maintained list of actions is a defect.
 
-Rendering rules — which surfaces admit which levels, the chrome budget, and what every invoking
-surface must print — live in [studio-ui-guidelines.md §12](studio-ui-guidelines.md).
+Rendering rules — which surfaces admit which levels, the chrome budget, and what every invoking surface must print — live in [studio-ui-guidelines.md §12](studio-ui-guidelines.md).
 
 ### 13.1 The record
 
@@ -2068,10 +1290,7 @@ surface must print — live in [studio-ui-guidelines.md §12](studio-ui-guidelin
 | `aiTool`      | `{ name, description }`             | Opt-in projection to the assistant. The human's gate and the agent's gate stay ONE predicate.                                       |
 | `run`         | `(ctx, args) => void \| Promise`    | The implementation.                                                                                                                 |
 
-**`when` and `enablement` are plain predicates, not a string expression language.** They are closures
-over the reactive context record (§13.4) — the same shape the AI tool gate already ships — so they
-recompute for free and need no tokenizer, parser or evaluator. A serialisable grammar would buy
-serialisability that nothing in Studio consumes.
+**`when` and `enablement` are plain predicates, not a string expression language.** They are closures over the reactive context record (§13.4) — the same shape the AI tool gate already ships — so they recompute for free and need no tokenizer, parser or evaluator. A serialisable grammar would buy serialisability that nothing in Studio consumes.
 
 Three things fail **at registration**, loudly, rather than degrading into a surface disagreement:
 
@@ -2079,11 +1298,9 @@ Three things fail **at registration**, loudly, rather than degrading into a surf
 2. A chord already claimed in the same `keyScope` (§13.3).
 3. A `menus` placement the level × placement matrix does not admit.
 
-The registry has no module-level singleton: the bootstrap creates one and passes it down, so tests,
-the CI checks and a second window each get their own, and the context arrives by injection.
+The registry has no module-level singleton: the bootstrap creates one and passes it down, so tests, the CI checks and a second window each get their own, and the context arrives by injection.
 
-**A command defines itself beside its implementation.** The record, the chord and the `run` are one
-thing; a shared "all the commands" module would recreate the second definition site by another name.
+**A command defines itself beside its implementation.** The record, the chord and the `run` are one thing; a shared "all the commands" module would recreate the second definition site by another name.
 
 ### 13.2 Level — the containment vocabulary
 
@@ -2096,13 +1313,9 @@ thing; a shared "all the commands" module would recreate the second definition s
 | `document`    | One open document                            | Save, Undo, Close Document, Next Tab     |
 | `selection`   | The current node selection or its content    | Duplicate, Delete, Bold, Select Parent   |
 
-The rule that settles contested cases: **file a command by the level of the state it _writes_, not
-the state it _reads_.** Insert reads the project's component registry and writes the document tree,
-so it is `document`. A Library action reads documents and writes project files, so it is `project`.
+The rule that settles contested cases: **file a command by the level of the state it _writes_, not the state it _reads_.** Insert reads the project's component registry and writes the document tree, so it is `document`. A Library action reads documents and writes project files, so it is `project`.
 
-There is deliberately **no `range` level.** Bold, Italic, Code and Link act on a text range inside
-the selected node, so their level is `selection` — what they act on is the selection's content —
-while their `keyScope` is `caret`. A fifth level would demand a fifth region, and there is none.
+There is deliberately **no `range` level.** Bold, Italic, Code and Link act on a text range inside the selected node, so their level is `selection` — what they act on is the selection's content — while their `keyScope` is `caret`. A fifth level would demand a fifth region, and there is none.
 
 ### 13.3 KeyScope and chords
 
@@ -2110,44 +1323,19 @@ while their `keyScope` is `caret`. A fifth level would demand a fifth region, an
 
 `global` · `canvas` · `caret` · `grid` · `code` · `dock` · `palette`
 
-Resolution walks a **scope stack**, narrowest first — `caret > grid/code engine > focused dock >
-global`. A chord bound in a narrower scope shadows the same chord in a wider one; that shadowing is
-the mechanism, not an accident, and it is why the two fields are separate. A chord whose command's
-`when` is false is **not a hit**: the key falls through to the browser rather than being swallowed by
-an action that is not there.
+Resolution walks a **scope stack**, narrowest first — `caret > grid/code engine > focused dock > global`. A chord bound in a narrower scope shadows the same chord in a wider one; that shadowing is the mechanism, not an accident, and it is why the two fields are separate. A chord whose command's `when` is false is **not a hit**: the key falls through to the browser rather than being swallowed by an action that is not there.
 
-Shadowing is by the narrowest **available** claimant, not the narrowest one. A hidden narrow binding
-does not hide the wider ones behind it: the dispatcher walks the stack a scope at a time and takes
-the first whose command is visible. `format.link` holds ⌘K at `caret` scope and `palette.open` holds
-it globally, and the caret stack is live in every parent-realm text field as well as in the canvas —
-so without this rule, ⌘K would have gone quiet in every panel field, resolving to a record whose
-`when` was false there.
+Shadowing is by the narrowest **available** claimant, not the narrowest one. A hidden narrow binding does not hide the wider ones behind it: the dispatcher walks the stack a scope at a time and takes the first whose command is visible. `format.link` holds ⌘K at `caret` scope and `palette.open` holds it globally, and the caret stack is live in every parent-realm text field as well as in the canvas — so without this rule, ⌘K would have gone quiet in every panel field, resolving to a record whose `when` was false there.
 
-**The canvas iframe resolves against the same table.** Studio's chords are dispatched against the
-editor document, so a keystroke inside the cross-origin canvas has to be forwarded to reach them.
-The frame is told the live (chord, scope) pairs for `caret`, `canvas` and `global` — a `keymap`
-message on the canvas protocol, reposted whenever a rebinding changes what is live — and forwards a
-keystroke iff some scope on its own stack claims it. Three consequences are derived rather than
-configured: the clipboard trio is `canvas`-scoped, so with a caret live nothing claims ⌘C and the
-browser copies the selected text; the bare editing keys behave the same way; and the `format.*`
-records are `caret`-scoped, so ⌘B forwards exactly while a caret exists. A chord no scope on the
-stack claims is neither forwarded nor `preventDefault`ed, which is what leaves the browser's own
-behaviour intact.
+**The canvas iframe resolves against the same table.** Studio's chords are dispatched against the editor document, so a keystroke inside the cross-origin canvas has to be forwarded to reach them. The frame is told the live (chord, scope) pairs for `caret`, `canvas` and `global` — a `keymap` message on the canvas protocol, reposted whenever a rebinding changes what is live — and forwards a keystroke iff some scope on its own stack claims it. Three consequences are derived rather than configured: the clipboard trio is `canvas`-scoped, so with a caret live nothing claims ⌘C and the browser copies the selected text; the bare editing keys behave the same way; and the `format.*` records are `caret`-scoped, so ⌘B forwards exactly while a caret exists. A chord no scope on the stack claims is neither forwarded nor `preventDefault`ed, which is what leaves the browser's own behaviour intact.
 
-Chords normalise to one canonical string — modifiers in the fixed order `mod+ctrl+alt+shift`, key
-lowercased — so `"Cmd+Shift+P"`, `"meta+shift+p"` and `"mod+shift+P"` are the same chord. `mod` is ⌘
-on macOS and Ctrl elsewhere. **One function formats a chord for display** (`⌘⇧P` on macOS,
-`Ctrl+Shift+P` elsewhere); no template may hardcode a glyph, or Windows and Linux users are shown
-shortcuts they do not have.
+Chords normalise to one canonical string — modifiers in the fixed order `mod+ctrl+alt+shift`, key lowercased — so `"Cmd+Shift+P"`, `"meta+shift+p"` and `"mod+shift+P"` are the same chord. `mod` is ⌘ on macOS and Ctrl elsewhere. **One function formats a chord for display** (`⌘⇧P` on macOS, `Ctrl+Shift+P` elsewhere); no template may hardcode a glyph, or Windows and Linux users are shown shortcuts they do not have.
 
-Because `mod` absorbs the platform's primary modifier, a physical **Ctrl+Tab** normalises to
-`ctrl+tab` on macOS and `mod+tab` elsewhere. A command that wants that one gesture on every platform
-declares both spellings; each is unreachable on the other platform, so it binds one gesture, not two.
+Because `mod` absorbs the platform's primary modifier, a physical **Ctrl+Tab** normalises to `ctrl+tab` on macOS and `mod+tab` elsewhere. A command that wants that one gesture on every platform declares both spellings; each is unreachable on the other platform, so it binds one gesture, not two.
 
 ### 13.4 Context keys
 
-One reactive record (`commands/context.ts`), derived from the reactive `shell` record, `workspace`
-and `activeTab`. Predicates read it; nothing writes to it from a predicate.
+One reactive record (`commands/context.ts`), derived from the reactive `shell` record, `workspace` and `activeTab`. Predicates read it; nothing writes to it from a predicate.
 
 | Group        | Keys                                                                                                                           |
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------ |
@@ -2165,20 +1353,11 @@ and `activeTab`. Predicates read it; nothing writes to it from a predicate.
 | `ai`         | `configured`, `streaming`                                                                                                      |
 | `capability` | One boolean per PAL member: `gitClone`, `importSite`, `openProjectInNewWindow`, `dataRows`, `windowControls`, `findReferences` |
 
-**`capability.*` replaces scattered platform branching.** A cloud/desktop/dev-server difference
-becomes one `when` clause on one record instead of an `if (platform.x)` in every template that
-touches the feature.
+**`capability.*` replaces scattered platform branching.** A cloud/desktop/dev-server difference becomes one `when` clause on one record instead of an `if (platform.x)` in every template that touches the feature.
 
-**Project-level keys are never sourced from the focused document.** Git status is a property of the
-project, so it lives on the `shell` record (§3): sourcing it from `activeTab` made the rail's Source
-Control badge vanish when the last tab closed, and let two tabs disagree about the branch.
+**Project-level keys are never sourced from the focused document.** Git status is a property of the project, so it lives on the `shell` record (§3): sourcing it from `activeTab` made the rail's Source Control badge vanish when the last tab closed, and let two tabs disagree about the branch.
 
-**`caret.active` and `caret.inCanvas` are two facts, deliberately.** The scope stack asks "is
-something being typed into" and folds a parent-realm text field in with the canvas caret, which is
-what stops element-level chords firing over a half-typed field. A RECORD asks a narrower question:
-`format.bold` acts on a run of text inside the selected node and means nothing while the caret is in
-the Inspector's href field, so the `format.*` family gates on `inCanvas`, which is sourced from the
-canvas bridge alone.
+**`caret.active` and `caret.inCanvas` are two facts, deliberately.** The scope stack asks "is something being typed into" and folds a parent-realm text field in with the canvas caret, which is what stops element-level chords firing over a half-typed field. A RECORD asks a narrower question: `format.bold` acts on a run of text inside the selected node and means nothing while the caret is in the Inspector's href field, so the `format.*` family gates on `inCanvas`, which is sourced from the canvas bridge alone.
 
 ### 13.5 Enforcement
 
@@ -2189,160 +1368,65 @@ canvas bridge alone.
 | `scripts/check-shot-contract.ts`  | A script naming an id nothing declares, a `toggle*` id, or a selector where an id belongs |
 | `scripts/check-icons.ts`          | An icon that reaches no DOM, in either of the two ways one can                            |
 
-All four run in CI, and `createCommandRegistry` applies the placement check again at registration so
-a violation cannot reach a running app either.
+All four run in CI, and `createCommandRegistry` applies the placement check again at registration so a violation cannot reach a running app either.
 
-**An icon is checked because nothing else can see it — and there are TWO key spaces, which fail
-differently.** A TAG written in a template (`<sp-icon-x>`) resolves through `customElements`, and an
-element the browser has never heard of is an `HTMLUnknownElement`: no shadow root, no content, no
-warning, an empty box the size of the missing glyph. The type checker is silent (the tag is a string
-in a template), and happy-dom is as content to render nothing as Chrome is, so a test asserting the
-element is present passes. Eleven shipped that way. Three named elements Spectrum has no such thing
-as — `sp-icon-rail-left-open`/`-close`, written by symmetry with the right-hand pair, which exists.
+**An icon is checked because nothing else can see it — and there are TWO key spaces, which fail differently.** A TAG written in a template (`<sp-icon-x>`) resolves through `customElements`, and an element the browser has never heard of is an `HTMLUnknownElement`: no shadow root, no content, no warning, an empty box the size of the missing glyph. The type checker is silent (the tag is a string in a template), and happy-dom is as content to render nothing as Chrome is, so a test asserting the element is present passes. Eleven shipped that way. Three named elements Spectrum has no such thing as — `sp-icon-rail-left-open`/`-close`, written by symmetry with the right-hand pair, which exists.
 
-A KEY on a record (`icon: "sp-icon-x"`) is **not a tag**. It resolves through a map, and never
-reaches `customElements` at all. A panel record's key goes to `activity-bar.ts`'s `tabIcon()`, whose
-tail is `return fn ? fn(size) : nothing`: a key with no row is not a missing element, it is zero
-nodes, and registering the element does nothing because the tag is never constructed.
+A KEY on a record (`icon: "sp-icon-x"`) is **not a tag**. It resolves through a map, and never reaches `customElements` at all. A panel record's key goes to `activity-bar.ts`'s `tabIcon()`, whose tail is `return fn ? fn(size) : nothing`: a key with no row is not a missing element, it is zero nodes, and registering the element does nothing because the tag is never constructed.
 
-**Conflating the two is not hypothetical.** Both spaces are spelled `sp-icon-*`, and one of the
-map's own rows — `sp-icon-git-branch` — is not a Spectrum element but a hand-drawn inline `<svg>`,
-because the workflow set ships no Git family. Reading that key as a tag says a working, pixel-perfect
-glyph is broken; "correcting" it to a real Spectrum name replaced it with a key nothing resolved, and
-a checker that asked only about registration passed the result. So keys are checked against their
-resolver, and the resolver that is enforced is the one whose miss is SILENT: `commandIcon()` falls
-back to the command's title and degrades visibly, `tabIcon()` falls back to nothing. A dead ROW is
-checked too — the orphan left behind by that regression was still being exercised by a test, which is
-how the suite went on proving a glyph rendered while the shipped panel pointed elsewhere.
+**Conflating the two is not hypothetical.** Both spaces are spelled `sp-icon-*`, and one of the map's own rows — `sp-icon-git-branch` — is not a Spectrum element but a hand-drawn inline `<svg>`, because the workflow set ships no Git family. Reading that key as a tag says a working, pixel-perfect glyph is broken; "correcting" it to a real Spectrum name replaced it with a key nothing resolved, and a checker that asked only about registration passed the result. So keys are checked against their resolver, and the resolver that is enforced is the one whose miss is SILENT: `commandIcon()` falls back to the command's title and degrades visibly, `tabIcon()` falls back to nothing. A dead ROW is checked too — the orphan left behind by that regression was still being exercised by a test, which is how the suite went on proving a glyph rendered while the shipped panel pointed elsewhere.
 
-**The scripting surface is a rendering, and these three rules are what make that true.**
-`window.__jxAutomation` (installed only under `?automation=1`) exposes `run(id, args)`, `seed(id,
-args)` and a read-only `probe`, and nothing else.
+**The scripting surface is a rendering, and these three rules are what make that true.** `window.__jxAutomation` (installed only under `?automation=1`) exposes `run(id, args)`, `seed(id, args)` and a read-only `probe`, and nothing else.
 
-**1. The projection rule.** `__jxAutomation.run` **is** `registry.run`, behind an `isScriptable`
-filter derived from the records themselves. There is no second action table: a hand-maintained
-parallel list of what the app can do is a second definition site, which this section already calls a
-defect. `probe.state()` returns the whole context record of §13.4 rather than a bespoke subset, and
-`probe.commands()` is the same records with their gates already evaluated. An id the registry does
-not declare **throws** — a silently skipped step leaves the app in a state its caller did not ask
-for, and every consumer of that state then believes a lie.
+**1. The projection rule.** `__jxAutomation.run` **is** `registry.run`, behind an `isScriptable` filter derived from the records themselves. There is no second action table: a hand-maintained parallel list of what the app can do is a second definition site, which this section already calls a defect. `probe.state()` returns the whole context record of §13.4 rather than a bespoke subset, and `probe.commands()` is the same records with their gates already evaluated. An id the registry does not declare **throws** — a silently skipped step leaves the app in a state its caller did not ask for, and every consumer of that state then believes a lie.
 
-**2. The idempotence rule.** A scriptable id names a STATE, never a delta. `run()` refuses
-`/\.toggle[A-Z]/` at runtime and names the setter the id should have been. This is a correctness
-property of the registry, not a convenience: `view.toggleAssistant` cannot say which state it ends
-in, so a caller that cannot observe the current one is guessing — which is exactly how flipping the
-assistant's default silently inverted 23 scripted steps, and exactly the bug an agent hits when it
-calls the same id. `enablement` refusing is a failure, not a no-op: `run()` throws
-`CommandUnavailableError` carrying the record's own `requires` sentence.
+**2. The idempotence rule.** A scriptable id names a STATE, never a delta. `run()` refuses `/\.toggle[A-Z]/` at runtime and names the setter the id should have been. This is a correctness property of the registry, not a convenience: `view.toggleAssistant` cannot say which state it ends in, so a caller that cannot observe the current one is guessing — which is exactly how flipping the assistant's default silently inverted 23 scripted steps, and exactly the bug an agent hits when it calls the same id. `enablement` refusing is a failure, not a no-op: `run()` throws `CommandUnavailableError` carrying the record's own `requires` sentence.
 
-**3. The Remote Rule.** _A seed may only write state whose real writer is a network or IPC boundary.
-It stands in for a remote, never for a user._ `seed.assistant` (the model stream), `seed.collab` (the
-awareness socket), `seed.publish` (the Pages API), `seed.git` (the platform's git routes) and
-`seed.projectList` (the recent-projects store) qualify; each declares the boundary it replaces.
-Refused outright, and named in the refusal: `setStatus`, `setActivity`, `setRightTab`, `setZoom`,
-`select` and `openSettings` — a user does all six, so a **command** does all six. Staging the status
-bar in particular is not a fixture but a false report; a surface that needs a calm shell needs the
-app to BE calm.
+**3. The Remote Rule.** _A seed may only write state whose real writer is a network or IPC boundary. It stands in for a remote, never for a user._ `seed.assistant` (the model stream), `seed.collab` (the awareness socket), `seed.publish` (the Pages API), `seed.git` (the platform's git routes) and `seed.projectList` (the recent-projects store) qualify; each declares the boundary it replaces. Refused outright, and named in the refusal: `setStatus`, `setActivity`, `setRightTab`, `setZoom`, `select` and `openSettings` — a user does all six, so a **command** does all six. Staging the status bar in particular is not a fixture but a false report; a surface that needs a calm shell needs the app to BE calm.
 
-Three further refusals follow from the same three rules. **No method that accepts a selector** — if
-a caller cannot say it in command ids, region ids and `JxPath`s, it cannot say it. **No write that
-bypasses the transaction log** — automation mutates documents by running the commands a user runs.
-**No compatibility shim**: a branch that exists to keep an external caller's verb working is that
-caller's coupling living inside the product.
+Three further refusals follow from the same three rules. **No method that accepts a selector** — if a caller cannot say it in command ids, region ids and `JxPath`s, it cannot say it. **No write that bypasses the transaction log** — automation mutates documents by running the commands a user runs. **No compatibility shim**: a branch that exists to keep an external caller's verb working is that caller's coupling living inside the product.
 
-**What `?automation=1` is allowed to change, exhaustively.** Beyond installing the hook, pinning the
-clock and selecting a profile, exactly three behaviours differ, and each is listed here because an
-unlisted one is indistinguishable from the compatibility shim the rule above forbids:
+**What `?automation=1` is allowed to change, exhaustively.** Beyond installing the hook, pinning the clock and selecting a profile, exactly three behaviours differ, and each is listed here because an unlisted one is indistinguishable from the compatibility shim the rule above forbids:
 
 1. `packages/ensure-deps.ts` does not run `bun install`.
 2. `packages/jxsuite-update.ts` does not prompt to update the project's `@jxsuite/*` dependencies.
 3. `ui/layers.ts` holds a toast open instead of retiring it on its timer.
 
-The first two are the same rule — **an automated run opens a project read-only** — and neither
-changes what a picture shows; they refuse to write to someone else's tree. Only the third changes
-what is on screen, and it is argued for in place.
+The first two are the same rule — **an automated run opens a project read-only** — and neither changes what a picture shows; they refuse to write to someone else's tree. Only the third changes what is on screen, and it is argued for in place.
 
-That an uninvited dialog is a **blocking** defect, not a cosmetic one, is a property of the layer
-stack rather than a matter of taste: a dialog renders with an underlay, and an underlay swallows
-every pointer event across the viewport. So a dialog the script did not raise does not appear beside
-the subject — it silently redirects every subsequent click, caret and hover into a scrim, and the
-capture shows one. A run therefore **refuses to photograph a Studio that booted with a modal
-already open**, naming it (`scripts/screenshots/lib/shot.ts`); no shot raises a dialog before its
-first step, so this needs no opt-out.
+That an uninvited dialog is a **blocking** defect, not a cosmetic one, is a property of the layer stack rather than a matter of taste: a dialog renders with an underlay, and an underlay swallows every pointer event across the viewport. So a dialog the script did not raise does not appear beside the subject — it silently redirects every subsequent click, caret and hover into a scrim, and the capture shows one. A run therefore **refuses to photograph a Studio that booted with a modal already open**, naming it (`scripts/screenshots/lib/shot.ts`); no shot raises a dialog before its first step, so this needs no opt-out.
 
-**"Settled" is a predicate, not a sleep** (`packages/studio/src/services/idle.ts`). `probe.idle()`
-resolves once seven subsystems have been quiet for two consecutive animation frames — no renderer
-mid-paint (`store.ts`), no panel scheduler holding a frame or withholding a render
-(`panel-scheduler.ts`), no unacked canvas generation or patch **per host** and no outstanding
-font/animation/image-retry reported by the frame itself (`iframe-host.ts`, folding the
-`{kind: "idle"}` message the canvas posts at its own rAF-quiet), no in-flight platform call
-(counted once, at `getPlatform()`, so every PAL method and every adapter is covered), no overlay
-still inside its settling window (`layers.ts`; a resting toast is not a blocker), no operation still
-RUNNING in the Activity tab (`activity-panel.ts`), and no grid still building or still laying out the
-selection range `selectableRange: 1` gives it (`grid-view.ts`). **A subsystem the predicate does not
-own is a subsystem automation photographs mid-flight**: a grid command resolves when the panel
-mounts, which is several frames before Tabulator has drawn a row, so `editor.kind` reading `grid`
-was never evidence that the grid was on screen. **It rejects
-with a `blockedBy` array naming each outstanding item**, and that rejection is the point: a sleep
-cannot fail, so a subsystem that is slow answers "+500 ms" and the caller proceeds against state that
-is still moving.
+**"Settled" is a predicate, not a sleep** (`packages/studio/src/services/idle.ts`). `probe.idle()` resolves once seven subsystems have been quiet for two consecutive animation frames — no renderer mid-paint (`store.ts`), no panel scheduler holding a frame or withholding a render (`panel-scheduler.ts`), no unacked canvas generation or patch **per host** and no outstanding font/animation/image-retry reported by the frame itself (`iframe-host.ts`, folding the `{kind: "idle"}` message the canvas posts at its own rAF-quiet), no in-flight platform call (counted once, at `getPlatform()`, so every PAL method and every adapter is covered), no overlay still inside its settling window (`layers.ts`; a resting toast is not a blocker), no operation still RUNNING in the Activity tab (`activity-panel.ts`), and no grid still building or still laying out the selection range `selectableRange: 1` gives it (`grid-view.ts`). **A subsystem the predicate does not own is a subsystem automation photographs mid-flight**: a grid command resolves when the panel mounts, which is several frames before Tabulator has drawn a row, so `editor.kind` reading `grid` was never evidence that the grid was on screen. **It rejects with a `blockedBy` array naming each outstanding item**, and that rejection is the point: a sleep cannot fail, so a subsystem that is slow answers "+500 ms" and the caller proceeds against state that is still moving.
 
-`probe.pointAt({ path })` and `probe.revealPath(path)` answer in **top-document coordinates**: the
-app composes the iframe offset, the panzoom transform and the edit-zoom scale itself, because those
-are its own arithmetic and a caller outside the app can only guess at them.
+`probe.pointAt({ path })` and `probe.revealPath(path)` answer in **top-document coordinates**: the app composes the iframe offset, the panzoom transform and the edit-zoom scale itself, because those are its own arithmetic and a caller outside the app can only guess at them.
 
 ---
 
 ## 14. Tabs and Document Identity
 
-> **Status: Partial.** The identity model and the strip ship; per-pane tab strips and preview tabs
-> are pending.
+> **Status: Partial.** The identity model and the strip ship; per-pane tab strips and preview tabs are pending.
 
 ### 14.1 A tab's id IS its document
 
-A file-backed tab is keyed by its path. Everything downstream believes that key: opening a file
-looks for a tab with a matching path and activates it rather than opening a second one; the strip
-uses the id as its list key; the collaboration session is keyed off it.
+A file-backed tab is keyed by its path. Everything downstream believes that key: opening a file looks for a tab with a matching path and activates it rather than opening a second one; the strip uses the id as its list key; the collaboration session is keyed off it.
 
-Consequently **a tab's document may never be swapped out from under its id.** Drilling into a
-component opens a **real tab** of its own. It used to rewrite `documentPath` in place and leave `id`
-alone, which broke the dedupe — re-opening the original page then called through with an id already
-in the map, overwriting the entry without disposing the old tab's effect scope and pushing a second
-copy of the id into the tab order: duplicate list keys and a leaked scope.
+Consequently **a tab's document may never be swapped out from under its id.** Drilling into a component opens a **real tab** of its own. It used to rewrite `documentPath` in place and leave `id` alone, which broke the dedupe — re-opening the original page then called through with an id already in the map, overwriting the entry without disposing the old tab's effect scope and pushing a second copy of the id into the tab order: duplicate list keys and a leaked scope.
 
-Opening an id that is already open **replaces** the tab in place — the previous one is disposed and
-its position in the strip is reused. The id can never appear twice.
+Opening an id that is already open **replaces** the tab in place — the previous one is disposed and its position in the strip is reused. The id can never appear twice.
 
 ### 14.2 The drill-in relationship
 
-The new tab records `openedFrom` — the id and path of the document the author drilled in from. It is
-a **relationship, not a navigation stack**: nothing pops it, nothing restores from it, and closing
-the parent leaves the child perfectly usable. The strip renders it as a `↳` marker and names the
-origin in the tab's tooltip.
+The new tab records `openedFrom` — the id and path of the document the author drilled in from. It is a **relationship, not a navigation stack**: nothing pops it, nothing restores from it, and closing the parent leaves the child perfectly usable. The strip renders it as a `↳` marker and names the origin in the tab's tooltip.
 
 ### 14.3 Sub-documents: withdrawn
 
-**There is no per-tab document stack.** This section used to specify one — a stack of frames, each
-snapshotting the parent's document coordinates and its whole UI context, restored on pop — reserved
-for the two things that have no file of their own: `$map` templates and function bodies.
+**There is no per-tab document stack.** This section used to specify one — a stack of frames, each snapshotting the parent's document coordinates and its whole UI context, restored on pop — reserved for the two things that have no file of their own: `$map` templates and function bodies.
 
-Both cases went elsewhere, and once they had, nothing was left that could push a frame. A function
-body opens in the Bottom dock's Logic tab (§16.3), where the page it belongs to stays on screen
-behind it — which is better than restoring you to a page you were never taken away from. A `$map`
-template is a subtree of its parent document, selected in place on the canvas like any other node,
-so it was never a document to descend into. Anything with a file of its own opens a **tab** (§14.1),
-under the `openedFrom` relationship §14.2 is careful to say is not a navigation stack.
+Both cases went elsewhere, and once they had, nothing was left that could push a frame. A function body opens in the Bottom dock's Logic tab (§16.3), where the page it belongs to stays on screen behind it — which is better than restoring you to a page you were never taken away from. A `$map` template is a subtree of its parent document, selected in place on the canvas like any other node, so it was never a document to descend into. Anything with a file of its own opens a **tab** (§14.1), under the `openedFrom` relationship §14.2 is careful to say is not a navigation stack.
 
-The machinery was nonetheless built, unit-tested and kept for six months. The push function had
-**zero callers** the entire time, so `documentStack` was permanently empty and every consumer of it
-was unreachable: the pop, the jump-to-level, a `Leave Sub-document` command in the palette, a
-breadcrumb in the pane context bar, and a guard that detached the collaboration session while
-"drilled in". A green test suite reported all of it working, because a unit test imports the module
-it tests and cannot see that nothing else does.
+The machinery was nonetheless built, unit-tested and kept for six months. The push function had **zero callers** the entire time, so `documentStack` was permanently empty and every consumer of it was unreachable: the pop, the jump-to-level, a `Leave Sub-document` command in the palette, a breadcrumb in the pane context bar, and a guard that detached the collaboration session while "drilled in". A green test suite reported all of it working, because a unit test imports the module it tests and cannot see that nothing else does.
 
-The rule that generalises: **a stack needs a push, and the push is the part to specify.** A
-restore-from-frame contract that nothing enters is not a partially-shipped feature — it is a shape
-in the codebase that reads like one.
+The rule that generalises: **a stack needs a push, and the push is the part to specify.** A restore-from-frame contract that nothing enters is not a partially-shipped feature — it is a shape in the codebase that reads like one.
 
 ### 14.4 The tab strip
 
@@ -2358,99 +1442,49 @@ in the codebase that reads like one.
 
 ### 14.5 MRU cycling
 
-Tabs carry a most-recently-used order alongside their left-to-right order, because "the tab I was
-just in" is rarely the one to the left. Closing the active tab lands on the most recently used
-survivor, not the rightmost.
+Tabs carry a most-recently-used order alongside their left-to-right order, because "the tab I was just in" is rarely the one to the left. Closing the active tab lands on the most recently used survivor, not the rightmost.
 
-`⌃Tab` freezes a snapshot of the MRU order for the duration of a cycle and walks it **without
-reordering**. Without the snapshot the first press would promote the tab it landed on and the second
-would come straight back — the shortcut would only ever toggle between two tabs. The cycle ends when
-the modifier is released (the tab the author settled on becomes the most recent) or at the next
-ordinary activation.
+`⌃Tab` freezes a snapshot of the MRU order for the duration of a cycle and walks it **without reordering**. Without the snapshot the first press would promote the tab it landed on and the second would come straight back — the shortcut would only ever toggle between two tabs. The cycle ends when the modifier is released (the tab the author settled on becomes the most recent) or at the next ordinary activation.
 
 ### 14.6 Reopen closed
 
-Closing a **file-backed** tab records its path on a bounded, newest-first stack; `⌘⇧T` pops the stack
-and re-reads the file. A virtual tab with no path is not recorded — there is nothing to re-read, and
-offering to reopen it would be a lie. The command renders disabled, with its reason, until something
-has been closed.
+Closing a **file-backed** tab records its path on a bounded, newest-first stack; `⌘⇧T` pops the stack and re-reads the file. A virtual tab with no path is not recorded — there is nothing to re-read, and offering to reopen it would be a lie. The command renders disabled, with its reason, until something has been closed.
 
 ### 14.7 Closing over unsaved work
 
-Three answers, because there are three things the author might mean: **Save · Close Without Saving ·
-Cancel** (`showSaveDiscardDialog`, `studio-ui-guidelines.md` §8.7, whose table assigns that dialog to
-unsaved-work decisions). `⌘W` and the tab's `×` ask it through one implementation.
+Three answers, because there are three things the author might mean: **Save · Close Without Saving · Cancel** (`showSaveDiscardDialog`, `studio-ui-guidelines.md` §8.7, whose table assigns that dialog to unsaved-work decisions). `⌘W` and the tab's `×` ask it through one implementation.
 
-**The close is conditional on the write, never concurrent with it.** A save that fails leaves the tab
-open, still dirty, with the reason in Problems. This is the reason `saveFile` returns a boolean
-rather than reporting and swallowing: reporting is right for `⌘S`, where the tab stays open either
-way, and useless where the answer decides whether the work survives.
+**The close is conditional on the write, never concurrent with it.** A save that fails leaves the tab open, still dirty, with the reason in Problems. This is the reason `saveFile` returns a boolean rather than reporting and swallowing: reporting is right for `⌘S`, where the tab stays open either way, and useless where the answer decides whether the work survives.
 
-**A dialog may not offer an answer the app cannot honour.** A read-only collaborator's local edits
-reach nothing — the mirror and the record publish are both gated on write permission, while the
-document still marks itself dirty — so `saveFile` refuses those tabs outright rather than falling
-back to writing the shared room's file to disk behind its owner. The prompt therefore has **two**
-answers there, headlined _Changes Cannot Be Saved_: **Close Without Saving · Keep Editing**. Three
-answers when only two are real is the same dishonesty as one when there are three, and it is worse
-on the one dialog whose whole job is to be trusted about losing work.
+**A dialog may not offer an answer the app cannot honour.** A read-only collaborator's local edits reach nothing — the mirror and the record publish are both gated on write permission, while the document still marks itself dirty — so `saveFile` refuses those tabs outright rather than falling back to writing the shared room's file to disk behind its owner. The prompt therefore has **two** answers there, headlined _Changes Cannot Be Saved_: **Close Without Saving · Keep Editing**. Three answers when only two are real is the same dishonesty as one when there are three, and it is worse on the one dialog whose whole job is to be trusted about losing work.
 
-The rule generalises past this dialog: **before a surface writes, it establishes that it may.** The
-Bottom dock made that concrete by raising the rate at which the Logic editor is torn down and
-repainted — a debounce armed over a disposed editor reads `""` from it, and a repaint that re-syncs
-the buffer from the document discards whatever is being typed. Both were data loss, both were
-invisible to a green suite, and both are one question asked too late.
+The rule generalises past this dialog: **before a surface writes, it establishes that it may.** The Bottom dock made that concrete by raising the rate at which the Logic editor is torn down and repainted — a debounce armed over a disposed editor reads `""` from it, and a repaint that re-syncs the buffer from the document discards whatever is being typed. Both were data loss, both were invisible to a green suite, and both are one question asked too late.
 
 ### 14.8 The session survives a relaunch
 
-**A project reopens with the documents it was left with.** Stored per project root in that
-project's namespaced record beside its named layouts: each pane's documents in strip order, which
-one was active, which pane had the keyboard, and per document the settings a person deliberately
-chose — canvas mode, the preview flag, both zooms, and the rendering context.
+**A project reopens with the documents it was left with.** Stored per project root in that project's namespaced record beside its named layouts: each pane's documents in strip order, which one was active, which pane had the keyboard, and per document the settings a person deliberately chose — canvas mode, the preview flag, both zooms, and the rendering context.
 
-**Paths, not tab ids.** A tab id is minted per open and means nothing across a reload; the path is
-the identity the workspace already dedupes on. Selection, hover, clipboard and undo history are not
-stored: they are derived or transient, and restoring a selection into a document that changed on
-disk would point at a node that may not exist.
+**Paths, not tab ids.** A tab id is minted per open and means nothing across a reload; the path is the identity the workspace already dedupes on. Selection, hover, clipboard and undo history are not stored: they are derived or transient, and restoring a selection into a document that changed on disk would point at a node that may not exist.
 
-**Every read is untrusted input** — the record is `localStorage`, hand-editable and older than the
-version reading it. A pane id the grid does not have, a mode this build does not draw, a value of
-the wrong type: each is dropped on its own, and a record that is not a session restores nothing.
+**Every read is untrusted input** — the record is `localStorage`, hand-editable and older than the version reading it. A pane id the grid does not have, a mode this build does not draw, a value of the wrong type: each is dropped on its own, and a record that is not a session restores nothing.
 
 Three refusals define the behaviour at the edges:
 
-- A path that **no longer resolves** is skipped, and the rest of the session still opens. Losing
-  eight documents because one was renamed would be worse than the problem this solves.
-- A session that restores **nothing** falls through to the home page. What counts as restored is
-  what the workspace holds afterwards, not what the opener returned: opening a missing file raises
-  a Problem and returns normally, so counting calls reported success and opened an empty window.
-- A window may only **write** a session for a project whose session it has already read. Setting
-  the project root is what starts the restore, and the same write would otherwise capture the empty
-  workspace of that instant and destroy the record a moment before it was wanted.
+- A path that **no longer resolves** is skipped, and the rest of the session still opens. Losing eight documents because one was renamed would be worse than the problem this solves.
+- A session that restores **nothing** falls through to the home page. What counts as restored is what the workspace holds afterwards, not what the opener returned: opening a missing file raises a Problem and returns normally, so counting calls reported success and opened an empty window.
+- A window may only **write** a session for a project whose session it has already read. Setting the project root is what starts the restore, and the same write would otherwise capture the empty workspace of that instant and destroy the record a moment before it was wanted.
 
-A URL that NAMES a document — `?file=`, or a `?project=` pointing into the project — is an
-instruction and wins. A bare `?project=<dir>` means "open this project", and that means the session.
+A URL that NAMES a document — `?file=`, or a `?project=` pointing into the project — is an instruction and wins. A bare `?project=<dir>` means "open this project", and that means the session.
 
 ## 15. Application Preferences
 
-> **Status: Partial.** Appearance, Assistant, Accounts and Keyboard ship, the last of them with
-> rebinding: `preferences-keymap.ts` captures a chord, `rebindCommand` refuses a conflicting one,
-> and the result is an override map laid over the registry and remembered across windows. Editor
-> behaviour and Updates/About are pending — neither exists as a pane.
+> **Status: Partial.** Appearance, Assistant, Accounts and Keyboard ship, the last of them with rebinding: `preferences-keymap.ts` captures a chord, `rebindCommand` refuses a conflicting one, and the result is an override map laid over the registry and remembered across windows. Editor behaviour and Updates/About are pending — neither exists as a pane.
 
-`project.json` configures a **project** and is edited as a project document (`⌘⇧,`, command id
-`settings.open`). **Preferences** (`⌘,`, command id `app.preferences`) configures the
-**application** and follows the author between projects. The two are different surfaces because they have different lifetimes; conflating them is
-why Studio had nowhere to put the chrome theme, the provider key, or the credentials it holds.
+`project.json` configures a **project** and is edited as a project document (`⌘⇧,`, command id `settings.open`). **Preferences** (`⌘,`, command id `app.preferences`) configures the **application** and follows the author between projects. The two are different surfaces because they have different lifetimes; conflating them is why Studio had nowhere to put the chrome theme, the provider key, or the credentials it holds.
 
-Preferences is a focus-managed dialog over the overlay contract in `studio-ui-guidelines.md` §8.7.
-It does not suspend the app, and it is reachable with **no project open** — a first run needs it
-exactly there. Re-opening it while it is up selects the named section rather than stacking a second
-sheet.
+Preferences is a focus-managed dialog over the overlay contract in `studio-ui-guidelines.md` §8.7. It does not suspend the app, and it is reachable with **no project open** — a first run needs it exactly there. Re-opening it while it is up selects the named section rather than stacking a second sheet.
 
-Three doors reach it: ⌘,, the palette, and the first row of the rail foot's **Settings** menu (§5.1),
-whose submenu is the four sections below. That submenu is a deep link rather than a second surface
-precisely because of the re-opening rule above — picking **Accounts** from the gear and picking it
-from the sheet's own nav are the same operation, `app.preferences { section }`.
+Three doors reach it: ⌘,, the palette, and the first row of the rail foot's **Settings** menu (§5.1), whose submenu is the four sections below. That submenu is a deep link rather than a second surface precisely because of the re-opening rule above — picking **Accounts** from the gear and picking it from the sheet's own nav are the same operation, `app.preferences { section }`.
 
 | Section    | Contents                                                                                                                                                                                       |
 | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -2461,64 +1495,28 @@ from the sheet's own nav are the same operation, `app.preferences { section }`.
 
 Two rules the sections must keep:
 
-1.  **An account row never prints the secret it describes.** It reports that something is stored and
-    what it is for. Disconnecting is idempotent, and revoking one account never touches another.
-2.  **The Keyboard sheet is generated, never authored.** It is the same projection
-    (`shortcutReference()`) that produces `docs/studio/interface/shortcuts.md`, so the in-app sheet
-    cannot drift from the app or from the documentation, and a command contributed by an extension
-    appears in it without anyone editing a list. One row per **binding**, not per command; a
-    chordless command is not listed, because there is nothing to press. Per the screenshot contract
-    there is deliberately **no screenshot** of it.
+1.  **An account row never prints the secret it describes.** It reports that something is stored and what it is for. Disconnecting is idempotent, and revoking one account never touches another.
+2.  **The Keyboard sheet is generated, never authored.** It is the same projection (`shortcutReference()`) that produces `docs/studio/interface/shortcuts.md`, so the in-app sheet cannot drift from the app or from the documentation, and a command contributed by an extension appears in it without anyone editing a list. One row per **binding**, not per command; a chordless command is not listed, because there is nothing to press. Per the screenshot contract there is deliberately **no screenshot** of it.
 
-Saving or revoking a credential announces itself, so surfaces that gate on one (the Assistant tab's
-setup notice) repaint without Preferences having to know they exist.
+Saving or revoking a credential announces itself, so surfaces that gate on one (the Assistant tab's setup notice) repaint without Preferences having to know they exist.
 
-**A brokered credential is read from the broker, never from the local slot it does not occupy.**
-Where the platform holds an account on the user's behalf, the row describing it asks the platform for
-its state; a row derived from local storage on such a platform reads "Not connected" forever, names
-no account, and offers a Disconnect that clears nothing anywhere. A brokered row therefore states
-what the broker reports — connected and to which account, connected but not yet pointed at one, or a
-grant that has lapsed — and carries the verb that state actually needs: Reconnect for a lapsed grant,
-a choice of account for an unpointed one, and a Disconnect that reaches the broker. Rule 1 still
-holds: none of these print the credential.
+**A brokered credential is read from the broker, never from the local slot it does not occupy.** Where the platform holds an account on the user's behalf, the row describing it asks the platform for its state; a row derived from local storage on such a platform reads "Not connected" forever, names no account, and offers a Disconnect that clears nothing anywhere. A brokered row therefore states what the broker reports — connected and to which account, connected but not yet pointed at one, or a grant that has lapsed — and carries the verb that state actually needs: Reconnect for a lapsed grant, a choice of account for an unpointed one, and a Disconnect that reaches the broker. Rule 1 still holds: none of these print the credential.
 
 Three rules govern the values themselves, and each of them is a defect that shipped:
 
-3.  **A blank field never deletes.** Storing an empty value and forgetting a value are different
-    operations, and only the second one forgets. Conflating them read as a convenience until a form
-    blanked its own drafts on Save while the sheet stayed open: pressing Save a second time on the
-    emptied form revoked the credentials the first press had stored. A form must therefore also show
-    what it saved rather than clearing itself, and clearing is the Accounts section's Disconnect.
-4.  **A default is not a stored value.** What a reader falls back to when nothing is stored must not
-    be readable as a choice the author made — a form prefilled from the fallback and saved persists
-    a decision nobody took, which is how a settings file came to name a model its owner had never
-    picked for a provider that did not serve it. Where a backend declares its own preference, that
-    preference is consulted before any default this app invents.
-5.  **A preference belongs to the author, not to the window.** Everything here roams: the theme, the
-    keyboard layer, the AI provider, every account. Two windows are two views of one set of
-    settings, so a change in either reaches the other, and a window that knows nothing about a
-    setting can never be the reason it is lost. Per-window state — dock geometry, which tabs are
-    open, a palette's recent commands — is the other thing and stays where it was written.
+3.  **A blank field never deletes.** Storing an empty value and forgetting a value are different operations, and only the second one forgets. Conflating them read as a convenience until a form blanked its own drafts on Save while the sheet stayed open: pressing Save a second time on the emptied form revoked the credentials the first press had stored. A form must therefore also show what it saved rather than clearing itself, and clearing is the Accounts section's Disconnect.
+4.  **A default is not a stored value.** What a reader falls back to when nothing is stored must not be readable as a choice the author made — a form prefilled from the fallback and saved persists a decision nobody took, which is how a settings file came to name a model its owner had never picked for a provider that did not serve it. Where a backend declares its own preference, that preference is consulted before any default this app invents.
+5.  **A preference belongs to the author, not to the window.** Everything here roams: the theme, the keyboard layer, the AI provider, every account. Two windows are two views of one set of settings, so a change in either reaches the other, and a window that knows nothing about a setting can never be the reason it is lost. Per-window state — dock geometry, which tabs are open, a palette's recent commands — is the other thing and stays where it was written.
 
 ---
 
 ## 16. Feedback, Problems and Progress
 
-> **Status: Implemented.** The notification substrate, the Bottom dock and all three of its tabs
-> (Problems, Logic, Activity), the inline field slot and the **announcement** all ship.
+> **Status: Implemented.** The notification substrate, the Bottom dock and all three of its tabs (Problems, Logic, Activity), the inline field slot and the **announcement** all ship.
 >
-> The announcement was the last piece and it is worth recording where it lives, because the obvious
-> place is wrong. It is not a region on the Problems panel: that panel sits in the Bottom dock, and
-> a live region inside a hidden tab announces nothing. `services/announce.ts` owns two body-level
-> regions — `assertive` and `polite`, because politeness is read when the region is created and not
-> when its text changes (WAI-ARIA §5.2.9) — and `notify()` calls it at one unconditional call site,
-> so a record cannot be posted without being announced and a future host inherits announcements
-> without knowing the module exists. See §19.
+> The announcement was the last piece and it is worth recording where it lives, because the obvious place is wrong. It is not a region on the Problems panel: that panel sits in the Bottom dock, and a live region inside a hidden tab announces nothing. `services/announce.ts` owns two body-level regions — `assertive` and `polite`, because politeness is read when the region is created and not when its text changes (WAI-ARIA §5.2.9) — and `notify()` calls it at one unconditional call site, so a record cannot be posted without being announced and a future host inherits announcements without knowing the module exists. See §19.
 
-Studio's predecessor had one feedback surface: a 24px status bar carrying 78 outcomes — successes
-and failures alike — in identical 11px grey text, destroyed after 3000ms. Nothing persisted, nothing
-could be acted on, and 158 of 240 `catch` blocks reached no surface at all. This section replaces
-that with **three lifetimes, chosen by the action the outcome requires.**
+Studio's predecessor had one feedback surface: a 24px status bar carrying 78 outcomes — successes and failures alike — in identical 11px grey text, destroyed after 3000ms. Nothing persisted, nothing could be acted on, and 158 of 240 `catch` blocks reached no surface at all. This section replaces that with **three lifetimes, chosen by the action the outcome requires.**
 
 ### 16.1 The three tiers
 
@@ -2528,581 +1526,265 @@ that with **three lifetimes, chosen by the action the outcome requires.**
 | **Problem** | until it is fixed        | must be fixed               | Bottom dock ⑪, count in the status bar |
 | **Inline**  | as long as the bad value | a value the user just typed | at its own control                     |
 
-`notify(severity, message, options)` is the only sanctioned entry point; `severity` is one of
-`success | info | warn | error`. The tier is **derived** from the severity — `error` defaults to a
-Problem, everything else to a toast — and `options.tier` overrides it, so a warning that must be
-fixed says so at its call site. A lint bans raw status writes outside `notify`, and bans bare empty
-`catch` blocks in `src/`, because a wide shallow change without a mechanical guard regrows.
+`notify(severity, message, options)` is the only sanctioned entry point; `severity` is one of `success | info | warn | error`. The tier is **derived** from the severity — `error` defaults to a Problem, everything else to a toast — and `options.tier` overrides it, so a warning that must be fixed says so at its call site. A lint bans raw status writes outside `notify`, and bans bare empty `catch` blocks in `src/`, because a wide shallow change without a mechanical guard regrows.
 
 Three rules hold across all three tiers:
 
-1.  **Recovery is a command id, not a closure.** `options.action` names a registered command, so the
-    button is rendered from the registry — with the command's own title, its keyboard chord and its
-    `requires` sentence when it is disabled. An unregistered id renders **no button**, which is what
-    lets a call site name a capability that lands a phase later without shipping a dead control.
-2.  **A record carries where it came from.** `source` (the subsystem) and `path` (the file) are what
-    make a Problem clickable and what let `clearProblems(match)` retire a whole class of them when
-    the underlying file is fixed.
-3.  **A repeat is not a new row.** `options.key` dedupes, so a failing watcher does not produce a
-    thousand identical Problems.
+1.  **Recovery is a command id, not a closure.** `options.action` names a registered command, so the button is rendered from the registry — with the command's own title, its keyboard chord and its `requires` sentence when it is disabled. An unregistered id renders **no button**, which is what lets a call site name a capability that lands a phase later without shipping a dead control.
+2.  **A record carries where it came from.** `source` (the subsystem) and `path` (the file) are what make a Problem clickable and what let `clearProblems(match)` retire a whole class of them when the underlying file is fixed.
+3.  **A repeat is not a new row.** `options.key` dedupes, so a failing watcher does not produce a thousand identical Problems.
 
 ### 16.2 The status bar carries ambient state only
 
-Three fields in scope order — **project ‖ document ‖ selection** — every item a command, the save
-state worded rather than a coloured dot. It reports the _effective_ view, so it cannot say one thing
-while the pane context bar says another. **No transient message is ever written to it.** That
-separation is the point: state that is true until something changes it, and outcomes that happened
-at a moment, are different things and had been sharing one 24px strip.
+Three fields in scope order — **project ‖ document ‖ selection** — every item a command, the save state worded rather than a coloured dot. It reports the _effective_ view, so it cannot say one thing while the pane context bar says another. **No transient message is ever written to it.** That separation is the point: state that is true until something changes it, and outcomes that happened at a moment, are different things and had been sharing one 24px strip.
 
 ### 16.3 The Bottom dock
 
-`⌘J`, under the **pane grid** rather than the window, so it never steals width from the side docks —
-and never covers the canvas, which is the one region that must not disappear. Three tabs, under a
-documented cap of four: **Problems · Logic · Activity**. It opens **collapsed**: an empty Problems
-list must not spend 220px of canvas to say nothing.
+`⌘J`, under the **pane grid** rather than the window, so it never steals width from the side docks — and never covers the canvas, which is the one region that must not disappear. Three tabs, under a documented cap of four: **Problems · Logic · Activity**. It opens **collapsed**: an empty Problems list must not spend 220px of canvas to say nothing.
 
-**No Bottom-dock tab has a rail button, Problems included.** It had one — the fourth slot in the
-rail's PROJECT group, with the count as its badge — and it was wrong on two counts. Mechanically,
-every other rail button opens a panel at the SIDE, so one that opened a dock along the BOTTOM
-needed a per-dock branch in `toggleRailPanel`, in `isRailPanelShowing` and in `focusPanel`: three
-branches so that one button of eight behaved like the other seven, and a control pointing left at
-something that appears below. And as a matter of what the shell SAYS: permanent navigation is a
-product's statement of what it is for, and a standing, first-class entry named Problems tells a
-new user to expect them before they have any. The count is not hidden — it sits in the status bar
-beside the branch and the deploy step, which is where ambient project state already lives, and it
-appears the moment the count is non-zero. Clicking it runs `view.setBottomTab { tab: "problems" }`,
-the same single door Diff, Logic and Activity are reached by. There is no `panel.focus.problems`,
-because the ⌘1–8 roster follows the rail.
+**No Bottom-dock tab has a rail button, Problems included.** It had one — the fourth slot in the rail's PROJECT group, with the count as its badge — and it was wrong on two counts. Mechanically, every other rail button opens a panel at the SIDE, so one that opened a dock along the BOTTOM needed a per-dock branch in `toggleRailPanel`, in `isRailPanelShowing` and in `focusPanel`: three branches so that one button of eight behaved like the other seven, and a control pointing left at something that appears below. And as a matter of what the shell SAYS: permanent navigation is a product's statement of what it is for, and a standing, first-class entry named Problems tells a new user to expect them before they have any. The count is not hidden — it sits in the status bar beside the branch and the deploy step, which is where ambient project state already lives, and it appears the moment the count is non-zero. Clicking it runs `view.setBottomTab { tab: "problems" }`, the same single door Diff, Logic and Activity are reached by. There is no `panel.focus.problems`, because the ⌘1–8 roster follows the rail.
 
-**Logic is why the dock exists.** The function editor and the formula workspace were canvas
-takeovers; here the page whose values they compute keeps rendering behind them. Because a takeover
-reveals itself by definition and a dock tab does not, opening a target reveals the dock on Logic —
-**once per target**, so closing the dock over an open formula keeps it closed. The tab joins the
-strip while there is something in it and leaves when the editor's own **Close** clears it; nothing
-short of that closes it, so collapsing the dock or leaving the document and returning keeps your
-place. Nothing else may draw a second exit beside that Close.
+**Logic is why the dock exists.** The function editor and the formula workspace were canvas takeovers; here the page whose values they compute keeps rendering behind them. Because a takeover reveals itself by definition and a dock tab does not, opening a target reveals the dock on Logic — **once per target**, so closing the dock over an open formula keeps it closed. The tab joins the strip while there is something in it and leaves when the editor's own **Close** clears it; nothing short of that closes it, so collapsing the dock or leaving the document and returning keeps your place. Nothing else may draw a second exit beside that Close.
 
-**The fourth slot is free, and Diff is not waiting for it.** Diff was reserved here behind a
-permanently-false predicate for four phases, on the strength of an argument against its own
-reservation: `diff` is an editor **kind**, a pane hosts it at pane size, and folding it into a 240px
-dock would be a downgrade. What it lacked was a pane to open into, and §18 shipped one. A
-reservation whose capability arrived somewhere better is not a reservation — it is an id in
-`view.setBottomTab`'s enum that can only ever select a hidden tab.
+**The fourth slot is free, and Diff is not waiting for it.** Diff was reserved here behind a permanently-false predicate for four phases, on the strength of an argument against its own reservation: `diff` is an editor **kind**, a pane hosts it at pane size, and folding it into a 240px dock would be a downgrade. What it lacked was a pane to open into, and §18 shipped one. A reservation whose capability arrived somewhere better is not a reservation — it is an id in `view.setBottomTab`'s enum that can only ever select a hidden tab.
 
-The slot is still free, and change review did not take it. A comparison's own chrome — the change
-count, the stepper, the Visual/Code switch (§21.2) — is stage chrome, drawn over the artboards it
-describes and scoped to the pane that owns them. A dock tab would be one copy of it for two panes
-that can be comparing two different files.
+The slot is still free, and change review did not take it. A comparison's own chrome — the change count, the stepper, the Visual/Code switch (§21.2) — is stage chrome, drawn over the artboards it describes and scoped to the pane that owns them. A dock tab would be one copy of it for two panes that can be comparing two different files.
 
-`view.setBottomDock {open}` and `view.setBottomTab {tab}` are the idempotent setters; the toggle is
-defined in terms of them. The region id `dock.bottom` resolves **only while the dock is open**, so
-keyboard region cycling never lands in a collapsed dock and a capture can never crop one.
+`view.setBottomDock {open}` and `view.setBottomTab {tab}` are the idempotent setters; the toggle is defined in terms of them. The region id `dock.bottom` resolves **only while the dock is open**, so keyboard region cycling never lands in a collapsed dock and a capture can never crop one.
 
 ### 16.4 Activity, and what may still block
 
-Any long operation opens an Activity entry: a title, a status line, an ordered step list, a
-streaming log, and **Cancel** when the caller supplies one. An entry outlives the operation, so a
-failure is inspectable after the fact instead of only while a modal is up.
+Any long operation opens an Activity entry: a title, a status line, an ordered step list, a streaming log, and **Cancel** when the caller supplies one. An entry outlives the operation, so a failure is inspectable after the fact instead of only while a modal is up.
 
-`fail()` does not render an error view of its own — it raises a Problem carrying the log as detail.
-This is the inversion the section exists for: the progress modal used to be the **only** surface in
-Studio with a real error view, and it was reachable from four call sites.
+`fail()` does not render an error view of its own — it raises a Problem carrying the log as detail. This is the inversion the section exists for: the progress modal used to be the **only** surface in Studio with a real error view, and it was reachable from four call sites.
 
-**Blocking is retained for dependency installation only**, and even there the modal offers _Run in
-the background_ and a real Cancel. Every blocking operation also leaves an Activity entry, so
-dismissing the modal never discards the account of what happened. Project open — which chained a
-blocking spinner, a transient status line and a confirm-plus-spinner, none cancellable — is one
-Activity entry with steps.
+**Blocking is retained for dependency installation only**, and even there the modal offers _Run in the background_ and a real Cancel. Every blocking operation also leaves an Activity entry, so dismissing the modal never discards the account of what happened. Project open — which chained a blocking spinner, a transient status line and a confirm-plus-spinner, none cancellable — is one Activity entry with steps.
 
-Running activities are a quiescence source: `probe.idle()` (§13.5) counts an open entry as
-not-idle, so automation cannot photograph a half-finished operation.
+Running activities are a quiescence source: `probe.idle()` (§13.5) counts an open entry as not-idle, so automation cannot photograph a half-finished operation.
 
 ### 16.5 Inline errors, and the withheld render
 
-A field's own error is rendered by the shared field row, so every consumer inherits it from one
-edit. Host-supplied diagnostics (`jx-validate`, Monaco markers) **win over** the intrinsic schema
-check, and a form the user has not touched paints nothing — marking every required field red on
-first render is this section backwards.
+A field's own error is rendered by the shared field row, so every consumer inherits it from one edit. Host-supplied diagnostics (`jx-validate`, Monaco markers) **win over** the intrinsic schema check, and a form the user has not touched paints nothing — marking every required field red on first render is this section backwards.
 
-Two write policies coexist deliberately, and each surface states which it uses: a form that builds a
-**candidate** validates before applying, so a refusal leaves the old value standing; a form that
-mutates project state in place can only **report**, because a pre-write check there would delay
-persisting what the user can already see rather than prevent anything.
+Two write policies coexist deliberately, and each surface states which it uses: a form that builds a **candidate** validates before applying, so a refusal leaves the old value standing; a form that mutates project state in place can only **report**, because a pre-write check there would delay persisting what the user can already see rather than prevent anything.
 
-Panels defer a render while one of their own fields has focus — finishing the author's sentence
-beats being current — and that deferral is now visible rather than silent. A panel showing state
-from before the last edit is correct; a panel showing it with no indication is indistinguishable
-from a panel that has stopped working.
+Panels defer a render while one of their own fields has focus — finishing the author's sentence beats being current — and that deferral is now visible rather than silent. A panel showing state from before the last edit is correct; a panel showing it with no indication is indistinguishable from a panel that has stopped working.
 
 ### 16.6 Reports about the author's own content
 
 > **Status: Implemented.**
 
-Three checks run over the document rather than over the app, and all file their findings as
-**Problems**: the accessibility report (`services/a11y-report.ts`), the SEO warnings the Search
-appearance window already computed, and the popover report (`services/popover-report.ts`).
+Three checks run over the document rather than over the app, and all file their findings as **Problems**: the accessibility report (`services/a11y-report.ts`), the SEO warnings the Search appearance window already computed, and the popover report (`services/popover-report.ts`).
 
-**The popover report is separate from the accessibility one, and separate on purpose.** An
-`A11yFinding` is typed to a WCAG criterion, and none of its findings are WCAG failures: a popover
-whose base rule sets `display` is not inaccessible, it is BROKEN — laid out on every page whether or
-not anyone opened it — and forcing that into a criterion field would be a lie in the report's own
-vocabulary. An unnamed popover landmark IS a WCAG matter, and belongs to the accessibility report.
+**The popover report is separate from the accessibility one, and separate on purpose.** An `A11yFinding` is typed to a WCAG criterion, and none of its findings are WCAG failures: a popover whose base rule sets `display` is not inaccessible, it is BROKEN — laid out on every page whether or not anyone opened it — and forcing that into a criterion field would be a lie in the report's own vocabulary. An unnamed popover landmark IS a WCAG matter, and belongs to the accessibility report.
 
-Its rules live in `@jxsuite/schema/overlays` rather than in the studio, because three surfaces judge
-the same documents — this report, `jx build`, and the starter conformance test — and three copies of
-"what is wrong with a popover" is three chances to disagree in front of an author. It runs at the
-one chokepoint every edit passes through, a successful SAVE, beside the component-slot check that is
-already there; a render-time lint would re-file a record every frame, which is the noise a
-notification key exists to prevent.
+Its rules live in `@jxsuite/schema/overlays` rather than in the studio, because three surfaces judge the same documents — this report, `jx build`, and the starter conformance test — and three copies of "what is wrong with a popover" is three chances to disagree in front of an author. It runs at the one chokepoint every edit passes through, a successful SAVE, beside the component-slot check that is already there; a render-time lint would re-file a record every frame, which is the noise a notification key exists to prevent.
 
-Every finding that can be repaired carries the command that repairs it, and the ones that cannot
-carry none. Moving `display` into `:popover-open`, removing two attributes that do nothing on the
-element they are written on, and writing the house spelling of `popover` are all mechanical, and
-each is ONE transaction so undo takes one press. "Point this invoker at the right panel" is not —
-which panel is the author's decision — so that finding is a sentence.
+Every finding that can be repaired carries the command that repairs it, and the ones that cannot carry none. Moving `display` into `:popover-open`, removing two attributes that do nothing on the element they are written on, and writing the house spelling of `popover` are all mechanical, and each is ONE transaction so undo takes one press. "Point this invoker at the right panel" is not — which panel is the author's decision — so that finding is a sentence.
 
-**Why Problems and not a panel of their own.** Problems is where this app keeps the records that
-outlive the frame the reader was not watching, and both of these are exactly that: a page shipped
-with no description, or with an unlabelled image, is a fact worth knowing whether or not the author
-thought to open a window. The Search appearance window keeps rendering its own list — the previews
-are what that window is for — and files the same warnings, keyed by warning id, so the two surfaces
-are naming one thing rather than two.
+**Why Problems and not a panel of their own.** Problems is where this app keeps the records that outlive the frame the reader was not watching, and both of these are exactly that: a page shipped with no description, or with an unlabelled image, is a fact worth knowing whether or not the author thought to open a window. The Search appearance window keeps rendering its own list — the previews are what that window is for — and files the same warnings, keyed by warning id, so the two surfaces are naming one thing rather than two.
 
-**No score, in either report.** A single figure out of a hundred aggregates unrelated facts into a
-verdict, and the verdict is what gets optimised. The list is the report.
+**No score, in either report.** A single figure out of a hundred aggregates unrelated facts into a verdict, and the verdict is what gets optimised. The list is the report.
 
-**Every accessibility finding names its WCAG criterion**, which is what ATAG 2.0 B.3.1 asks a report
-to carry. B.3.2 — a repair the author can invoke from the finding — is only partly answered: a
-finding whose repair is a command carries it, and most repairs ("give this image alt text") have no
-command yet, so those findings carry none. Naming a command that merely reopens a panel would put a
-button on a finding that does not do what the button says.
+**Every accessibility finding names its WCAG criterion**, which is what ATAG 2.0 B.3.1 asks a report to carry. B.3.2 — a repair the author can invoke from the finding — is only partly answered: a finding whose repair is a command carries it, and most repairs ("give this image alt text") have no command yet, so those findings carry none. Naming a command that merely reopens a panel would put a button on a finding that does not do what the button says.
 
-**A run says what it could NOT check.** Colour contrast between computed colours, target size in
-rendered pixels, focus order and reading order are all properties of built output in a browser, not
-of a document tree; answering them means running the page with an engine like axe-core. Two
-Problems name that absence on every run, because a report that lists nothing otherwise reads as
-"this page is accessible" — a claim the run cannot make. This is the `redirects-grid.ts` idiom, for
-the same reason it exists there.
+**A run says what it could NOT check.** Colour contrast between computed colours, target size in rendered pixels, focus order and reading order are all properties of built output in a browser, not of a document tree; answering them means running the page with an engine like axe-core. Two Problems name that absence on every run, because a report that lists nothing otherwise reads as "this page is accessible" — a claim the run cannot make. This is the `redirects-grid.ts` idiom, for the same reason it exists there.
 
 ---
 
 ## 17. Project Documents (Settings and Styles)
 
-> **Status: Partial.** `project.json` is a document under the transaction log and both surfaces
-> render from it; the formatting-preserving writer described in §17.2 is not built.
+> **Status: Partial.** `project.json` is a document under the transaction log and both surfaces render from it; the formatting-preserving writer described in §17.2 is not built.
 
-Project configuration used to be edited through a modal by **29 fire-and-forget call sites across
-eight files**, twenty-one of which dropped a rejected write on the floor — `void
-saveProjectConfig()`, or an `await` inside an un-awaited click handler. It was the app's
-highest-consequence silent-failure path, and it wrote the file that defines the project.
+Project configuration used to be edited through a modal by **29 fire-and-forget call sites across eight files**, twenty-one of which dropped a rejected write on the floor — `void saveProjectConfig()`, or an `await` inside an un-awaited click handler. It was the app's highest-consequence silent-failure path, and it wrote the file that defines the project.
 
 ### 17.1 Configuration is a document
 
-`project.json` is a **Tab**, which is what makes the rest true rather than aspirational: it gets
-undo, the dirty flag, ⌘S and the history delegate from the same machinery every document uses. Two
-surfaces render it — **Project Settings** (sections as inner nav: Overview, Contexts, Site head,
-Locales, CSS Variables, Data Shapes, Content types, Data tables, Connections, Packages, Extensions,
-Deploy, Raw JSON, plus whatever else an extension contributes) and **Project Styles** (§7) — and
-both edit one object.
+`project.json` is a **Tab**, which is what makes the rest true rather than aspirational: it gets undo, the dirty flag, ⌘S and the history delegate from the same machinery every document uses. Two surfaces render it — **Project Settings** (sections as inner nav: Overview, Contexts, Site head, Locales, CSS Variables, Data Shapes, Content types, Data tables, Connections, Packages, Extensions, Deploy, Raw JSON, plus whatever else an extension contributes) and **Project Styles** (§7) — and both edit one object.
 
-**Each surface is reached by one command**, `settings.open { section, entry }` and `styles.open`,
-and the two declare the **same availability rule** because they write the same state (§13,
-`studio-ui-guidelines.md` §12.4). Both open the tab if it is closed and switch its editor if it is
-not, so neither ever discards the document's history. Project Settings' sections are one click deep
-from the rail foot's Settings menu (§5.1), and that submenu is the same projection the inner nav
-draws — a contributed section appears in both or in neither.
+**Each surface is reached by one command**, `settings.open { section, entry }` and `styles.open`, and the two declare the **same availability rule** because they write the same state (§13, `studio-ui-guidelines.md` §12.4). Both open the tab if it is closed and switch its editor if it is not, so neither ever discards the document's history. Project Settings' sections are one click deep from the rail foot's Settings menu (§5.1), and that submenu is the same projection the inner nav draws — a contributed section appears in both or in neither.
 
 Three rules follow, and they are the section's whole content:
 
-1.  **One chokepoint.** Every configuration write goes through a single commit path: one
-    serialization, one error path. A rejected write raises a **Problem** (§16) naming the file; it
-    is never dropped.
-2.  **`registerSettingsSection` survives.** An extension contributes a section, and a section that
-    fails to load reports to Problems rather than leaving a blank pane.
-3.  **`project.json` is excluded from collaboration replication.** No session attaches to a tab whose
-    `documentPath` is `project.json`, so no history delegate is registered over it. Its edits arrive
-    from surfaces that are not the canvas, and its value configures the local editor's formats,
-    extensions, schemas and style cascade — a shared document would let one author's configuration
-    reconfigure another's editor mid-keystroke, and would let the source-canonical freeze pause
-    configuration edits that contain no text. `specs/collab.md` states the same exclusion.
+1.  **One chokepoint.** Every configuration write goes through a single commit path: one serialization, one error path. A rejected write raises a **Problem** (§16) naming the file; it is never dropped.
+2.  **`registerSettingsSection` survives.** An extension contributes a section, and a section that fails to load reports to Problems rather than leaving a blank pane.
+3.  **`project.json` is excluded from collaboration replication.** No session attaches to a tab whose `documentPath` is `project.json`, so no history delegate is registered over it. Its edits arrive from surfaces that are not the canvas, and its value configures the local editor's formats, extensions, schemas and style cascade — a shared document would let one author's configuration reconfigure another's editor mid-keystroke, and would let the source-canonical freeze pause configuration edits that contain no text. `specs/collab.md` states the same exclusion.
 
 ### 17.2 A no-op edit writes nothing
 
-The committed `project.json` files in a repository are formatted by whatever formatter the project
-uses, not by `JSON.stringify`. Re-serializing a parsed config therefore does **not** reproduce the
-bytes on disk — short arrays get expanded, authored line breaks are lost — so a writer that compares
-bytes would rewrite the entire file's indentation on the first settings edit, and every settings
-edit would arrive as a whole-file diff that hides what actually changed.
+The committed `project.json` files in a repository are formatted by whatever formatter the project uses, not by `JSON.stringify`. Re-serializing a parsed config therefore does **not** reproduce the bytes on disk — short arrays get expanded, authored line breaks are lost — so a writer that compares bytes would rewrite the entire file's indentation on the first settings edit, and every settings edit would arrive as a whole-file diff that hides what actually changed.
 
-**The commit compares semantically and writes nothing when nothing changed.** That is
-formatting-independent, and it is what makes a settings edit reviewable.
+**The commit compares semantically and writes nothing when nothing changed.** That is formatting-independent, and it is what makes a settings edit reviewable.
 
-A real one-field edit still re-serializes the whole file, so it still reformats. Preserving the
-author's formatting through a genuine edit needs a key-span splice over the original text and is
-**not built**; until it is, a configuration edit is a whole-file diff, and this section says so
-rather than implying otherwise.
+A real one-field edit still re-serializes the whole file, so it still reformats. Preserving the author's formatting through a genuine edit needs a key-span splice over the original text and is **not built**; until it is, a configuration edit is a whole-file diff, and this section says so rather than implying otherwise.
 
 ### 17.3 What the surfaces may assume
 
-A settings surface renders from the configuration document and commits through the chokepoint. It
-may not keep its own copy of the config object: two objects is how an edit gets silently reverted
-by whichever writer runs second. A surface that needs to reject a value validates it and reports
-inline (§16), rather than writing and hoping.
+A settings surface renders from the configuration document and commits through the chokepoint. It may not keep its own copy of the config object: two objects is how an edit gets silently reverted by whichever writer runs second. A surface that needs to reject a value validates it and reports inline (§16), rather than writing and hoping.
 
 ---
 
 ## 18. Panes
 
-> **Status: Implemented.** The pane grid, two live Canvas panes, per-pane canvas state, the jump
-> bar, the dock takeovers and derived panes.
+> **Status: Implemented.** The pane grid, two live Canvas panes, per-pane canvas state, the jump bar, the dock takeovers and derived panes.
 
 ### 18.1 A pane is where a document is shown
 
-Two panes at most, and the cap is enforced in code rather than by convention — `splitRight` is the
-only pane creator and refuses past the maximum. **Both panes draw a live Canvas**, and a split is a
-move: the tab crosses as it is.
+Two panes at most, and the cap is enforced in code rather than by convention — `splitRight` is the only pane creator and refuses past the maximum. **Both panes draw a live Canvas**, and a split is a move: the tab crosses as it is.
 
-**There is one cap now, and it is on the number of panes.** A second cap used to sit beside it,
-naming the editor kinds a pane other than the primary could host — Code, Diff, Config, Entry, Grid,
-Library, the cheap ones — because a second live host was unaffordable while the shell had one stage
-to hand between panes and one app-wide render generation to invalidate. Neither is true any longer,
-so the kind cap has nothing left to protect and every predicate that read it is deleted, including
-the one that flipped a splitting Design tab to Code on its way across. `MAX_PANES` stays at two
-because two is a measured budget, not a placeholder: each host is a real `@jxsuite/runtime` render,
-an `iframe-channel` connection and a structured clone, all on one main thread.
+**There is one cap now, and it is on the number of panes.** A second cap used to sit beside it, naming the editor kinds a pane other than the primary could host — Code, Diff, Config, Entry, Grid, Library, the cheap ones — because a second live host was unaffordable while the shell had one stage to hand between panes and one app-wide render generation to invalidate. Neither is true any longer, so the kind cap has nothing left to protect and every predicate that read it is deleted, including the one that flipped a splitting Design tab to Code on its way across. `MAX_PANES` stays at two because two is a measured budget, not a placeholder: each host is a real `@jxsuite/runtime` render, an `iframe-channel` connection and a structured clone, all on one main thread.
 
 Three rules govern the lifecycle, and each of them was a defect first:
 
-1.  **A pane is complete before it is published.** Focus moves last. Publishing a pane's id before
-    its tab left every `activeTab` reader — the jump bar, the Inspector, the toolbar — printing
-    "no document" over a stage that was drawing one.
-2.  **A pane is never observable without existing.** Closing one hands the survivor its tabs and
-    the focus while both are still in the grid, and only then removes it. The window between
-    "focused" and "present" emptied the stage and nothing repainted it, because the render effects
-    key on the active _tab_ and the tab had not changed.
-3.  **A pane with nothing in it is a hole in the grid**, so every path that empties one collapses
-    it. Closing the last tab had this rule; splitting the last tab back to the primary did not, and
-    three keystrokes reached a shell with no stage, no tab strip and no jump bar while two
-    documents were open.
+1.  **A pane is complete before it is published.** Focus moves last. Publishing a pane's id before its tab left every `activeTab` reader — the jump bar, the Inspector, the toolbar — printing "no document" over a stage that was drawing one.
+2.  **A pane is never observable without existing.** Closing one hands the survivor its tabs and the focus while both are still in the grid, and only then removes it. The window between "focused" and "present" emptied the stage and nothing repainted it, because the render effects key on the active _tab_ and the tab had not changed.
+3.  **A pane with nothing in it is a hole in the grid**, so every path that empties one collapses it. Closing the last tab had this rule; splitting the last tab back to the primary did not, and three keystrokes reached a shell with no stage, no tab strip and no jump bar while two documents were open.
 
 ### 18.2 What a second pane costs, and what it does not
 
-Parent-side render preparation happens **once per pass**, not once per host: the document is
-resolved and serialized once and fanned out to every live host, so that cost is flat in the number
-of hosts rather than linear. Param-bound state used to make one backend round trip **per host** for
-the same data; it makes one.
+Parent-side render preparation happens **once per pass**, not once per host: the document is resolved and serialized once and fanned out to every live host, so that cost is flat in the number of hosts rather than linear. Param-bound state used to make one backend round trip **per host** for the same data; it makes one.
 
-**What no fan-out removes:** each frame lays out its own viewport, and same-origin frames share the
-renderer's main thread, so N hosts remain N `@jxsuite/runtime` renders and N structured clones.
-That is the real budget for a second live Canvas, and it is why the cap exists at all.
+**What no fan-out removes:** each frame lays out its own viewport, and same-origin frames share the renderer's main thread, so N hosts remain N `@jxsuite/runtime` renders and N structured clones. That is the real budget for a second live Canvas, and it is why the cap exists at all.
 
-**A pane owns its canvas state.** The mounted artboards, the canvas mode, the previous mode that
-decides a teardown, and the escalation target are all per pane. A patch escalates the pane showing
-the document, not every pane — and "is this tab patchable" asks whether _a pane is displaying it_,
-not whether the keyboard is in that pane, which is the more truthful question and happens also to
-be the correct one.
+**A pane owns its canvas state.** The mounted artboards, the canvas mode, the previous mode that decides a teardown, and the escalation target are all per pane. A patch escalates the pane showing the document, not every pane — and "is this tab patchable" asks whether _a pane is displaying it_, not whether the keyboard is in that pane, which is the more truthful question and happens also to be the correct one.
 
-**Anything a host reports resolves through the host, not through focus.** A canvas message names
-its own tab; reading `activeTab` instead wrote the clicked breakpoint, the selection and the
-resolved data scope to whichever document happened to be focused. With one stage that was invisible.
-With two it is a data bug, so the resolution is by host everywhere, including the artboard header
-that lives on the parent side.
+**Anything a host reports resolves through the host, not through focus.** A canvas message names its own tab; reading `activeTab` instead wrote the clicked breakpoint, the selection and the resolved data scope to whichever document happened to be focused. With one stage that was invisible. With two it is a data bug, so the resolution is by host everywhere, including the artboard header that lives on the parent side.
 
 ### 18.3 The grid draws a cell per pane
 
-There is no stage handover. The shell used to own one of each pane-scoped surface — one tab strip,
-one jump bar, one context bar, one stage — as flat rows of the **application** grid, which is to say
-application rows that only ever described the primary pane, handed to whichever pane took focus. The
-pane grid draws **one cell per pane**, each holding that pane's own four surfaces, and every pane
-registers its own canvas surface when its cell is built and releases it when the cell is disposed.
-Nothing changes hands, so no pane is ever left describing DOM it does not own.
+There is no stage handover. The shell used to own one of each pane-scoped surface — one tab strip, one jump bar, one context bar, one stage — as flat rows of the **application** grid, which is to say application rows that only ever described the primary pane, handed to whichever pane took focus. The pane grid draws **one cell per pane**, each holding that pane's own four surfaces, and every pane registers its own canvas surface when its cell is built and releases it when the cell is disposed. Nothing changes hands, so no pane is ever left describing DOM it does not own.
 
-**The grid is a keyed template, and the key is load-bearing.** A cell is identified by its pane id,
-so an unchanged cell's DOM is moved rather than rebuilt. That is not a preference: re-parenting an
-`<iframe>` reloads it, dropping its channel, its document and every acknowledged panel. Expressing
-the reconciler declaratively turns a rule the previous imperative version could only ask for in a
-comment into a property of the rendering.
+**The grid is a keyed template, and the key is load-bearing.** A cell is identified by its pane id, so an unchanged cell's DOM is moved rather than rebuilt. That is not a preference: re-parenting an `<iframe>` reloads it, dropping its channel, its document and every acknowledged panel. Expressing the reconciler declaratively turns a rule the previous imperative version could only ask for in a comment into a property of the rendering.
 
-**A split is a side-by-side.** Two documents, both live, both editable, each with its own strip,
-address, context bar and stage, and a splitter between them whose ratio is layout state. Every
-string a reader sees may now say so — and the converse obligation held for as long as it was false,
-which is why `pane.splitRight` spent a release refusing to promise "beside the canvas".
+**A split is a side-by-side.** Two documents, both live, both editable, each with its own strip, address, context bar and stage, and a splitter between them whose ratio is layout state. Every string a reader sees may now say so — and the converse obligation held for as long as it was false, which is why `pane.splitRight` spent a release refusing to promise "beside the canvas".
 
-**Clicking into a pane focuses it.** For most of this section's life `focusPane` had exactly one
-call site — the tab strip — so a click on a pane's canvas, its context bar or its editor left the
-keyboard in the other pane, and the unfocused pane was not a rare state but the state you were in
-the moment you clicked into one. A cell focuses its pane on pointerdown; a frame reports the same
-through the protocol, because a click inside a cross-origin document does not reach the parent.
+**Clicking into a pane focuses it.** For most of this section's life `focusPane` had exactly one call site — the tab strip — so a click on a pane's canvas, its context bar or its editor left the keyboard in the other pane, and the unfocused pane was not a rare state but the state you were in the moment you clicked into one. A cell focuses its pane on pointerdown; a frame reports the same through the protocol, because a click inside a cross-origin document does not reach the parent.
 
-**Nothing drawn for a pane may resolve the focus.** This is the rule the whole section reduces to,
-and it was violated in every module that had been written when there was one stage — the Document
-Header card mutating the focused document, the zoom axis writing the focused tab's scale, a render
-posting the focused tab's colour scheme into whichever pane it was drawing, a host asking the focus
-whether to restore a caret it owed. Each was correct while "the focused pane" and "this pane" named
-the same thing. `scripts/check-pane-singletons.ts` enforces it: a function whose parameters name a
-pane may not read the focus in its body, one hop into a helper that does not name its own subject.
-A rule over a list of field names could not see any of this, which is why it parses.
+**Nothing drawn for a pane may resolve the focus.** This is the rule the whole section reduces to, and it was violated in every module that had been written when there was one stage — the Document Header card mutating the focused document, the zoom axis writing the focused tab's scale, a render posting the focused tab's colour scheme into whichever pane it was drawing, a host asking the focus whether to restore a caret it owed. Each was correct while "the focused pane" and "this pane" named the same thing. `scripts/check-pane-singletons.ts` enforces it: a function whose parameters name a pane may not read the focus in its body, one hop into a helper that does not name its own subject. A rule over a list of field names could not see any of this, which is why it parses.
 
-**A surface that caches "am I mounted?" in a module outlives the DOM it mounted into.** Every such
-fast path must also ask whether the mode changed, or it returns on the strength of an editor whose
-container was thrown away one frame earlier.
+**A surface that caches "am I mounted?" in a module outlives the DOM it mounted into.** Every such fast path must also ask whether the mode changed, or it returns on the strength of an editor whose container was thrown away one frame earlier.
 
 ### 18.4 Derived panes
 
-A derived pane is chosen by a **standing rule** rather than by a document: show me the Code of
-whatever that pane is showing, or its diff, or the layout it uses, or the definition of the
-component under its selection, or the same page at one named breakpoint. The rule re-resolves when
-its inputs change, and **Pin** ends the following and leaves an ordinary tab.
+A derived pane is chosen by a **standing rule** rather than by a document: show me the Code of whatever that pane is showing, or its diff, or the layout it uses, or the definition of the component under its selection, or the same page at one named breakpoint. The rule re-resolves when its inputs change, and **Pin** ends the following and leaves an ordinary tab.
 
 **A preset is one of three mechanisms, and which one is decided by the document, not by taste.**
 
-1.  **A projection** — Code and Diff. The same document in a different view, which needs a second
-    `Tab` because `session.ui` is per-tab: the two panes disagree about mode, scroll and zoom while
-    agreeing about content. So a projection shares the source's document and history _by reference_
-    and carries its own session, and its id names the lens as well as the document.
-2.  **A follow** — Layout, Component definition, and the same page in another language. These are
-    _different documents_, and a second id over one file would be two documents, two undo stacks,
-    two collaboration rooms and a race to save. §14.1 read in the other direction. So the pane opens
-    the ordinary path-keyed tab and the rule only decides _which_.
-3.  **Neither** — "the same page at ⟨breakpoint⟩" is one artboard of the design board the pane
-    already draws. It was specified as a preset and is a filter.
+1.  **A projection** — Code and Diff. The same document in a different view, which needs a second `Tab` because `session.ui` is per-tab: the two panes disagree about mode, scroll and zoom while agreeing about content. So a projection shares the source's document and history _by reference_ and carries its own session, and its id names the lens as well as the document.
+2.  **A follow** — Layout, Component definition, and the same page in another language. These are _different documents_, and a second id over one file would be two documents, two undo stacks, two collaboration rooms and a race to save. §14.1 read in the other direction. So the pane opens the ordinary path-keyed tab and the rule only decides _which_.
+3.  **Neither** — "the same page at ⟨breakpoint⟩" is one artboard of the design board the pane already draws. It was specified as a preset and is a filter.
 
-**§14.1 holds, and is stronger for this.** A projection's id names the document _and_ the lens, and
-neither is ever reassigned: following is dispose-and-open, never mutation, which is exactly the
-discipline the rule was written after the drill-in failure to enforce. What a projection does
-endanger is the other half — _opening a file finds the tab that already has it_ — because two ids
-now reach one document. That is preserved by four exclusions stated once: a derived id is never a
-dedupe target, never a reopen record, never a collaboration key, and never counted among the
-documents a close-all would lose.
+**§14.1 holds, and is stronger for this.** A projection's id names the document _and_ the lens, and neither is ever reassigned: following is dispose-and-open, never mutation, which is exactly the discipline the rule was written after the drill-in failure to enforce. What a projection does endanger is the other half — _opening a file finds the tab that already has it_ — because two ids now reach one document. That is preserved by four exclusions stated once: a derived id is never a dedupe target, never a reopen record, never a collaboration key, and never counted among the documents a close-all would lose.
 
-**A projection's own view state belongs to the PANE, not to the tab it borrows.** A Diff lens
-carries its Visual/Code position and its place in the change list, and neither may be written onto
-`session.ui`: that session belongs to the pane beside it, and a control that flips the document
-somebody else is editing is the defect the whole lens/tab split exists to refuse. It is the same
-rule the per-pane zoom already follows, applied to the two axes a comparison adds.
+**A projection's own view state belongs to the PANE, not to the tab it borrows.** A Diff lens carries its Visual/Code position and its place in the change list, and neither may be written onto `session.ui`: that session belongs to the pane beside it, and a control that flips the document somebody else is editing is the defect the whole lens/tab split exists to refuse. It is the same rule the per-pane zoom already follows, applied to the two axes a comparison adds.
 
-**A pane may hold a derivation or tabs of its own, never both.** A projection borrows the pane, so a
-gesture that puts a document there — a split, a compare, a drill-in — releases the rule rather than
-stacking on it. The author asked for a document to be somewhere; the projection had nothing to lose.
+**A pane may hold a derivation or tabs of its own, never both.** A projection borrows the pane, so a gesture that puts a document there — a split, a compare, a drill-in — releases the rule rather than stacking on it. The author asked for a document to be somewhere; the projection had nothing to lose.
 
-**The `locale` preset is a follow, and it is the one that had to prove the distinction.** Jx has no
-message catalogue (`site-architecture.md` §13.3): a translation is a different file in a different
-directory, so "the same page in French" opens that file rather than re-rendering this one. A preset
-that redrew the pane under another language would be describing a system Jx does not have. Its label
-and its chip are unfinished phrases completed by the locale's own autonym — "Same page in français"
-— for the reason the breakpoint chip's is: a strip reading "Same page in" over a French document
-says nothing the pane beside it did not already say.
+**The `locale` preset is a follow, and it is the one that had to prove the distinction.** Jx has no message catalogue (`site-architecture.md` §13.3): a translation is a different file in a different directory, so "the same page in French" opens that file rather than re-rendering this one. A preset that redrew the pane under another language would be describing a system Jx does not have. Its label and its chip are unfinished phrases completed by the locale's own autonym — "Same page in français" — for the reason the breakpoint chip's is: a strip reading "Same page in" over a French document says nothing the pane beside it did not already say.
 
-Where a translation _would_ live is string math on the path (§13.5's `translationPathFor`); whether
-anybody has written it is a question only the disk can answer, and the resolver is pure and
-synchronous. So the derivation carries a **probe**: it asks once per wanted path, and until the
-answer lands the pane holds. A locale with no copy yet is `unavailable` **with the sentence that
-names the recovery**, never a blank pane under a chip naming a language — the case §18.4's last
-paragraph refuses, in the one preset where the missing document is the ordinary situation rather
-than the error. `fileExists` joins `openFileInPane` and `loadDiff` as the third read injected into
-the derivation for exactly this, and for the same reason: the module that decides owns no I/O.
+Where a translation _would_ live is string math on the path (§13.5's `translationPathFor`); whether anybody has written it is a question only the disk can answer, and the resolver is pure and synchronous. So the derivation carries a **probe**: it asks once per wanted path, and until the answer lands the pane holds. A locale with no copy yet is `unavailable` **with the sentence that names the recovery**, never a blank pane under a chip naming a language — the case §18.4's last paragraph refuses, in the one preset where the missing document is the ordinary situation rather than the error. `fileExists` joins `openFileInPane` and `loadDiff` as the third read injected into the derivation for exactly this, and for the same reason: the module that decides owns no I/O.
 
-**A preset that cannot be supplied is not offered**, and one that stops resolving says so on the
-stage rather than leaving the pane blank. A pane showing a rule that has gone quiet still names the
-document it holds and offers the verb that ends the follow — the alternative is a pane with no
-chrome, no exit and no explanation, which is the shape §16 exists to refuse.
+**A preset that cannot be supplied is not offered**, and one that stops resolving says so on the stage rather than leaving the pane blank. A pane showing a rule that has gone quiet still names the document it holds and offers the verb that ends the follow — the alternative is a pane with no chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 ---
 
 ## 20. Internationalization Surfaces
 
-> **Status: Partial.** The locale reader, the rendering-language segment, the locale companion, the
-> Languages panel, the Locales settings section and the five verbs ship. What is missing is stated
-> in §20.2: a freshly mounted artboard does not learn its pane's rendering language until the value
-> next changes, because the locale is posted to a live host rather than carried on the render
-> message.
+> **Status: Partial.** The locale reader, the rendering-language segment, the locale companion, the Languages panel, the Locales settings section and the five verbs ship. What is missing is stated in §20.2: a freshly mounted artboard does not learn its pane's rendering language until the value next changes, because the locale is posted to a live host rather than carried on the render message.
 
-Everything here is a reading of one project fact — the `i18n` block `site-architecture.md` §13
-defines — and none of it is a second implementation of it. **Studio resolves locales with the
-compiler's own `resolveI18n`**, which is why the function lives in `@jxsuite/schema/locale` rather
-than in the compiler: Studio cannot import that package, and a tag Studio offers must be a tag the
-build accepts. Two resolutions would disagree about what `EN-us` means, and the disagreement would
-surface as a directory the build ignores.
+Everything here is a reading of one project fact — the `i18n` block `site-architecture.md` §13 defines — and none of it is a second implementation of it. **Studio resolves locales with the compiler's own `resolveI18n`**, which is why the function lives in `@jxsuite/schema/locale` rather than in the compiler: Studio cannot import that package, and a tag Studio offers must be a tag the build accepts. Two resolutions would disagree about what `EN-us` means, and the disagreement would surface as a directory the build ignores.
 
 ### 20.1 The Locale Reader
 
-`getEffectiveLocales()` sits beside the other effective-value helpers and answers from the live
-project config every time it is called. It is not cached: the project state is replaced wholesale on
-a project switch, so a cached answer would describe a project that is no longer open.
+`getEffectiveLocales()` sits beside the other effective-value helpers and answers from the live project config every time it is called. It is not cached: the project state is replaced wholesale on a project switch, so a cached answer would describe a project that is no longer open.
 
-It **drops** the resolver's errors. Every helper beside it answers a render, and a render has
-nowhere to put a sentence; a malformed tag is refused with words in §20.5, before it can reach the
-file. `project.isMultilingual` (§13.4) counts resolved locales rather than array entries, so a
-config listing one tag twice — or one tag and one typo — opens nothing.
+It **drops** the resolver's errors. Every helper beside it answers a render, and a render has nowhere to put a sentence; a malformed tag is refused with words in §20.5, before it can reach the file. `project.isMultilingual` (§13.4) counts resolved locales rather than array entries, so a config listing one tag twice — or one tag and one typo — opens nothing.
 
 ### 20.2 Rendering Language
 
-Axis 3 of the pane context bar gains a **Language** segment, on a multilingual project only, and
-`i18n.switchLocale` is the verb behind it. It sets `session.ui.previewLocale`, which persists with
-`activeMedia` and `previewColorScheme` because it is the same kind of fact: an author's view choice
-about this document.
+Axis 3 of the pane context bar gains a **Language** segment, on a multilingual project only, and `i18n.switchLocale` is the verb behind it. It sets `session.ui.previewLocale`, which persists with `activeMedia` and `previewColorScheme` because it is the same kind of fact: an author's view choice about this document.
 
-**What it changes is `lang` and `dir` on the artboard, and nothing else.** The text is whatever file
-is open, and the control says so, because a translation is a different file — §18.4's `locale`
-preset is what opens it. That makes this an honest rendering context rather than a label: `dir` is
-what makes an RTL preview actually mirror, and `lang` is what `:lang()` and the font stack select
-on. An undeclared tag is refused rather than clamped, the way `canvas.setBreakpoint` refuses one.
+**What it changes is `lang` and `dir` on the artboard, and nothing else.** The text is whatever file is open, and the control says so, because a translation is a different file — §18.4's `locale` preset is what opens it. That makes this an honest rendering context rather than a label: `dir` is what makes an RTL preview actually mirror, and `lang` is what `:lang()` and the font stack select on. An undeclared tag is refused rather than clamped, the way `canvas.setBreakpoint` refuses one.
 
-The segment and the bar's summary name the language **only when it differs from the document's own**
-— a French page open in a French pane is not a rendering context worth reporting, and a bar that
-grew a third term in every multilingual project would stop reading as a state. A lens shares its
-tab, so it renders under the tab's preview language whether it asked to or not; its read-only
-Context line states that, for the reason the line exists.
+The segment and the bar's summary name the language **only when it differs from the document's own** — a French page open in a French pane is not a rendering context worth reporting, and a bar that grew a third term in every multilingual project would stop reading as a state. A lens shares its tab, so it renders under the tab's preview language whether it asked to or not; its read-only Context line states that, for the reason the line exists.
 
-> **Status: Partial.** A host that mounts after the value was set does not receive it — the post
-> goes to live hosts and the render message carries no locale — so a restored `previewLocale` does
-> not reach the artboard until the author touches the control. The fix is a locale on the render
-> payload, beside the colour scheme.
+> **Status: Partial.** A host that mounts after the value was set does not receive it — the post goes to live hosts and the render message carries no locale — so a restored `previewLocale` does not reach the artboard until the author touches the control. The fix is a locale on the render payload, beside the colour scheme.
 
 ### 20.3 The Locale Companion
 
-`site-architecture.md` §13.5 in a pane: the same page in another language, side by side. Specified
-in §18.4 with the rest of the presets, because it is one of them rather than a surface of its own.
+`site-architecture.md` §13.5 in a pane: the same page in another language, side by side. Specified in §18.4 with the rest of the presets, because it is one of them rather than a surface of its own.
 
 ### 20.4 Translation Parity
 
-A project-level Navigator panel, **Languages**, listing one row per translation key and one column
-per declared locale. A cell is `present`, `stale` or `missing`, and each is a button that runs a
-command by id rather than calling a function — which is what makes every cell reachable from the
-palette and from automation, and what gets the per-state refusal for free.
+A project-level Navigator panel, **Languages**, listing one row per translation key and one column per declared locale. A cell is `present`, `stale` or `missing`, and each is a button that runs a command by id rather than calling a function — which is what makes every cell reachable from the palette and from automation, and what gets the per-state refusal for free.
 
-**This is the surface the rest of the toolchain cannot provide.** The build is happy to ship a
-French page that has been wrong for six months, and §13.5 will dutifully advertise it; the Files
-panel draws `fr/` the way it draws any directory, and a page nobody has translated is invisible
-precisely because the file that would prove it does not exist. Parity is a grid over absence.
+**This is the surface the rest of the toolchain cannot provide.** The build is happy to ship a French page that has been wrong for six months, and §13.5 will dutifully advertise it; the Files panel draws `fr/` the way it draws any directory, and a page nobody has translated is invisible precisely because the file that would prove it does not exist. Parity is a grid over absence.
 
-**The key is the document's, not the path's.** The grid reads `$translationKey` (§13.5) the way the
-build does, because a **localized slug** is exactly the case it exists to report on: keyed by path
-alone, `pages/about.json` and `pages/fr-ca/a-propos.json` are two half-translated pages and four of
-the cells name files nobody should write. One route can be a page or a directory's index, so a
-declared key is matched against the files actually scanned rather than against a spelling.
+**The key is the document's, not the path's.** The grid reads `$translationKey` (§13.5) the way the build does, because a **localized slug** is exactly the case it exists to report on: keyed by path alone, `pages/about.json` and `pages/fr-ca/a-propos.json` are two half-translated pages and four of the cells name files nobody should write. One route can be a page or a directory's index, so a declared key is matched against the files actually scanned rather than against a spelling.
 
-**Stale is defined once**: the default locale's file for the same key is newer than the
-translation's. A file the platform reports no timestamp for is `present`, never `stale` — an absent
-timestamp is not evidence of being behind.
+**Stale is defined once**: the default locale's file for the same key is newer than the translation's. A file the platform reports no timestamp for is `present`, never `stale` — an absent timestamp is not evidence of being behind.
 
-**Off the rail.** Rail declarations are not filtered by `when`, so a rail button here would spend a
-rail slot in every monolingual project and shift every document panel's chord by one.
-`i18n.showParity` is how the panel is reached, which is why it is one of the verbs.
+**Off the rail.** Rail declarations are not filtered by `when`, so a rail button here would spend a rail slot in every monolingual project and shift every document panel's chord by one. `i18n.showParity` is how the panel is reached, which is why it is one of the verbs.
 
 ### 20.5 Declaring Locales
 
-A **Locales** section in Project Settings, writing through the single `project.json` commit
-chokepoint (§17). It is the one place a malformed tag is refused with words, and the one writer of
-`i18n.locales` — `i18n.addLocale` performs the same write rather than a second one, because two
-writers of one key is how the two come to disagree.
+A **Locales** section in Project Settings, writing through the single `project.json` commit chokepoint (§17). It is the one place a malformed tag is refused with words, and the one writer of `i18n.locales` — `i18n.addLocale` performs the same write rather than a second one, because two writers of one key is how the two come to disagree.
 
-The patch is merged at the top level only (§17.3), so the section spreads the parent block itself: a
-patch of `{ i18n: { locales } }` would delete `defaultLocale` and `routing`. `i18n.addLocale` is the
-one verb here **not** gated on `isMultilingual` — a project with no locales is exactly where it is
-needed.
+The patch is merged at the top level only (§17.3), so the section spreads the parent block itself: a patch of `{ i18n: { locales } }` would delete `defaultLocale` and `routing`. `i18n.addLocale` is the one verb here **not** gated on `isMultilingual` — a project with no locales is exactly where it is needed.
 
 ---
 
 ## 21. Change Review
 
-> **Status: Implemented.** The two-sided change map, the marks on both artboards, the change
-> stepper, the Visual/Code axis, the code comparison, and the revalidation that keeps all of it
-> honest after a save.
+> **Status: Implemented.** The two-sided change map, the marks on both artboards, the change stepper, the Visual/Code axis, the code comparison, and the revalidation that keeps all of it honest after a save.
 
-A comparison is the working tree against HEAD, and nothing else. Staged-versus-unstaged is a
-different question with a different answer, and no ref picker is offered: the range is the one an
-author is about to commit.
+A comparison is the working tree against HEAD, and nothing else. Staged-versus-unstaged is a different question with a different answer, and no ref picker is offered: the range is the one an author is about to commit.
 
 ### 21.1 The change map is two-sided, and that is not a detail
 
-The artboards render documents, so "what changed" has to be answered in document paths — the same
-coordinate space `data-jx-path` is stamped in. A structural walk aligns the two trees through the
-same LCS matcher the collaboration bridge uses, and carries BOTH sides' paths down at once: a removal
-is addressed in the original, an addition in the current, and a modification in each.
+The artboards render documents, so "what changed" has to be answered in document paths — the same coordinate space `data-jx-path` is stamped in. A structural walk aligns the two trees through the same LCS matcher the collaboration bridge uses, and carries BOTH sides' paths down at once: a removal is addressed in the original, an addition in the current, and a modification in each.
 
-**A replay script cannot answer this.** The op list that turns one document into the other is
-addressed in the destination, and its removals name indices the very next splice invalidates. It is
-the right shape for applying a change and the wrong one for pointing at it, so the two callers share
-the matcher and not the output.
+**A replay script cannot answer this.** The op list that turns one document into the other is addressed in the destination, and its removals name indices the very next splice invalidates. It is the right shape for applying a change and the wrong one for pointing at it, so the two callers share the matcher and not the output.
 
-Three rules follow from what the canvas can actually stamp, and each is a limit rather than a
-preference:
+Three rules follow from what the canvas can actually stamp, and each is a limit rather than a preference:
 
-1. A change to a node's own keys marks that node once, however many keys moved. `textContent` is a
-   key, so the ordinary "someone edited this paragraph" case marks the paragraph.
-2. A bare string child is never a stamped element, so a change to one is attributed to its parent. A
-   mark addressed to a text node is a change the count promises and the artboard never shows.
-3. A root-level key — `state`, `$head` — is reported in words and never tinted. The root's element is
-   the whole page, and tinting it says everything changed.
+1. A change to a node's own keys marks that node once, however many keys moved. `textContent` is a key, so the ordinary "someone edited this paragraph" case marks the paragraph.
+2. A bare string child is never a stamped element, so a change to one is attributed to its parent. A mark addressed to a text node is a change the count promises and the artboard never shows.
+3. A root-level key — `state`, `$head` — is reported in words and never tinted. The root's element is the whole page, and tinting it says everything changed.
 
-**A reorder of identical siblings is a removal plus an addition, not a move.** The matcher cannot
-distinguish a move from a delete-and-insert of an equal value, so a "moved" mark would be a claim the
-data does not support. It is also what `git diff` prints for a moved block.
+**A reorder of identical siblings is a removal plus an addition, not a move.** The matcher cannot distinguish a move from a delete-and-insert of an equal value, so a "moved" mark would be a claim the data does not support. It is also what `git diff` prints for a moved block.
 
-**Not every mark reaches an element.** A component's internals are created by its own
-`connectedCallback` and never pass through the stamper; under a repeater, only the first expanded row
-carries the template's collapsed path. Such a mark climbs to the nearest stamped ancestor and lands
-there as "something inside here changed", and the count says how many of its changes are drawn. A
-count that silently shrank to what happened to be paintable would be the worse answer, and it is the
-standing argument for the code view being a peer rather than a fallback.
+**Not every mark reaches an element.** A component's internals are created by its own `connectedCallback` and never pass through the stamper; under a repeater, only the first expanded row carries the template's collapsed path. Such a mark climbs to the nearest stamped ancestor and lands there as "something inside here changed", and the count says how many of its changes are drawn. A count that silently shrank to what happened to be paintable would be the worse answer, and it is the standing argument for the code view being a peer rather than a fallback.
 
-Alignment is bounded rather than unbounded: a sibling group too large to pair up degrades to plain
-removals and additions, and the stage says so. A comparison that cannot be built at all leaves the
-artboards exactly as they were before any of this existed.
+Alignment is bounded rather than unbounded: a sibling group too large to pair up degrades to plain removals and additions, and the stage says so. A comparison that cannot be built at all leaves the artboards exactly as they were before any of this existed.
 
 ### 21.2 The stage's own chrome
 
 Drawn over the artboards and scoped to the pane that owns them, never in a dock (§16.3):
 
 - **The count**, which reads as a total until the author begins stepping and as a position after.
-- **The stepper**, bound to :kbd[F7] and :kbd[⇧F7] — VSCode's own chords, and free here. It stops at
-  each end rather than wrapping: a tab strip is a ring, a change list is a document read top to
-  bottom, and wrapping returns a reviewer to part of the page they have already cleared.
+- **The stepper**, bound to :kbd[F7] and :kbd[⇧F7] — VSCode's own chords, and free here. It stops at each end rather than wrapping: a tab strip is a ring, a change list is a document read top to bottom, and wrapping returns a reviewer to part of the page they have already cleared.
 - **The Visual/Code axis** (§21.3).
 
-Both artboards share one pan surface, so one move serves both. A step pans to the UNION of the two
-sides' rectangles, because a change sitting at a different height on each side is only readable if
-the move accounts for both; a one-sided change pans to the side that has it. Each step announces
-where it landed and names the kind in words, which is also the last of the three non-colour cues.
+Both artboards share one pan surface, so one move serves both. A step pans to the UNION of the two sides' rectangles, because a change sitting at a different height on each side is only readable if the move accounts for both; a one-sided change pans to the side that has it. Each step announces where it landed and names the kind in words, which is also the last of the three non-colour cues.
 
-**Colour is never the only encoding.** Each kind carries its own border style and its own gutter
-glyph in the ordinary render, not only under forced colours — the artboard is drawn in the author's
-own palette on a permanently light surface, so the chrome tints are unavailable to it and a
-red/green pair alone would fail a reader who cannot separate them.
+**Colour is never the only encoding.** Each kind carries its own border style and its own gutter glyph in the ordinary render, not only under forced colours — the artboard is drawn in the author's own palette on a permanently light surface, so the chrome tints are unavailable to it and a red/green pair alone would fail a reader who cannot separate them.
 
 ### 21.3 Renderability chooses the view, never whether there is one
 
-A document the canvas can draw offers both halves behind a Visual/Code switch: the marks answer
-"what moved on the page", the code comparison answers "what changed in the file", and neither
-pretends to the other's resolution — one marks nodes, the other marks lines. A file the canvas
-cannot draw offers the code half alone, and the switch is drawn as a label rather than as a control
-that cannot move.
+A document the canvas can draw offers both halves behind a Visual/Code switch: the marks answer "what moved on the page", the code comparison answers "what changed in the file", and neither pretends to the other's resolution — one marks nodes, the other marks lines. A file the canvas cannot draw offers the code half alone, and the switch is drawn as a label rather than as a control that cannot move.
 
-The code half is a read-only diff editor over the two texts already in hand. Its models take a
-reserved URI namespace, per pane and per side, because a source editor, a Code lens and a comparison
-can all want one path at once and two models on one URI is an error; disjoint URIs make the
-collision impossible rather than refused. It never takes the collaboration lock: that lock freezes
-structural editing for every peer in the room, and taking it to show somebody a read-only comparison
-would freeze a live session on a gesture nobody made.
+The code half is a read-only diff editor over the two texts already in hand. Its models take a reserved URI namespace, per pane and per side, because a source editor, a Code lens and a comparison can all want one path at once and two models on one URI is an error; disjoint URIs make the collision impossible rather than refused. It never takes the collaboration lock: that lock freezes structural editing for every peer in the room, and taking it to show somebody a read-only comparison would freeze a live session on a gesture nobody made.
 
 ### 21.4 A comparison for a file that is not a document
 
-A changed `.ts`, `.css` or `.gitignore` has no document tree, and the tab model wants one. Such a
-file opens a real tab keyed by its path with a stub document the stage never reads — the same shape a
-media file already uses, and set by the opener rather than by `inferModes`, which answers for
-documents. One path is still one tab, so §14.1 holds unchanged.
+A changed `.ts`, `.css` or `.gitignore` has no document tree, and the tab model wants one. Such a file opens a real tab keyed by its path with a stub document the stage never reads — the same shape a media file already uses, and set by the opener rather than by `inferModes`, which answers for documents. One path is still one tab, so §14.1 holds unchanged.
 
-**This door is the Source Control panel's alone.** Opening the same file from the file tree still
-says the Studio has no editor for it, which is the truth about opening it as a document; the panel
-asks a narrower question and gets a narrower answer.
+**This door is the Source Control panel's alone.** Opening the same file from the file tree still says the Studio has no editor for it, which is the truth about opening it as a document; the panel asks a narrower question and gets a narrower answer.
 
 ### 21.5 A comparison follows the working tree
 
-Two texts read once notice nothing. Every git operation and every save bumps a revision that both
-holders of a comparison watch, so the marks describe the file as it is rather than as it was when the
-review began. The author's position in the change list is CLAMPED across that re-read rather than
-reset: landing back at the first change after every save is what makes a review loop get abandoned.
+Two texts read once notice nothing. Every git operation and every save bumps a revision that both holders of a comparison watch, so the marks describe the file as it is rather than as it was when the review began. The author's position in the change list is CLAMPED across that re-read rather than reset: landing back at the first change after every save is what makes a review loop get abandoned.
 
 ---
 
