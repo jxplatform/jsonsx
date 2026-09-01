@@ -9,6 +9,10 @@ coveragePathIgnorePatterns = [
   "../compiler/**",
   "../create/**",
   "../desktop/**",
+  # The catalogue this package now serves is a dependency, so its metadata module lands here at
+  # 50% functions and fails the per-file gate, while being 100% under packages/extension-catalog's
+  # own run (gated there at 0.99). Same rule as `../protocol/**` below.
+  "../extension-catalog/**",
   "../markup/**",
   "../parser/**",
   # Same omission as packages/desktop had: `../protocol/src/routes.ts` lands in this package's

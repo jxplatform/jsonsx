@@ -2,9 +2,9 @@
 
 ## Declarative Document Object Model — JSON Edition
 
-**Version:** 0.5.8-draft
+**Version:** 0.5.9-draft
 **Status:** Partial
-**Updated:** 2026-08-26
+**Updated:** 2026-08-31
 **License:** MIT
 
 ---
@@ -716,9 +716,26 @@ because an enumerated attribute carries its value in its text.
 Every renderer applies this identically — the static compiler writing HTML source and the runtime
 writing live elements — so an element does not change meaning when a prerendered page hydrates.
 
-> **Status: Implemented.** `booleanAttrValue()` in `@jxsuite/runtime` is the single decision; the
-> compiler's `buildAttrs()` and the runtime's `applyAttributes()` both defer to it, and the runtime
-> removes the attribute rather than writing `"false"` when a binding flips.
+**`popover` is enumerated, and is deliberately emitted through the presence branch.** Its keywords
+are `auto`, `manual` and `hint`; its MISSING-value default is `auto`, so a bare `popover` and
+`popover=""` are both auto popovers — which is what the presence branch produces for `true`. Its
+INVALID-value default is `manual`, so emitting `popover="true"` would silently give up light dismiss
+and Escape. The house spelling is therefore the keyword itself, `"popover": "auto"`, and a boolean
+`popover` is a defect a document report names rather than an emission a renderer corrects. It is the
+one attribute for which the paragraph above needs a caveat: a presence attribute counts any value as
+true, but `popover="false"` is a _manual_ popover rather than a true-ish one.
+
+> **Status: Implemented.** `booleanAttrValue()` in `@jxsuite/runtime` is the single decision, and all
+> FOUR writers defer to it: the compiler's `buildAttrs()`, its custom-element and client targets, and
+> the runtime's `applyAttributes()`. The runtime removes the attribute rather than writing `"false"`
+> when a binding flips, and the two generated-module targets do the same through an inlined copy of
+> the rule whose enumerated-name list is serialized from `enumeratedAttrNames()` — those modules load
+> without `@jxsuite/runtime`, and a test asserts the emitted literal still equals that export.
+>
+> The element and client targets did NOT defer to it until they were made to: they stringified
+> booleans, so a component's `open: true` compiled to `open="true"` and a bound `open` that flipped
+> false wrote `open="false"` — an OPEN element the author had closed. Only the static emitter was
+> ever correct, which is why this note used to name two writers.
 
 ### 8.4 Child Arrays
 
@@ -879,6 +896,31 @@ and project style schemas model the same recursive contract. (Known compiler
 limitation: inside an at-rule group, only one selector level is currently
 emitted — at-rule → selector → pseudo is accepted by the schema and runtime
 but not yet fully emitted by the static compiler.)
+
+**Some at-rules take a DECLARATION body rather than a selector body**, and both
+emitters recognise them by name: `@position-try`, `@property`, `@font-face` and
+`@counter-style`. Their block is emitted verbatim with no selector inside it and
+is not scoped to the element whose `style` object declares it, because the name
+such a rule declares is document-global — the same way an author writes one in a
+plain stylesheet, near the rule that uses it:
+
+```json
+{
+  "style": {
+    "position-anchor": "--menu-button",
+    "position-try-fallbacks": "--flip-up",
+    "@position-try --flip-up": { "inset-block-start": "auto" }
+  }
+}
+```
+
+The name is part of the key, so the test is a prefix match. `@keyframes` is
+deliberately absent: its body is neither declarations nor selectors but
+percentage stops, which is a third shape.
+
+> **Status: Implemented.** Wrapping one of these in a selector produced a block
+> the parser discards without a word, which is why an anchor-positioned panel
+> could declare no custom fallback at all.
 
 ### 9.3 Static Style Extraction
 
@@ -2516,6 +2558,7 @@ This rewrites the mutating handlers of Appendix A's idiom using `$expression`, l
 
 ## Changelog
 
+- **0.5.9-draft** (2026-08-31) — popover is enumerated and emitted through the presence branch; declaration-body at-rules (@position-try, @property) emit verbatim; all four boolean-attribute writers now defer to booleanAttrValue.
 - **0.5.8-draft** (2026-08-26) — §5.3: $lazy on a $src Function defers the module to first call.
 - **0.5.7-draft** (2026-08-26) — §8.3: a boolean attribute value is emitted by family — presence for HTML boolean attributes, the written word for aria-* and the enumerated three.
 - **0.5.6-draft** (2026-08-25) — Clarify that the parentheses in an @(condition) style key belong to the query, so a bare media type emits without them (§9).
@@ -2578,4 +2621,4 @@ This rewrites the mutating handlers of Appendix A's idiom using `$expression`, l
 
 ---
 
-_Jx Specification v0.5.8-draft — subject to revision_
+_Jx Specification v0.5.9-draft — subject to revision_

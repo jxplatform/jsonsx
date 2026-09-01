@@ -44,15 +44,18 @@ describe("the module has no dependencies at all", () => {
 });
 
 describe("the subpath carries what @jxsuite/site/site-style needs", () => {
-  test("all six exports are present", () => {
+  test("all nine exports are present", () => {
     // A move that dropped one would surface as a build failure three packages away.
     expect(Object.keys(css).toSorted()).toEqual([
       "COLOR_SCHEME_ATTR",
       "COLOR_SCHEME_STORAGE_KEY",
       "camelToKebab",
+      "isDeclarationAtRule",
       "pureSchemeOf",
       "resolveAtQuery",
+      "resolveNestedSelector",
       "schemeSelectors",
+      "transposeCanvasPopoverSelector",
     ]);
   });
 

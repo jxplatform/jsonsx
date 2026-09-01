@@ -2,9 +2,9 @@
 
 ## Platform Abstraction, Project Loading, and Component Scoping
 
-**Version:** 0.4.8-draft
+**Version:** 0.4.9-draft
 **Status:** Pending
-**Updated:** 2026-08-28
+**Updated:** 2026-08-31
 **License:** MIT
 
 ---
@@ -82,7 +82,7 @@ The canonical `StudioPlatform` interface is `packages/studio/src/types.ts` — r
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **Session / project**    | `id`, `projectRoot`, `activate`, `openProject`, `openProjectPicker?`, `probeRootProject`, `createDestination`, `createProject`, `pickDirectory?`, `listStarters?`, `importSite?`, `listProjects?`, recent-projects persistence |
 | **Filesystem**           | `listDirectory`, `readFile`, `writeFile`, `uploadFile`, `deleteFile`, `renameFile`, `findReferences?`, `createDirectory`, `locateFile`, `searchFiles`, `subscribeFileEvents?`                                                  |
-| **Documents / formats**  | `discoverComponents`, `listFormats?`, `listExtensions?`, `fetchProjectSchemas?`, `formatAction?`, `fetchPluginSchema`                                                                                                          |
+| **Documents / formats**  | `discoverComponents`, `listFormats?`, `listExtensions?`, `listExtensionCatalog?`, `fetchProjectSchemas?`, `formatAction?`, `fetchPluginSchema`                                                                                 |
 | **Packages**             | `listPackages`, `addPackage`, `removePackage`, `installDependencies?`, `packageVersions?`, `setPackageVersions?`                                                                                                               |
 | **Git**                  | `gitStatus`, `gitCommit`, `gitPush`, `gitPull`, `gitDiff`, `gitCheckout`, `gitClone?`, `createPullRequest?`, …                                                                                                                 |
 | **Collab**               | `collab?` (realtime co-editing handle per document)                                                                                                                                                                            |
@@ -1279,6 +1279,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.4.9-draft** (2026-08-31) — The PAL member table names listExtensionCatalog, the extension catalogue a backend answers for itself (extensions.md §9.2).
 - **0.4.8-draft** (2026-08-28) — Distinguish the window's own icon (favicon-driven, studio.md 11.2) from the taskbar/dock icon (StartupWMClass) in section 9.3.
 - **0.4.7-draft** (2026-08-27) — The files route answers in stable path order, in every backend.
 - **0.4.6-draft** (2026-08-27) — The PAL is project-relative in both directions; an adapter translates a request space or a reply space, never both.
@@ -1331,4 +1332,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_Jx Studio Desktop Architecture Specification v0.4.8-draft_
+_Jx Studio Desktop Architecture Specification v0.4.9-draft_

@@ -150,6 +150,7 @@ Everything Studio can do is a command, and every command is reachable by name: p
 | Show Outline                   | `panel.focus.layers`         | `⌘4`                  | application | an open project                                                                                                              |
 | Show Packages                  | `panel.focus.packages`       | `⌘7`                  | application | an open project                                                                                                              |
 | Show Page                      | `panel.focus.page`           | `⌘5`                  | application | an open project                                                                                                              |
+| Show Popover                   | `canvas.setPopoverOpen`      | —                     | document    | a popover in the open document                                                                                               |
 | Show Resolving Values          | `canvas.setResolvingOpen`    | —                     | document    | an open document                                                                                                             |
 | Show Search                    | `panel.focus.search`         | `⌘2`                  | application | an open project                                                                                                              |
 | Show Source Control            | `panel.focus.git`            | `⌘3`                  | application | an open project                                                                                                              |
@@ -166,46 +167,53 @@ Everything Studio can do is a command, and every command is reachable by name: p
 
 ## Document
 
-| Command                | Id                            | Shortcut           | Level    | Requires                                          |
-| ---------------------- | ----------------------------- | ------------------ | -------- | ------------------------------------------------- |
-| Check Accessibility    | `document.checkAccessibility` | —                  | document | an open document                                  |
-| Close Document         | `document.close`              | `⌘W`               | document | an open document                                  |
-| Edit Event Handler     | `formula.editEvent`           | —                  | document | an open document                                  |
-| Edit Function          | `formula.editDef`             | —                  | document | an open document that defines state               |
-| Expand Data Row        | `data.expandRow`              | —                  | document | an open document that defines data                |
-| Keep Document Open     | `document.keepOpen`           | —                  | document | a preview document — one opened by a single click |
-| Next Tab               | `document.nextTab`            | `⌃Tab` or `⌘Tab`   | document | a second open document                            |
-| Open Formula Workspace | `formula.openWorkspace`       | —                  | document | a selected state entry that holds a formula       |
-| Pin / Unpin Document   | `document.togglePinned`       | —                  | document | an open document                                  |
-| Previous Tab           | `document.previousTab`        | `⌃⇧Tab` or `⌘⇧Tab` | document | a second open document                            |
-| Reopen Closed Document | `document.reopenClosed`       | `⌘⇧T`              | document | a document closed in this session                 |
-| Search Appearance      | `document.openSeo`            | —                  | document | an open document                                  |
-| Set Document Pinned    | `document.setPinned`          | —                  | document | an open document                                  |
-| Set Draft              | `content.setDraft`            | —                  | document | a content entry open                              |
+| Command                             | Id                              | Shortcut           | Level    | Requires                                              |
+| ----------------------------------- | ------------------------------- | ------------------ | -------- | ----------------------------------------------------- |
+| Check Accessibility                 | `document.checkAccessibility`   | —                  | document | an open document                                      |
+| Check Popovers                      | `document.checkPopovers`        | —                  | document | an open document                                      |
+| Close Document                      | `document.close`                | `⌘W`               | document | an open document                                      |
+| Edit Event Handler                  | `formula.editEvent`             | —                  | document | an open document                                      |
+| Edit Function                       | `formula.editDef`               | —                  | document | an open document that defines state                   |
+| Expand Data Row                     | `data.expandRow`                | —                  | document | an open document that defines data                    |
+| Keep Document Open                  | `document.keepOpen`             | —                  | document | a preview document — one opened by a single click     |
+| Move display into :popover-open     | `document.repairPopoverDisplay` | —                  | document | a popover whose base rule sets display                |
+| Next Tab                            | `document.nextTab`              | `⌃Tab` or `⌘Tab`   | document | a second open document                                |
+| Open Formula Workspace              | `formula.openWorkspace`         | —                  | document | a selected state entry that holds a formula           |
+| Pin / Unpin Document                | `document.togglePinned`         | —                  | document | an open document                                      |
+| Previous Tab                        | `document.previousTab`          | `⌃⇧Tab` or `⌘⇧Tab` | document | a second open document                                |
+| Remove the inert popover attributes | `document.repairPopoverInvoker` | —                  | document | an element carrying popovertarget that cannot invoke  |
+| Reopen Closed Document              | `document.reopenClosed`         | `⌘⇧T`              | document | a document closed in this session                     |
+| Search Appearance                   | `document.openSeo`              | —                  | document | an open document                                      |
+| Set Document Pinned                 | `document.setPinned`            | —                  | document | an open document                                      |
+| Set Draft                           | `content.setDraft`              | —                  | document | a content entry open                                  |
+| Set popover to auto                 | `document.repairPopoverMode`    | —                  | document | a popover whose mode is not one of the three keywords |
 
 ## Project
 
-| Command                 | Id                      | Shortcut | Level       | Requires                                    |
-| ----------------------- | ----------------------- | -------- | ----------- | ------------------------------------------- |
-| Add Language            | `i18n.addLocale`        | —        | project     | an open project                             |
-| Build Site              | `project.buildSite`     | —        | project     | a site project                              |
-| Edit Collection in Grid | `collection.editInGrid` | —        | project     | a project that declares content collections |
-| Edit Redirects          | `redirects.open`        | —        | project     | an open project                             |
-| Import Redirects…       | `redirects.import`      | —        | project     | an open project                             |
-| Library: Filter Files   | `library.setSearch`     | —        | project     | an open project                             |
-| Library: New Entry      | `library.newEntry`      | —        | project     | an open project                             |
-| Library: Rescan Files   | `library.refresh`       | —        | project     | an open project                             |
-| Library: Set Layout     | `library.setLayout`     | —        | project     | an open project                             |
-| Library: Show Category  | `library.setCategory`   | —        | project     | an open project                             |
-| Library: Show Language  | `library.setLocale`     | —        | project     | a project with more than one locale         |
-| New Project…            | `project.new`           | —        | application | —                                           |
-| Open Data Grid          | `data.openGrid`         | —        | project     | a platform that serves the data routes      |
-| Open Library            | `library.open`          | `⌘⇧E`    | project     | an open project                             |
-| Open Project Settings   | `settings.open`         | `⌘⇧,`    | project     | an open project                             |
-| Open Project Styles     | `styles.open`           | —        | project     | an open project                             |
-| Open Project…           | `project.open`          | `⌘O`     | project     | —                                           |
-| Open Recent…            | `project.openRecent`    | —        | project     | —                                           |
-| Validate Redirects      | `redirects.validate`    | —        | project     | an open project                             |
+| Command                      | Id                         | Shortcut | Level       | Requires                                    |
+| ---------------------------- | -------------------------- | -------- | ----------- | ------------------------------------------- |
+| Add Language                 | `i18n.addLocale`           | —        | project     | an open project                             |
+| Build Site                   | `project.buildSite`        | —        | project     | a site project                              |
+| Disable Extension            | `project.disableExtension` | —        | project     | an open project                             |
+| Edit Collection in Grid      | `collection.editInGrid`    | —        | project     | a project that declares content collections |
+| Edit Redirects               | `redirects.open`           | —        | project     | an open project                             |
+| Enable Extension             | `project.enableExtension`  | —        | project     | an open project                             |
+| Import Redirects…            | `redirects.import`         | —        | project     | an open project                             |
+| Library: Filter Files        | `library.setSearch`        | —        | project     | an open project                             |
+| Library: New Entry           | `library.newEntry`         | —        | project     | an open project                             |
+| Library: Rescan Files        | `library.refresh`          | —        | project     | an open project                             |
+| Library: Set Layout          | `library.setLayout`        | —        | project     | an open project                             |
+| Library: Show Category       | `library.setCategory`      | —        | project     | an open project                             |
+| Library: Show Language       | `library.setLocale`        | —        | project     | a project with more than one locale         |
+| New Project…                 | `project.new`              | —        | application | —                                           |
+| Open Data Grid               | `data.openGrid`            | —        | project     | a platform that serves the data routes      |
+| Open Library                 | `library.open`             | `⌘⇧E`    | project     | an open project                             |
+| Open Project Settings        | `settings.open`            | `⌘⇧,`    | project     | an open project                             |
+| Open Project Styles          | `styles.open`              | —        | project     | an open project                             |
+| Open Project…                | `project.open`             | `⌘O`     | project     | —                                           |
+| Open Recent…                 | `project.openRecent`       | —        | project     | —                                           |
+| Remove Package (destructive) | `packages.remove`          | —        | project     | an open project                             |
+| Validate Redirects           | `redirects.validate`       | —        | project     | an open project                             |
 
 ## Source Control
 

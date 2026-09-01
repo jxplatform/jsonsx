@@ -19,6 +19,7 @@ import {
   runScoped,
   setCanvasAssetResolver,
   setCanvasDelinkAnchors,
+  setCanvasDelinkPopovers,
   setCanvasViewportTranspose,
   setRootMedia,
   setSkipAutoRequests,
@@ -26,7 +27,7 @@ import {
   setStampPropBindings,
 } from "@jxsuite/runtime";
 import { resolveAssetRef } from "./asset-resolve";
-import { classifyRenderNode, serializeJxPath } from "./path-mapping";
+import { classifyRenderNode, jxPathSelector, serializeJxPath } from "./path-mapping";
 /* No cycle: `iframe-position.ts` imports only `path-mapping` and a type. It already owns the
    stamped-attribute lookup, escaping included, so a second query built here would be a second
    answer to "which element is this path". */
@@ -129,6 +130,10 @@ export const EDIT_PLACEHOLDER_STYLE_ID = "jx-canvas-edit-css";
  * both rules match the same element, and the emptiness test broke the specificity tie that used to
  * decide it by source order.
  */
+/*
+ * NOTE: this is a template literal, so a BACKTICK anywhere inside — including in a CSS comment —
+ * ends the string and produces a syntax error several lines later. Quote property names bare.
+ */
 export const EDIT_PLACEHOLDER_CSS = `
 .empty-media-placeholder {
   display: inline-block;
@@ -217,6 +222,65 @@ export const EDIT_PLACEHOLDER_CSS = `
 }
 [data-jx-layout-region] [data-jx-layout-region]::before {
   content: none;
+}
+/* The UA rule a de-popovered element lost, re-supplied at UA-EQUIVALENT PRECEDENCE.
+
+   The cascade layer is the mechanism and it is the whole point. An unlayered author declaration
+   beats a layered one whatever its specificity — and in the canvas a base declaration is written
+   as an INLINE style by applyStyle, which beats it harder still. That is exactly how author origin
+   beats UA origin on the shipped page, so the canvas reproduces the real cascade rather than an
+   approximation of it.
+
+   Deliberately NOT forced with a priority flag. A popover whose base rule sets display is laid out
+   on every page whether open or not; that is a real defect, @jxsuite/schema/overlays reports it as
+   base-display, and the canvas's job is to SHOW it, not to hide it behind a stronger rule. */
+@layer jx-canvas-ua {
+  [data-jx-popover]:not([data-jx-popover-open]) {
+    display: none;
+  }
+}
+/* SHOWN IN PLACE, and the position declaration is what makes that true.
+
+   Dropping the popover attribute drops the UA rule that made the panel fixed, so a panel that never
+   set position itself — every one in the fleet — lands in normal flow at its document position,
+   contributes to #jx-canvas-root's scrollHeight, and the host grows the artboard to fit it. That is
+   the whole geometry fix, and it is why an open panel is reachable at all.
+
+   The two alignment declarations are the other half, and they were found by measuring rather than
+   by reasoning. Every drawer in the fleet is declared inside its header's flex row, so in flow it
+   becomes a FLEX ITEM: align-items:center on the row centres a 904px panel on a 64px header and
+   half of it sits above the artboard at a negative offset, where it contributes nothing to the
+   scrollable overflow the host measures. Pinned to the start and refused any flex sizing, the same
+   panel hangs down from its own position and the artboard grows by its full height.
+
+   Forced, because a panel that DOES set position: fixed would otherwise keep it and be laid out
+   against the frame's own viewport — which in an editable mode is the document's full height, so a
+   drawer pinned with inset: 0 lands halfway down a long page and a short component frame clips it.
+   This is a presentation override for an editing affordance, the same kind as the layout-region
+   dimming above, and it is NOT the same move as forcing display: that would hide a real defect in
+   the document (base-display), while this hides nothing — Preview renders the panel natively, top
+   layer and all. */
+[data-jx-popover][data-jx-popover-open] {
+  position: relative !important;
+  inset: auto !important;
+  align-self: start !important;
+  flex: none !important;
+  outline: 1px dashed color-mix(in srgb, #808080 55%, transparent);
+  outline-offset: 2px;
+}
+[data-jx-popover][data-jx-popover-open]::before {
+  content: "POPOVER \\00B7 SHOWN IN PLACE";
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  padding: 1px 5px;
+  border-radius: 0 0 3px 0;
+  background: color-mix(in srgb, #808080 78%, transparent);
+  color: #fff;
+  font: 700 9px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.08em;
+  pointer-events: none;
 }
 `;
 
@@ -586,6 +650,34 @@ export function applyPreviewColorScheme(doc: Document, scheme: "light" | "dark" 
   }
 }
 
+/**
+ * Draw the popover at `path` open, and every other one closed.
+ *
+ * The canvas-only twin of `showPopover()` — one attribute, no top layer, no light dismiss, and
+ * idempotent, so the parent may post the same value as often as it likes. Re-applied after every
+ * render AND after every patch: an `attributes` op routes through `replaceSubtree`, which rebuilds
+ * the element and takes the attribute with it.
+ *
+ * A path naming a node that is not a de-popovered panel opens nothing rather than throwing — the
+ * frame's copy of a value the host may have computed against a document it has since changed.
+ *
+ * @param root The render container (`#jx-canvas-root`).
+ * @param path Serialized document path of the popover to open, or null to close them all.
+ * @docs studio/interface/canvas
+ */
+export function applyCanvasPopoverOpen(root: ParentNode, path: string | null): void {
+  for (const el of root.querySelectorAll("[data-jx-popover-open]")) {
+    delete (el as HTMLElement).dataset.jxPopoverOpen;
+  }
+  if (path === null) {
+    return;
+  }
+  const target = root.querySelector(`[data-jx-popover]${jxPathSelector(path)}`);
+  if (target) {
+    (target as HTMLElement).dataset.jxPopoverOpen = "";
+  }
+}
+
 /** Inject the document's `$head` (link/meta/script) into the iframe's <head>, de-duped by href/src. */
 export function injectHead(doc: JxDocument, assets: AssetContext | null = null): void {
   const head = (doc as { $head?: HeadEntry[] }).$head;
@@ -784,6 +876,8 @@ export async function renderResolvedDocument(opts: {
   allowAutoRequests?: boolean;
   /** Change marks for a git-diff artboard, in this side's own document coordinates. */
   diffMarks?: WireDiffMarks | null;
+  /** Serialized path of the popover to draw open, or null/absent for none. */
+  popoverOpen?: string | null;
 }): Promise<RenderHandle> {
   /* FIRST, before anything emits CSS or an attribute. The resolver is module-global in the runtime,
      so it is set on every render — including to null — or a previous document's context would
@@ -806,6 +900,11 @@ export async function renderResolvedDocument(opts: {
   // De-link `<a href>` in design/edit so clicks select the anchor instead of navigating the iframe;
   // Preview keeps real links live (mirrors the server-function gate above).
   setCanvasDelinkAnchors(opts.mode !== "preview");
+  /* De-popover in the same modes and for the same reason: an OPEN popover is in the top layer,
+     whose containing block is the viewport — a fiction here, since the frame is sized to its own
+     content — and which contributes to no ancestor's scrollable overflow, so the artboard could
+     never grow to fit one. Preview keeps the real top layer, backdrop and all. */
+  setCanvasDelinkPopovers(opts.mode !== "preview");
   // Stamp `data-jx-bound-prop` on component-internal invertible text bindings in design/edit only —
   // The inline prop-edit affordance. Set every render so a preview/stylebook render in the same
   // Iframe clears it (page-level templates are inert in design/edit via prepareForEditMode, so only
@@ -839,6 +938,7 @@ export async function renderResolvedDocument(opts: {
     () => renderNode(opts.doc, $defs, { _path: [], onNodeCreated }) as HTMLElement,
   );
   opts.container.replaceChildren(el);
+  applyCanvasPopoverOpen(opts.container, opts.popoverOpen ?? null);
   // Claim (or release) the editing host AFTER the tree lands, so the browser computes editability
   // Against the final DOM rather than an empty container.
   syncEditableRoot(opts.container, opts.mode);

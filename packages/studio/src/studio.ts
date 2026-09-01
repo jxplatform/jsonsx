@@ -237,9 +237,12 @@ import { openNewProjectModal, registerNewProjectCommands } from "./new-project/n
 import { invalidatePageRouteCache, registerInspectorCommands } from "./panels/properties-panel";
 import { liveElementCommands, setContextMenuNavigate } from "./editor/context-menu";
 import { registerSeoCommands, renderSeoModal } from "./panels/seo-modal";
+import { ensurePopoverRevealWatch, setOpenPopover } from "./canvas/popover-state";
 import { registerA11yCommands } from "./services/a11y-report";
+import { registerPopoverCommands } from "./services/popover-report";
 import { registerStyleCommands } from "./panels/style-panel";
 import { registerGridCommands } from "./grid/grid-open";
+import { registerExtensionCommands } from "./settings/extension-commands";
 import { registerSettingsCommands } from "./settings/settings-document";
 import { registerPreferencesCommands } from "./settings/preferences-dialog";
 import { registerAboutCommands } from "./about/about-modal";
@@ -1491,23 +1494,28 @@ registerCanvasViewCommands(commandRegistry, {
   getCanvasMode,
   renderPane: renderCanvas,
   setCanvasMode,
+  setOpenPopover,
   setResolvingOpen: paneContext.setResolvingOpen,
 });
-/* Walking a comparison. No deps: the stepper reads the pane-keyed diff store directly and the
-   toolbar redraws itself, so there is nothing for the bootstrap to inject. */
 /* A save moves the working tree under any comparison of that file, and nothing about a
    comparison notices on its own — see `noteFileSaved`. Injected rather than imported: `file-ops`
    must not pull the Source Control panel into its graph. */
 setDocumentSavedListener((path) => {
   void noteFileSaved(path);
 });
+/* Walking a comparison. No deps: the stepper reads the pane-keyed diff store directly and the
+   toolbar redraws itself, so there is nothing for the bootstrap to inject. */
 commandRegistry.registerAll(diffCommands());
+/* The one rule that opens a popover when the selection lands in one, from whichever surface made
+   the selection. Started here because it is app-lifetime state, like the canvas's own watches. */
+ensurePopoverRevealWatch();
 registerSelectionSetCommand(commandRegistry);
 registerInspectorCommands(commandRegistry);
 /* Search appearance, behind one record with two buttons: the Document Header card's and the Page
    panel's. A surface that IS the capability is one the palette cannot reach. */
 registerSeoCommands(commandRegistry);
 registerA11yCommands(commandRegistry);
+registerPopoverCommands(commandRegistry);
 /* The element menu's eight verbs, in the APP registry rather than only in the popover's own. They
    have always declared `menus: ["context/element", "palette"]`; the palette has never listed one,
    because the only registry holding them was the one `editor/context-menu.ts` builds for itself.
@@ -1523,6 +1531,7 @@ registerSignalsCommands(commandRegistry);
 registerFormulaEditorCommands(commandRegistry);
 registerGridCommands(commandRegistry);
 registerSettingsCommands(commandRegistry);
+registerExtensionCommands(commandRegistry);
 registerPreferencesCommands(commandRegistry);
 registerLibraryCommands(commandRegistry);
 registerFileFormatCommands(commandRegistry);

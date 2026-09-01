@@ -105,7 +105,7 @@ describe("project binding", () => {
     const platform = createCloudPlatform(PROJECT);
     const opened = await platform.openProject();
     expect(opened?.config.name).toBe("My Site");
-    expect(opened?.handle.root).toBe("octocat/my-site");
+    expect(opened?.handle.root).toBe("octocat/my-site@main");
   });
 
   test("open-project picking routes through the studio repo picker in both modes", () => {
@@ -129,6 +129,28 @@ describe("project binding", () => {
     const probe = await platform.probeRootProject();
     expect(probe?.info.isSiteProject).toBe(false);
     expect(probe?.meta.name).toBe("my-site");
+  });
+
+  /* The Recent list is written from `probeRootProject`'s meta.root and re-opened by parsing it back
+     as a root key, so a branchless root here was a Recent row that did nothing when clicked while
+     the catalogue's row for the same project — built by `projectRootKey` — opened it. */
+  test("the bound project's root is the catalogue root key, branch included", async () => {
+    mockFetch({
+      "/project-info": {
+        body: {
+          root: "octocat/my-site",
+          name: "my-site",
+          defaultBranch: "main",
+          permission: "write",
+          projectConfig: { name: "My Site" },
+        },
+      },
+    });
+    const platform = createCloudPlatform(PROJECT);
+    expect(platform.projectRoot).toBe(projectRootKey(PROJECT));
+    const probe = await platform.probeRootProject();
+    expect(probe?.meta.root).toBe(projectRootKey(PROJECT));
+    expect(parseRootKey(platform.projectRoot)).toEqual(PROJECT);
   });
 });
 
@@ -421,6 +443,45 @@ describe("project-less mode (/studio)", () => {
       deduped: true,
       config: null,
     });
+  });
+
+  /* Recent rows written by studios that shipped before the root key carried a branch are still in
+     people's browsers. They name a project but not a branch, so the catalogue answers with the one
+     that project's Projects row opens. */
+  test("setWindowProject resolves a branchless recent through the catalogue", async () => {
+    const calls = mockFetch({
+      "/api/v1/projects": {
+        body: [
+          {
+            fullName: "octocat/site",
+            owner: "octocat",
+            name: "site",
+            defaultBranch: "trunk",
+            permission: "admin",
+          },
+        ],
+      },
+    });
+    const realAssign = location.assign;
+    const assigned: string[] = [];
+    (location as { assign: unknown }).assign = (url: string) => {
+      assigned.push(url);
+    };
+    try {
+      const p = createCloudPlatform(null);
+      expect(await p.setWindowProject?.("octocat/site")).toEqual({ deduped: true, config: null });
+      expect(calls.some((c) => c.url.includes("/api/v1/projects"))).toBe(true);
+      expect(assigned).toEqual([editUrl({ owner: "octocat", repo: "site", branch: "trunk" })]);
+    } finally {
+      (location as { assign: unknown }).assign = realAssign;
+    }
+  });
+
+  test("setWindowProject fails on a key that names nothing openable", async () => {
+    mockFetch({ "/api/v1/projects": { body: [] } });
+    const p = createCloudPlatform(null);
+    expect(p.setWindowProject?.("octocat/gone")).rejects.toThrow(/No project to open/);
+    expect(p.setWindowProject?.("not a root key")).rejects.toThrow(/No project to open/);
   });
 });
 
@@ -888,7 +949,7 @@ describe("bound session surface", () => {
     expect(await p.locateFile("index.md")).toBe("pages/index.md");
     expect(await p.searchFiles("index", [".md"])).toHaveLength(1);
     const ctx = await p.resolveSiteContext("pages/index.md");
-    expect(ctx.sitePath).toBe("octocat/my-site");
+    expect(ctx.sitePath).toBe("octocat/my-site@main");
     expect(ctx.fileRelPath).toBe("pages/index.md");
   });
 
@@ -1012,6 +1073,47 @@ describe("formats (session backend registry)", () => {
     expect(await projectless.listExtensions?.()).toEqual([]);
   });
 
+  /*
+   * The catalogue is a CAPABILITY rather than a constant precisely because of this backend: a
+   * Worker ships a fixed set of extension packages (specs/extensions.md §5.5), decided by the
+   * platform build rather than by this repository's extensions/ tree. So cloud asks its gateway,
+   * and never serves the shipped first-party list.
+   */
+  test("listExtensionCatalog asks the gateway and marks everything bundled", async () => {
+    const calls = mockFetch({
+      "/extension-catalog": {
+        body: [
+          { name: "@jxsuite/parser", sections: [{ key: "content" }], source: "first-party" },
+          { name: "@jxsuite/feed", sections: [{ key: "feed" }], source: "first-party" },
+        ],
+      },
+      "/file?path=package.json": {
+        body: { content: JSON.stringify({ dependencies: { "@jxsuite/parser": "^1.7.0" } }) },
+      },
+    });
+    const p = createCloudPlatform(PROJECT);
+    const catalog = await p.listExtensionCatalog?.();
+
+    // Nothing resolves a module in a Worker, so enabling one of these is a project.json write
+    // Alone — which is what `bundled` means.
+    expect(catalog?.every((e) => e.bundled === true)).toBe(true);
+    // `installed` degrades to DECLARED, the only fact this adapter has.
+    expect(catalog?.find((e) => e.name === "@jxsuite/parser")?.installed).toBe(true);
+    expect(catalog?.find((e) => e.name === "@jxsuite/feed")?.installed).toBe(false);
+    expect(calls.some((c) => c.url === `${BASE}/extension-catalog`)).toBe(true);
+  });
+
+  test("the catalogue degrades to nothing rather than to the shipped list", async () => {
+    /*
+     * The whole contract. A session whose gateway predates the route must offer NOTHING: offering
+     * five extensions three of which the Worker cannot load would put a toggle in front of the
+     * reader that silently does not work.
+     */
+    mockFetch({ "/extension-catalog": { status: 404, body: { error: "no such route" } } });
+    expect(await createCloudPlatform(PROJECT).listExtensionCatalog?.()).toEqual([]);
+    expect(await createCloudPlatform(null).listExtensionCatalog?.()).toEqual([]);
+  });
+
   /* The cloud composes the entry documents server-side from bundled artifacts (it has no
      node_modules and no filesystem), so the studio just registers what it is handed. Before this
      member existed the cloud always fell back to the core schemas, and extension sections got no
@@ -1131,7 +1233,9 @@ describe("navigation members under a DOM", () => {
       const p = createCloudPlatform(null);
       await p.openProjectInNewWindow?.("octocat/site@main");
       expect(openMock).toHaveBeenCalled();
-      await p.openProjectInNewWindow?.("malformed"); // Parse-fail path: no call.
+      // Unresolvable: it must fail rather than answer, because the caller reports "Opened in
+      // Another window" for any call that returns.
+      expect(p.openProjectInNewWindow?.("malformed")).rejects.toThrow(/No project to open/);
       expect(openMock).toHaveBeenCalledTimes(1);
     } finally {
       (window as { open: unknown }).open = realOpen;

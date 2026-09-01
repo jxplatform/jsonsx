@@ -13,6 +13,23 @@
 
 import type { JxPath } from "../state";
 
+/**
+ * A `[data-jx-path='…']` selector for a serialized path.
+ *
+ * Single quotes because the serialized path is JSON and only ever uses double ones; the two escapes
+ * cover the characters that could still break out of an attribute-value selector. Shared because
+ * two callers need the same string — `measureHits` locating a node to measure, and
+ * `applyCanvasPopoverOpen` locating one to flip — and a second copy of an escaping rule is a second
+ * chance to get an escape wrong.
+ *
+ * @param serialized A path already through {@link serializeJxPath}.
+ * @returns The attribute selector, without a leading tag or combinator.
+ */
+export function jxPathSelector(serialized: string): string {
+  const escaped = serialized.replaceAll("\\", String.raw`\\`).replaceAll("'", String.raw`\'`);
+  return `[data-jx-path='${escaped}']`;
+}
+
 /** Context the mapper needs, computed once per render by whoever prepared the document. */
 export interface PathMapCtx {
   canvasMode: string;

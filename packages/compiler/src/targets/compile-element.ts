@@ -7,6 +7,9 @@
 
 import { RESERVED_KEYS, camelToKebab } from "@jxsuite/runtime";
 import {
+  ATTR_HELPER,
+  attrHelperSource,
+  booleanAttrValue,
   PREFORMATTED_TAGS,
   collectStyles,
   compileExpression,
@@ -405,7 +408,11 @@ export function emitElementModule(
 
   lines.push(
     `import { reactive, computed, effect, stop } from '@vue/reactivity';`,
-    `import { render, html } from 'lit-html';`,
+    /* `nothing` is what REMOVES an attribute in a lit template, and it is the only way to express a
+       false presence attribute: writing `open="false"` produces an OPEN <details>. See
+       `attrHelperSource`. */
+    `import { render, html, nothing } from 'lit-html';`,
+    attrHelperSource(),
   );
 
   /*
@@ -1037,10 +1044,26 @@ ${no}
 
   if (def.attributes) {
     for (const [key, val] of Object.entries(def.attributes)) {
+      /* Every branch here answers the same question the runtime's `applyAttributes` answers, and
+         must answer it the same way or a prerendered page changes meaning as it hydrates (spec.md
+         §8.3). A LITERAL boolean is decided now; a BOUND one cannot be, because its resolved type
+         is not known until the effect runs — so it goes through the emitted helper, whose `null`
+         becomes lit's `nothing` and takes the attribute off. */
       if (val && typeof val === "object" && isRef(val)) {
-        parts.push(`${key}="\${${refToExpr(val.$ref)}}"`);
+        parts.push(`${key}="\${${ATTR_HELPER}('${key}', ${refToExpr(val.$ref)}) ?? nothing}"`);
+      } else if (typeof val === "string" && isWholeTemplate(val)) {
+        parts.push(
+          `${key}="\${${ATTR_HELPER}('${key}', ${toLitExpr(val).slice(2, -1)}) ?? nothing}"`,
+        );
       } else if (typeof val === "string" && val.includes("${")) {
+        /* A template with literal text around it — `"page ${n}"` — is a string by construction, so
+           there is no boolean to decide and wrapping it would only add a call. */
         parts.push(`${key}="${toLitExpr(val)}"`);
+      } else if (typeof val === "boolean") {
+        const text = booleanAttrValue(key, val);
+        if (text !== null) {
+          parts.push(text === "" ? key : `${key}="${text}"`);
+        }
       } else {
         parts.push(`${key}="${val}"`);
       }
@@ -1402,6 +1425,20 @@ function mapRefToExpr(ref: string) {
  */
 function toLitExpr(str: string) {
   return str.replaceAll("state.", "s.");
+}
+
+/**
+ * Whether the whole attribute value is ONE `${…}` and nothing else.
+ *
+ * Only such a value can resolve to a boolean — anything with literal text around the expression is
+ * a string by construction — so this is the test for whether the boolean decision has to be
+ * deferred to runtime.
+ *
+ * @param {string} str
+ * @returns {boolean}
+ */
+function isWholeTemplate(str: string): boolean {
+  return str.startsWith("${") && str.endsWith("}") && !str.slice(2).includes("${");
 }
 
 /**

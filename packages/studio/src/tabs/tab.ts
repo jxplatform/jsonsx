@@ -2,6 +2,7 @@
 import { effectScope, reactive } from "../reactivity";
 import { formatByName, formatForPath } from "../format/format-host";
 import { normalizeArrayChildren } from "../state";
+import type { JxPath } from "../state";
 import type { FormulaEditDef, FunctionEditDef, InlineEditDef, JsonValue } from "../types";
 import { editorKindForMode } from "../commands/context";
 import type { EditorKind } from "../commands/context";
@@ -39,6 +40,24 @@ export interface TabUi {
   editZoom: number;
   activeMedia: string | null;
   activeSelector: string | null;
+  /**
+   * The popover the canvas is drawing OPEN, by document path, or null for none.
+   *
+   * Per tab rather than per pane, beside `activeMedia` and `previewColorScheme`, because it is a
+   * fact about a DOCUMENT's elements: two panes showing the same tab show the same open panel,
+   * which is correct — it is the same element.
+   *
+   * Exactly one, never a set. Several de-popovered panels in flow at once would shove the page
+   * around and make the canvas unreadable; native `popover="auto"` already enforces a single stack,
+   * so a set would model something the platform does not have; and "exactly one" makes the
+   * open-on-selection rule total, with no ordering decision to make.
+   *
+   * A VIEW state — it writes nothing to the document, so it takes no undo entry, does not dirty the
+   * tab and is not replicated over collaboration. It is also deliberately not restored with a
+   * session (§14.8): reopening a project with a modal spread across the page is a worse first frame
+   * than reopening it closed.
+   */
+  openPopover: JxPath | null;
   editingFunction: FunctionEditDef | null;
   /** Logic-tab formula target ($expression editing); editingFunction wins if both are set. */
   editingFormula: FormulaEditDef | null;
@@ -216,6 +235,7 @@ function createDefaultUi(canvasMode: string, preview = false) {
   return {
     activeMedia: null,
     activeSelector: null,
+    openPopover: null,
     canvasMode,
     editZoom: 1,
     editingFormula: null,

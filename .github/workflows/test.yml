@@ -268,6 +268,12 @@ jobs:
       # this is green on the release PR's first run; it fires when a template gains a dependency or
       # an extra-files entry is dropped. `bun run templates:sync` fixes it.
       - run: bun run templates:check
+      # The extension catalogue is generated from every extensions/*/jx-extension.json and the
+      # class descriptors it names. A new extension, a renamed section key, a reworded manifest
+      # title or a package that lost its `exports["./jx-extension.json"]` all move these bytes;
+      # `bun run catalog:sync` fixes it. Its own gate because check-schema-freshness derives its
+      # file set from tracked *schema.json and would never see this artifact.
+      - run: bun run catalog:verify
       # Studio commands: every declared `menus` placement must admit the command's
       # containment level (the level × placement matrix — UX-REDESIGN-PLAN §5.1,
       # normative copy in specs/studio-ui-guidelines.md §12).

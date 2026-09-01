@@ -194,7 +194,11 @@ const KNOWN_UNREACHABLE: Record<string, Record<string, string>> = {
       "builds a nesting validator from a format's `$studio.elements`. Drop and insert both reject " +
       "invalid nesting inside the iframe's own drop math, so no parent-side validator is built",
   },
-  "format/format-host.ts": { setExtensions: TEST_SEAM, setFormats: TEST_SEAM },
+  "format/format-host.ts": {
+    setExtensionCatalog: TEST_SEAM,
+    setExtensions: TEST_SEAM,
+    setFormats: TEST_SEAM,
+  },
   "grid/grid-layout.ts": {
     clearGridLayout:
       'drops a grid\'s stored layout AND its named views. Nothing offers "reset this grid" — the ' +

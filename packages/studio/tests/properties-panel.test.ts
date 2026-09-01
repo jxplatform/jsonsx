@@ -1524,3 +1524,66 @@ describe("editing a component definition is not editing an instance of it", () =
     expect(doc.$props).toBeUndefined();
   });
 });
+
+describe("popovertarget control", () => {
+  /** A trigger and two panels, so the picker has real ids to offer. */
+  function popoverDoc(triggerAttrs: Record<string, unknown> = {}) {
+    return {
+      children: [
+        { attributes: { ...triggerAttrs }, tagName: "button" },
+        { attributes: { id: "site-menu", popover: "auto" }, tagName: "nav" },
+        { attributes: { id: "search", popover: "auto" }, tagName: "div" },
+        { attributes: { id: "not-a-popover" }, tagName: "section" },
+      ],
+      tagName: "div",
+    };
+  }
+
+  const picker = (c: HTMLElement) =>
+    c.querySelector("sp-picker.popover-target-value") as HTMLInputElement | null;
+  const options = (c: HTMLElement) =>
+    [...picker(c)!.querySelectorAll("sp-menu-item")].map((m) => m.getAttribute("value"));
+
+  test("a <button> gets a picker over the document's popovers, not a text field", async () => {
+    openDoc(popoverDoc({ popovertarget: "site-menu" }), ["children", 0]);
+    const c = await renderPanel();
+    expect(picker(c)).not.toBeNull();
+    // The ids that carry `popover`, and nothing else — `#not-a-popover` is absent, which is the
+    // Whole point: a free-text field is what let six invokers name the wrong panel.
+    expect(options(c)).toEqual(["site-menu", "search", "jx:other"]);
+    expect(picker(c)!.value).toBe("site-menu");
+  });
+
+  test("choosing an id commits it", async () => {
+    openDoc(popoverDoc({ popovertarget: "site-menu" }), ["children", 0]);
+    const c = await renderPanel();
+    const p = picker(c)!;
+    p.value = "search";
+    p.dispatchEvent(new Event("change", { bubbles: true }));
+    expect((docNow().children as JxMutableNode[])[0]!.attributes!.popovertarget).toBe("search");
+  });
+
+  test("an id from another file stays selected and offered — the list cannot be complete", async () => {
+    // A popovertarget resolves in the RENDERED DOM, and a page composes components whose internals
+    // This document cannot see. So the picker offers what it can prove and refuses nothing.
+    openDoc(popoverDoc({ popovertarget: "in-a-component" }), ["children", 0]);
+    const c = await renderPanel();
+    expect(options(c)).toEqual(["in-a-component", "site-menu", "search", "jx:other"]);
+    expect(picker(c)!.value).toBe("in-a-component");
+  });
+
+  test("a bound value falls through to the raw widget so it stays an expression", async () => {
+    openDoc(popoverDoc({ popovertarget: "${state.which}" }), ["children", 0]);
+    const c = await renderPanel();
+    expect(picker(c)).toBeNull();
+  });
+
+  test("a non-invoker element is never offered the attribute at all", async () => {
+    // `popovertarget` is declared `$elements: ["button", "input"]`, because the IDL mixin that
+    // Defines it is included into exactly those two interfaces.
+    openDoc(popoverDoc(), ["children", 3]);
+    const c = await renderPanel();
+    expect(picker(c)).toBeNull();
+    expect(c.textContent).not.toContain("Opens popover");
+  });
+});

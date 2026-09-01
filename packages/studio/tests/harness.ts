@@ -206,6 +206,7 @@ export function installMockPlatform(
     gitUnstage: log("gitUnstage", async () => {}),
     id: "mock",
     listDirectory: log("listDirectory", async (dir) => dirEntriesFor(state.files, dir)),
+    listExtensionCatalog: log("listExtensionCatalog", async () => []),
     listPackages: log("listPackages", async () => []),
     locateFile: log("locateFile", async (name) => {
       for (const path of state.files.keys()) {

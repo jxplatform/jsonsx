@@ -72,7 +72,7 @@ import { renderStylebookLayersTemplate } from "./stylebook-layers-panel";
 import { selectStylebookTag, stylebookMeta } from "./stylebook-panel";
 import { isInlineElement } from "../editor/inline-edit";
 import { showContextMenu } from "../editor/context-menu";
-import { panToElement } from "../canvas/canvas-utils";
+import { revealPathInCanvas } from "../canvas/popover-state";
 import {
   commandIcon,
   commandTooltip,
@@ -1054,7 +1054,7 @@ function outlineRowTemplate(
       data-dnd-expanded=${isStructural && isExpandable && !collapsed.has(key) ? "" : nothing}
       @click=${(e: MouseEvent) => {
         applyRowSelection(path, { additive: e.ctrlKey || e.metaKey, range: e.shiftKey });
-        panToElement(path);
+        revealPathInCanvas(path);
       }}
       @dblclick=${
         isStructural

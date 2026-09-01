@@ -169,6 +169,8 @@ function installRegistry(ran: string[]) {
       getCanvasMode: () => "design",
       renderPane: () => {},
       setCanvasMode: () => {},
+      setOpenPopover: () => {},
+
       setResolvingOpen: paneContext.setResolvingOpen,
     }).filter((c) =>
       [

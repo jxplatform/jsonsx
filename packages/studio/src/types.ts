@@ -28,6 +28,7 @@ import type {
   DataRowsResult,
   DataRowUpdate,
   DirEntry,
+  ExtensionCatalogEntry,
   ExtensionsInfo,
   FsEvent,
   GitBranchesResult,
@@ -77,8 +78,10 @@ export type {
   DataRowUpdate,
   DirEntry,
   ErrorBody,
+  ExtensionCatalogEntry,
   ExtensionContributionInfo,
   ExtensionProjectBlock,
+  ExtensionSectionInfo,
   ExtensionsInfo,
   FsEvent,
   GitBranchesResult,
@@ -386,6 +389,25 @@ export interface StudioPlatform {
    * platforms without it lose descriptor-contributed settings sections.
    */
   listExtensions?: () => Promise<ExtensionsInfo[]>;
+  /**
+   * The extensions this backend can OFFER, enabled or not — the AVAILABLE half of the pair whose
+   * enabled half is {@link StudioPlatform.listExtensions} above.
+   *
+   * A capability rather than a constant because not every host can run every extension: a Worker
+   * ships a fixed set of extension packages (specs/extensions.md §5.5), and one it does not bundle
+   * is dropped from the registry before composition rather than passed to it. A studio that
+   * advertised a shipped list would offer rows the host would refuse.
+   *
+   * Each entry additionally carries two facts only a backend holds: whether THIS host resolves the
+   * package without a project install (`bundled`), and whether the project has it installed
+   * (`installed`) — the latter because `listPackages` does not mean one thing across backends.
+   * `enabled` is deliberately absent: it is `projectConfig.extensions.includes(name)`, which Studio
+   * already owns and rewrites through the `updateSiteConfig` chokepoint.
+   *
+   * Optional: platforms without it offer no catalogue, and adding an extension stays a typed
+   * package name.
+   */
+  listExtensionCatalog?: () => Promise<ExtensionCatalogEntry[]>;
   /**
    * Fetch the project's generated entry schemas (project.schema.json / document.schema.json),
    * PRE-BUNDLED into self-contained documents for editor registration. Optional: without it the

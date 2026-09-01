@@ -105,6 +105,13 @@ textarea.field-input {
 .field-row sp-checkbox {
   flex: none;
 }
+/* The popovertarget picker. Its longest option is a popover id, which is author-chosen text and can
+   be long, so it truncates rather than pushing the row's clear-dot off the panel. */
+.popover-target-value {
+  flex: 1;
+  min-width: 0;
+  max-width: 100%;
+}
 .field-row sp-field-label {
   width: 80px;
   flex-shrink: 0;

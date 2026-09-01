@@ -65,10 +65,14 @@ function deriveSlug(name: string): string {
   );
 }
 
-/** Prefill owner/repo from cloud roots ("owner/repo"); blank elsewhere. */
+/**
+ * Prefill owner/repo from cloud root keys ("owner/repo@branch", or the older "owner/repo"); blank
+ * elsewhere. The branch is part of the key the cloud adapter reports as its `projectRoot` — without
+ * the optional suffix here, the whole key failed to match and the form opened empty.
+ */
 function prefillRepo(): { owner: string; repo: string } {
   const root = getPlatform().projectRoot;
-  const match = /^([\w.-]+)\/([\w.-]+)$/.exec(root);
+  const match = /^([\w.-]+)\/([\w.-]+)(?:@.+)?$/.exec(root);
   return match ? { owner: match[1]!, repo: match[2]! } : { owner: "", repo: "" };
 }
 

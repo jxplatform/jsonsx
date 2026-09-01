@@ -1503,3 +1503,60 @@ describe("buildComponentCSS — $media propagation", () => {
     expect(css).not.toContain("@media");
   });
 });
+
+describe("compileStyles — declaration-body at-rules", () => {
+  test("@position-try emits its declarations with no selector wrapper", () => {
+    const result = compileStyles({
+      children: [],
+      id: "menu",
+      style: {
+        "@position-try --flip-up": { insetBlockEnd: "anchor(top)", insetBlockStart: "auto" },
+        positionAnchor: "--btn",
+      },
+      tagName: "nav",
+    });
+    expect(result).toContain("@position-try --flip-up {");
+    expect(result).toContain("inset-block-start: auto");
+    // The defect this fixes: a selector inside makes the whole block dead, silently.
+    expect(result).not.toContain("@position-try --flip-up { #menu");
+  });
+
+  test("@property does the same, and @media still wraps a selector", () => {
+    const result = compileStyles({
+      children: [],
+      id: "x",
+      style: {
+        "@--md": { color: "red" },
+        "@property --ratio": { inherits: "false", syntax: "'<number>'" },
+      },
+      tagName: "div",
+    });
+    expect(result).toContain("@property --ratio {");
+    expect(result).toContain("syntax: '<number>'");
+    expect(result).toContain("#x { color: red }");
+  });
+
+  test("@starting-style and @supports keep their selector level", () => {
+    const result = compileStyles({
+      children: [],
+      id: "p",
+      style: {
+        "@starting-style": { ":popover-open": { opacity: "0" } },
+        "@supports not (position-area: block-end)": { top: "5rem" },
+      },
+      tagName: "div",
+    });
+    expect(result).toContain("@starting-style { #p:popover-open { opacity: 0 } }");
+    expect(result).toContain("@supports not (position-area: block-end) { #p { top: 5rem } }");
+  });
+
+  test("an empty declaration block emits nothing", () => {
+    const result = compileStyles({
+      children: [],
+      id: "e",
+      style: { "@position-try --none": {} },
+      tagName: "div",
+    });
+    expect(result).not.toContain("@position-try");
+  });
+});

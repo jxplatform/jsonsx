@@ -10,7 +10,7 @@ import { readFileSync } from "node:fs";
 import { dirname, isAbsolute, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
-import { buildExtensionRegistry } from "@jxsuite/schema/extension-registry";
+import { buildExtensionRegistry, EXTENSION_MANIFEST } from "@jxsuite/schema/extension-registry";
 import type { ExtensionRegistry } from "@jxsuite/schema/extension-registry";
 import type { FormatHostIO, FormatRegistry, ProjectBlock } from "@jxsuite/schema/format-registry";
 import type { ProjectConfig } from "@jxsuite/schema/types";
@@ -73,6 +73,59 @@ export function createNodeFormatIO(projectRoot: string): FormatHostIO {
       }
     },
   };
+}
+
+/**
+ * Where an extension package's manifest resolves from — the two answers `createNodeFormatIO`
+ * merges.
+ */
+export interface ExtensionResolution {
+  /** Resolvable from the PROJECT's own node_modules. */
+  project: boolean;
+  /** Resolvable from the HOST's module graph — `createNodeFormatIO`'s fallback branch. */
+  host: boolean;
+  /** The manifest path from whichever probe answered; the project wins, matching resolution order. */
+  manifestPath?: string;
+}
+
+/**
+ * Split `createNodeFormatIO`'s two-branch resolution into its two ANSWERS.
+ *
+ * The IO deliberately collapses them (project first, then host) because a caller loading a class
+ * only needs the file. A catalogue needs them apart: "the project installed this" and "this host
+ * ships it" are different affordances — install-then-enable versus enable — and a surface that
+ * cannot tell them apart offers the wrong one.
+ *
+ * Probes the MANIFEST rather than the package directory, because the manifest is what the registry
+ * resolves (see `loadExtension`): a package present in node_modules whose `exports` map omits
+ * `./jx-extension.json` is one whose enablement would throw, so it must not read as resolvable.
+ *
+ * @param {string} projectRoot - The project whose node_modules is tried first
+ * @param {string} name - Bare package specifier, e.g. "@jxsuite/parser"
+ * @returns {ExtensionResolution}
+ */
+export function probeExtension(projectRoot: string, name: string): ExtensionResolution {
+  const ref = `${name}/${EXTENSION_MANIFEST}`;
+  let manifestPath: string | undefined;
+
+  let project = false;
+  try {
+    manifestPath = createRequire(resolve(projectRoot, "package.json")).resolve(ref);
+    project = true;
+  } catch {
+    // Not installed in the project. The host probe below decides whether it resolves at all.
+  }
+
+  let host = false;
+  try {
+    const fromHost = createRequire(import.meta.url).resolve(ref);
+    host = true;
+    manifestPath ??= fromHost;
+  } catch {
+    // Not shipped by this host either.
+  }
+
+  return { host, project, ...(manifestPath === undefined ? {} : { manifestPath }) };
 }
 
 /** Build the extension registry for a project from its project.json `extensions` array. */

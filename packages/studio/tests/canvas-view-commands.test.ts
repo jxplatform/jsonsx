@@ -152,10 +152,12 @@ const setCanvasMode = mock((tab: Tab | null, mode: string) => {
 const renderedPanes: string[] = [];
 /** Which pane each rendering-context verb opened or closed the resolving popover for. */
 const resolvingOpened: [string, boolean][] = [];
+const openedPopovers: [string, unknown][] = [];
 const deps = {
   getCanvasMode: () => canvasMode,
   renderPane: (paneId: string) => renderedPanes.push(paneId),
   setCanvasMode,
+  setOpenPopover: (tab: Tab, path: unknown) => openedPopovers.push([tab.id, path]),
   setResolvingOpen: (paneId: string, open: boolean) => resolvingOpened.push([paneId, open]),
 };
 
@@ -183,6 +185,7 @@ beforeEach(() => {
   resetFits();
   resetEditWidths();
   renderedPanes.length = 0;
+  openedPopovers.length = 0;
   surfaceForPane("primary").panzoomWrap = null;
   ctx = makeContext({ document: { open: true } });
   registry = createCommandRegistry({ getContext: () => ctx });
@@ -219,6 +222,11 @@ describe("the records themselves", () => {
       // Argument and the repaint — are local to this module. `insert.data` is the precedent.
       "i18n.switchLocale",
       "canvas.setLayoutVisible",
+      // The one element STATE the canvas simulates. A setter for the same reason as its neighbours,
+      // And with a sharper edge: `scripts/check-shot-contract.ts` rejects any `/\.toggle[A-Z]/` id
+      // Outright and `services/automation.ts` throws on one, so a `togglePopover` could never be
+      // Driven from a documentation screenshot — which is exactly the shot this record exists for.
+      "canvas.setPopoverOpen",
       // The route params and component test props live in a popover now, and a transient surface
       // Opens by command rather than by clicking (§13.2) — otherwise the shot that types a test
       // Value would need a CSS selector to reach it.
@@ -831,5 +839,66 @@ describe("the pan-zoom family agrees with itself", () => {
     // The reader to open a document they already have open.
     expect(registry.disabledReason("canvas.setFit")).toBe("a document on the pan-zoom surface");
     expect(registry.disabledReason("canvas.setZoom")).toBe("a document on the pan-zoom surface");
+  });
+});
+
+describe("canvas.setPopoverOpen", () => {
+  /** Give the active tab a document with one popover and select something inside it. */
+  function withPopover(selection: (string | number)[][] = []) {
+    const tab = activeTab.value!;
+    (tab.doc as { document: unknown }).document = {
+      children: [
+        { tagName: "button" },
+        {
+          attributes: { id: "menu", popover: "auto" },
+          children: [{ tagName: "a" }],
+          tagName: "nav",
+        },
+      ],
+      tagName: "div",
+    };
+    tab.session.selection = selection as never;
+    return tab;
+  }
+
+  test("with no argument it opens the popover the selection is in", () => {
+    const tab = withPopover([["children", 1, "children", 0]]);
+    void registry.run("canvas.setPopoverOpen", {});
+    expect(openedPopovers).toEqual([[tab.id, ["children", 1]]]);
+  });
+
+  test("an explicit path opens that one", () => {
+    const tab = withPopover();
+    void registry.run("canvas.setPopoverOpen", { path: ["children", 1] });
+    expect(openedPopovers).toEqual([[tab.id, ["children", 1]]]);
+  });
+
+  test("open:false with no path closes whatever is open — one record covers both", () => {
+    const tab = withPopover();
+    void registry.run("canvas.setPopoverOpen", { open: false });
+    expect(openedPopovers).toEqual([[tab.id, null]]);
+  });
+
+  test("running it twice ends in the same state — the point of a setter over a toggle", () => {
+    const tab = withPopover();
+    void registry.run("canvas.setPopoverOpen", { path: ["children", 1] });
+    void registry.run("canvas.setPopoverOpen", { path: ["children", 1] });
+    expect(openedPopovers).toEqual([
+      [tab.id, ["children", 1]],
+      [tab.id, ["children", 1]],
+    ]);
+  });
+
+  test("it REFUSES a path that is not a popover rather than opening nothing", () => {
+    withPopover();
+    expect(() => registry.run("canvas.setPopoverOpen", { path: ["children", 0] })).toThrow(
+      RangeError,
+    );
+    expect(openedPopovers).toEqual([]);
+  });
+
+  test("and refuses when neither an argument nor the selection names one", () => {
+    withPopover([["children", 0]]);
+    expect(() => registry.run("canvas.setPopoverOpen", {})).toThrow(RangeError);
   });
 });

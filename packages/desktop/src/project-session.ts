@@ -40,6 +40,15 @@ import {
 import { readBundledProjectSchemas } from "@jxsuite/compiler/schema-command";
 import { componentMetaFrom } from "@jxsuite/schema/component-meta";
 import type { ExtensionsPayloadEntry } from "@jxsuite/compiler/format-host";
+import type {
+  ExtensionCatalogEntry,
+  DataPushRequest,
+  DataRowDelete,
+  DataRowInsert,
+  DataRowsQuery,
+  DataRowUpdate,
+  SecretsSetRequest,
+} from "@jxsuite/protocol";
 import type { ExtensionRegistry } from "@jxsuite/schema/extension-registry";
 import type {
   FsEventPayload,
@@ -48,14 +57,6 @@ import type {
   RenameReport,
 } from "@jxsuite/server/refactor";
 import { openExternal as handUrlToOs } from "./utils.ts";
-import type {
-  DataPushRequest,
-  DataRowDelete,
-  DataRowInsert,
-  DataRowsQuery,
-  DataRowUpdate,
-  SecretsSetRequest,
-} from "@jxsuite/protocol";
 import type { FormatCapability, FormatRegistry } from "@jxsuite/schema/format-registry";
 import type { ProjectConfig } from "@jxsuite/schema/types";
 import type {
@@ -634,6 +635,31 @@ export function createProjectSession(initialRoot: string | null) {
   }
 
   /**
+   * What this backend can OFFER, enabled or not — the desktop twin of GET
+   * /__studio/extension-catalog.
+   *
+   * Same builder as the dev server, deliberately: what differs between the two hosts is what the
+   * resolution PROBE answers, not the code. A desktop build stages what it stages, and hardcoding a
+   * bundled list here would tell a reader "just enable it" for a package whose next build throws.
+   *
+   * A welcome window has no project to probe against, and the shipped half of the catalogue is
+   * still true — but `installed`/`bundled` would be answered against nothing, so it returns the
+   * empty list and the section falls back to a typed package name, exactly as listExtensions does.
+   */
+  async function listExtensionCatalog(): Promise<ExtensionCatalogEntry[]> {
+    if (!projectRoot) {
+      return [];
+    }
+    try {
+      const { buildExtensionCatalog } = await import("@jxsuite/server/extension-catalog");
+      return await buildExtensionCatalog(projectRoot);
+    } catch (error) {
+      console.error("[desktop] listExtensionCatalog failed:", error);
+      return [];
+    }
+  }
+
+  /**
    * The project's generated entry schemas, PRE-BUNDLED for Monaco registration — the desktop twin
    * of GET /__studio/project-schemas (regenerates missing/stale entry documents on demand).
    */
@@ -1197,6 +1223,7 @@ export function createProjectSession(initialRoot: string | null) {
     setFileEventSink,
     dispose: stopWatching,
     listFormats,
+    listExtensionCatalog,
     listExtensions,
     fetchProjectSchemas,
     formatAction,

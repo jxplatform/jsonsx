@@ -99,6 +99,19 @@ writes the word for these, in both directions:
 <div aria-expanded="false"></div>
 ```
 
+`popover` sits between the two families and is the one attribute worth naming. It is enumerated (its
+keywords are `auto`, `manual` and `hint`), but an empty value means `auto` rather than unset, so a
+boolean `true` writing the bare name happens to be right. A value the browser does not recognise
+falls back to `manual`, which gives up closing on Escape and on a click outside without saying so,
+and `popover="true"` is such a value. Write the keyword:
+
+```json
+{ "attributes": { "popover": "auto" } }
+```
+
+Studio reports a boolean `popover` as a problem rather than correcting it. See
+[Popovers and overlays](/docs/framework/concepts/overlays).
+
 That distinction matters for accessibility: a bare `aria-hidden` is _not_ hidden, and an omitted
 `contenteditable` means "inherit from the parent" rather than `false`. Writing either as a presence
 attribute would silently invert it.

@@ -11,6 +11,8 @@ import {
   COLOR_SCHEME_STORAGE_KEY,
   RESERVED_KEYS,
   booleanAttrValue,
+  enumeratedAttrNames,
+  isDeclarationAtRule,
   camelToKebab,
   isSingleExpression,
   pureSchemeOf,
@@ -1056,6 +1058,19 @@ function conditionalRuleEmitter(
   mediaQueries: Record<string, string>,
   rules: string[],
 ): (selector: string, props: string) => void {
+  /* A declaration-body at-rule has no selector to wrap: `@position-try --flip { … }` IS the body,
+     and the default path below would emit `@position-try --flip { #panel { … } }`, which the
+     parser discards silently. The name it declares is document-global, so the block is written
+     once and the selector is dropped rather than scoped. */
+  if (isDeclarationAtRule(atKey)) {
+    let emitted = false;
+    return (_selector: string, props: string) => {
+      if (props && !emitted) {
+        emitted = true;
+        rules.push(`${atKey} { ${props} }`);
+      }
+    };
+  }
   const query = resolveAtQuery(atKey, mediaQueries);
   const atRule = query === null ? atKey : `@media ${query}`;
   const scheme = query === null ? null : pureSchemeOf(query);
@@ -1094,6 +1109,10 @@ function pushConditionalRule(
   }
   const emit = conditionalRuleEmitter(atKey, mediaQueries, rules);
   emit(selector, toCSSText(obj));
+  if (isDeclarationAtRule(atKey)) {
+    // Its children are declarations, so there is no nested selector level to walk.
+    return;
+  }
   for (const [sel, sub] of Object.entries(obj)) {
     if (sub === null || typeof sub !== "object" || Array.isArray(sub)) {
       continue;
@@ -1108,6 +1127,47 @@ function pushConditionalRule(
         : `${selector} ${sel}`;
     emit(resolved, toCSSText(sub));
   }
+}
+
+/**
+ * The name of the boolean-attribute helper the generated modules call.
+ *
+ * Prefixed and improbable because it lands in the same scope as the author's own bindings.
+ */
+export const ATTR_HELPER = "__jxAttrText";
+
+/**
+ * The source of that helper, to be emitted into a generated module's preamble.
+ *
+ * **Why an inlined copy rather than an import.** `booleanAttrValue` is the single decision about
+ * which family an attribute belongs to, and `buildAttrs` here calls it directly — but the element
+ * and client targets emit standalone ES modules that a built site loads with `lit-html` and
+ * `@vue/reactivity` and nothing else. Importing `@jxsuite/runtime` into every compiled component to
+ * reach four lines would put the whole renderer on the critical path of pages that never use it.
+ *
+ * So the rule is inlined, and the enumerated names are SERIALIZED from `enumeratedAttrNames()`
+ * rather than retyped. `compile-element.test.ts` asserts the emitted literal still equals that
+ * export, which is what keeps this from becoming a fourth, drifting definition — the exact failure
+ * the essay above `buildAttrs` exists to prevent, and the one these two targets shipped for months:
+ * they stringified booleans, so a component's `open: true` compiled to `open="true"` and a bound
+ * `open` that flipped false wrote `open="false"` — an OPEN `<details>` the author had closed.
+ *
+ * Returns the text to write, or `null` to mean "remove the attribute"; each caller adapts that null
+ * to its own idiom (`nothing` in a lit template, `removeAttribute` in the hydration script).
+ *
+ * @returns {string} One `function` declaration, ready to push into a module's line list.
+ */
+export function attrHelperSource(): string {
+  const names = JSON.stringify(enumeratedAttrNames());
+  return (
+    `const __jxEnumAttrs = new Set(${names});\n` +
+    `function ${ATTR_HELPER}(n, v) {\n` +
+    `  if (typeof v !== 'boolean') return v;\n` +
+    `  const l = n.toLowerCase();\n` +
+    `  if (l.startsWith('aria-') || __jxEnumAttrs.has(l)) return String(v);\n` +
+    `  return v ? '' : null;\n` +
+    `}`
+  );
 }
 
 /**

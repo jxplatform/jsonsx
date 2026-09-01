@@ -1711,3 +1711,94 @@
   color: var(--fg-dim);
   font-size: var(--spectrum-font-size-50, 11px);
 }
+
+/* ─── Extensions section ─── */
+/* One group per origin: what this backend offers, what the project already has, and what
+   project.json names that nothing could describe. */
+.settings-extension-group {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 16px;
+}
+.settings-extension-group-title {
+  margin: 0 0 2px;
+  font-size: var(--spectrum-font-size-75, 12px);
+  font-weight: 600;
+  color: var(--fg);
+}
+/* A wrapping row, never an overflowing one (studio-ui-guidelines §4.6): the package name is
+   author-supplied and unbounded, and the Inspector renders at two very different widths. */
+.settings-toggle-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-top: 4px;
+}
+.settings-toggle-row--broken {
+  border-color: var(--warning);
+}
+/* `min-width: 0` is the declaration that makes the wrap work: without it the <code> below refuses
+   to shrink past its min-content and sets the row's width. */
+.settings-toggle-body {
+  flex: 1 1 220px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.settings-toggle-title {
+  font-size: var(--spectrum-font-size-75, 12px);
+  font-weight: 600;
+  color: var(--fg);
+}
+.settings-toggle-package {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--fg-dim);
+  overflow-wrap: anywhere;
+}
+.settings-toggle-desc {
+  margin: 2px 0 0;
+  font-size: var(--spectrum-font-size-75, 12px);
+  color: var(--fg-dim);
+}
+.settings-toggle-sections {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+.settings-toggle-section {
+  padding: 1px 6px;
+  border-radius: var(--radius);
+  background: var(--accent-15);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--fg);
+}
+.settings-toggle-note {
+  margin: 4px 0 0;
+  font-size: 10px;
+  color: var(--fg-dim);
+}
+.settings-toggle-note--warn {
+  color: var(--warning);
+}
+.settings-toggle-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+/* The switch and the Remove button sit at the row's edges and do not take part in its wrap. */
+.settings-extension-toggle {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.settings-extension-remove {
+  flex-shrink: 0;
+}

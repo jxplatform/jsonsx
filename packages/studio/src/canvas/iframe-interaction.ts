@@ -6,7 +6,7 @@
  * the iframe only reports what was pointed at.
  */
 
-import { parseJxPath, serializeJxPath } from "./path-mapping";
+import { jxPathSelector, parseJxPath, serializeJxPath } from "./path-mapping";
 import { rectOf } from "../utils/geometry";
 import { computeInsertZones, insertZonesKey } from "./iframe-insert";
 import { getActiveElement, isEditing } from "../editor/inline-edit";
@@ -61,24 +61,56 @@ export function nearestHit(target: EventTarget | null): NodeHit | null {
 }
 
 /**
- * Measure the current rect of each requested document path by locating its `data-jx-path` element.
- * Paths with no matching node are omitted. The serialized path is the same string the renderer
- * stamps, so a stored selection path round-trips back to its element.
+ * Whether an element is actually rendered, as opposed to merely present in the DOM.
+ *
+ * `checkVisibility` is the platform's own answer, and it is the right one: it walks the ancestor
+ * chain, so a node inside a closed popover or a `display: none` section is reported hidden without
+ * this having to know why. happy-dom implements it faithfully (`display`, `visibility`, `opacity`,
+ * disconnection), so the guard is exercised under test rather than merely asserted.
+ *
+ * A rect test would NOT work here and was tried: happy-dom performs no layout, so every element
+ * measures 0×0 at the origin and the guard would report the whole document hidden.
+ *
+ * An engine without `checkVisibility` gets the benefit of the doubt. Withholding a selection box
+ * from a node that is on screen is a worse failure than drawing one for a node that is not.
  */
-export function measureHits(paths: (string | number)[][], doc: Document = document): NodeHit[] {
-  const out: NodeHit[] = [];
+function isRendered(el: Element): boolean {
+  const check = (el as { checkVisibility?: (o?: object) => boolean }).checkVisibility;
+  return typeof check === "function" ? check.call(el, { checkVisibilityCSS: true }) : true;
+}
+
+/**
+ * Measure the current rect of each requested document path by locating its `data-jx-path` element.
+ *
+ * Paths with no matching node are omitted. Paths that resolve to an element which is NOT RENDERED —
+ * a closed popover, a `display: none` node, a `$switch` branch that is not the live case — come
+ * back under `hidden` instead of as a rect. That distinction is the point: they used to be measured
+ * like anything else, and a zero rect is a truthy object, so the overlay drew a 0×0 box at the
+ * artboard origin and the block action bar anchored to it. Selecting a hidden node put a selection
+ * marker in the corner of the page and left the toolbar sitting there.
+ *
+ * The serialized path is the same string the renderer stamps, so a stored selection path
+ * round-trips back to its element.
+ */
+export function measureHits(
+  paths: (string | number)[][],
+  doc: Document = document,
+): { hits: NodeHit[]; hidden: (string | number)[][] } {
+  const hits: NodeHit[] = [];
+  const hidden: (string | number)[][] = [];
   for (const path of paths) {
-    const serialized = serializeJxPath(path);
-    // Wrap in single quotes (the serialized JSON only ever uses double quotes) and escape the few
-    // Characters that could still break out of an attribute-value selector.
-    const esc = serialized.replaceAll("\\", String.raw`\\`).replaceAll("'", String.raw`\'`);
-    const el = doc.querySelector(`[data-jx-path='${esc}']`);
-    if (el) {
+    const el = doc.querySelector(jxPathSelector(serializeJxPath(path)));
+    if (!el) {
+      continue;
+    }
+    if (isRendered(el)) {
       const r = rectOf(el);
-      out.push({ path, rect: { height: r.height, width: r.width, x: r.x, y: r.y } });
+      hits.push({ path, rect: { height: r.height, width: r.width, x: r.x, y: r.y } });
+    } else {
+      hidden.push(path);
     }
   }
-  return out;
+  return { hidden, hits };
 }
 
 /**
@@ -87,6 +119,50 @@ export function measureHits(paths: (string | number)[][], doc: Document = docume
  * {@link file://./iframe-drop.ts}'s `startGrabDetector` receives its deps rather than reaching for
  * module state.
  */
+/** The three `popovertargetaction` keywords. Anything else falls back to the HTML default. */
+const INVOKER_ACTIONS = new Set(["toggle", "show", "hide"]);
+
+/**
+ * Report an invoker click, when the click landed on one and it names an addressable popover.
+ *
+ * Both attributes are read from their CANVAS spellings: the runtime renamed `popover` to
+ * `data-jx-popover` for the render, but `popovertarget` keeps its own name — nothing in the editor
+ * needs it renamed, since with no real popover to invoke the browser does nothing with it anyway.
+ * That is what makes this safe to post unconditionally: a trigger whose target is a component's own
+ * internal popover resolves to no addressable node, and nothing is posted.
+ *
+ * Called only after `onClick`'s preview branch has returned, so no mode gate is needed here.
+ *
+ * @param target The click's `e.target`.
+ * @param channel The frame's channel.
+ */
+function postPopoverInvoke(
+  target: EventTarget | null,
+  channel: { post: (m: IframeToParent) => void },
+): void {
+  if (!(target instanceof Element)) {
+    return;
+  }
+  const invoker = target.closest("[popovertarget]");
+  const id = invoker?.getAttribute("popovertarget");
+  if (!invoker || !id) {
+    return;
+  }
+  /* Scanned rather than selected. The id is author-controlled text, so a `[id='…']` selector would
+     need escaping — a rule this file already keeps in exactly one place (`jxPathSelector`) and
+     should not gain a second spelling of. The set scanned is the addressable POPOVERS, which is
+     also the set the answer has to come from, so the scan is the test. */
+  const panels = invoker.ownerDocument.querySelectorAll("[data-jx-popover]");
+  const panel = [...panels].find((el) => el.id === id) as HTMLElement | undefined;
+  const serialized = panel?.dataset.jxPath;
+  if (!serialized) {
+    return;
+  }
+  const raw = invoker.getAttribute("popovertargetaction") ?? "toggle";
+  const action = INVOKER_ACTIONS.has(raw) ? (raw as "toggle" | "show" | "hide") : "toggle";
+  channel.post({ action, kind: "popoverTargetClick", targetPath: parseJxPath(serialized) });
+}
+
 export interface InteractionDeps {
   /**
    * The iframe's current non-reactive shadow doc (path coordinate space), or null before the first
@@ -178,6 +254,7 @@ export function startInteraction(
       // No hit post: a click in preview is a click on the page, never a selection.
       return;
     }
+    postPopoverInvoke(e.target, channel);
     const hit = nearestHit(e.target);
     if (hit) {
       // Ctrl/Cmd is the accumulate gesture (§6.5). The iframe reports the modifier and nothing

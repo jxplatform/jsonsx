@@ -136,7 +136,14 @@ export function collapseDotPaths(obj: Record<string, unknown>) {
   return result;
 }
 
-/** CSS pseudo-class / pseudo-element names (keys that become `:` prefixed in style objects). */
+/**
+ * CSS pseudo-CLASS names — keys that become `:` prefixed in style objects.
+ *
+ * `before` and `after` are pseudo-_elements_ and belong in the set below on the modern spelling,
+ * but they have been written with one colon since this file existed and CSS still accepts that
+ * form. Moving them would rewrite every `.md` component in the repo for no behaviour change, so
+ * they stay here; {@link CSS_PSEUDO_ELEMENTS} is for names that have never had a one-colon form.
+ */
 const CSS_PSEUDO_NAMES = new Set([
   "hover",
   "focus",
@@ -156,7 +163,23 @@ const CSS_PSEUDO_NAMES = new Set([
   "selection",
   "before",
   "after",
+  // The overlay states. Without these an author could declare a popover in a `.md` component and
+  // Have no way to style it open — `style.popover-open.opacity` fell through unmapped, and
+  // `collectStyles` then read the bare key as a DESCENDANT TYPE SELECTOR, emitting
+  // `#panel popover-open { … }`: a rule that matches nothing, with nothing to say it does not.
+  "popover-open",
+  "open",
+  "modal",
 ]);
+
+/**
+ * CSS pseudo-ELEMENT names — keys that become `::` prefixed.
+ *
+ * A separate set because the prefix is different, not because the concept is. `backdrop` is the
+ * only member today and it is the one a popover needs: there is no one-colon form of it, so the
+ * single-colon set above could not have carried it.
+ */
+const CSS_PSEUDO_ELEMENTS = new Set(["backdrop"]);
 
 /**
  * Apply CSS pseudo-class and media query key mapping to a style object's top-level keys.
@@ -171,7 +194,9 @@ const CSS_PSEUDO_NAMES = new Set([
 export function applyStyleKeyMapping(styleObj: Record<string, unknown>) {
   const result: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(styleObj)) {
-    if (CSS_PSEUDO_NAMES.has(key)) {
+    if (CSS_PSEUDO_ELEMENTS.has(key)) {
+      result[`::${key}`] = value;
+    } else if (CSS_PSEUDO_NAMES.has(key)) {
       result[`:${key}`] = value;
     } else if (key.startsWith("--")) {
       result[`@${key}`] = value;
@@ -208,7 +233,11 @@ export function collapseStylePaths(styleObj: Record<string, unknown>) {
   const normalized: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(styleObj)) {
-    if (key.startsWith(":") && CSS_PSEUDO_NAMES.has(key.slice(1))) {
+    /* `::` before `:`, or a pseudo-element would match the pseudo-class arm on its second colon
+       and be re-emitted with one colon. */
+    if (key.startsWith("::") && CSS_PSEUDO_ELEMENTS.has(key.slice(2))) {
+      normalized[key.slice(2)] = value;
+    } else if (key.startsWith(":") && CSS_PSEUDO_NAMES.has(key.slice(1))) {
       normalized[key.slice(1)] = value;
     } else if (key.startsWith("@--")) {
       normalized[key.slice(1)] = value;

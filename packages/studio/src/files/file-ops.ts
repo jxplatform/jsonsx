@@ -24,6 +24,7 @@ import { errorMessage } from "@jxsuite/schema/parse";
 import { noteDocumentSaved } from "../panels/statusbar";
 import { notify } from "../services/notify";
 import { validateComponentSlots } from "../services/cem-export";
+import { reportPopoverProblems } from "../services/popover-report";
 import { getPlatform } from "../platform";
 import { getGridController } from "../grid/grid-controller";
 import { activeTab, openTab } from "../workspace/workspace";
@@ -199,6 +200,11 @@ function reportSaved(tab: Tab) {
       tier: "problem",
     });
   }
+  /* Popover correctness, beside the slot check and for the same reason it is here: a successful
+     save is the one chokepoint every edit passes through, whichever surface made it. A render-time
+     lint would be the alternative and is the wrong shape — there is no render-lint pipeline, and a
+     record re-filed every frame is exactly the noise `NotifyOptions.key` exists to prevent. */
+  reportPopoverProblems(doc, tab.documentPath ?? undefined);
 }
 
 /**

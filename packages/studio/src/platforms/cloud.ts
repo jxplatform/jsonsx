@@ -25,6 +25,7 @@ import type {
   ComponentMeta,
   CreateProjectDestination,
   DirEntry,
+  ExtensionCatalogEntry,
   ExtensionsInfo,
   FsEvent,
   GitBranchesResult,
@@ -58,6 +59,15 @@ interface ProjectInfoWire {
   defaultBranch: string;
   permission: "admin" | "write" | "read" | "none";
   projectConfig: Record<string, unknown> | null;
+}
+
+/** One row of the platform's project catalogue (`GET /api/v1/projects`). */
+interface ProjectListWire {
+  fullName: string;
+  owner: string;
+  name: string;
+  defaultBranch: string;
+  permission: string;
 }
 
 interface SessionEventWire {
@@ -304,6 +314,35 @@ export function parseRootKey(root: string): CloudProject | null {
   return { owner, repo, branch };
 }
 
+/** Every project this account can open, straight off the wire; [] when the catalogue is unreachable. */
+async function fetchProjects(): Promise<ProjectListWire[]> {
+  const res = await fetch("/api/v1/projects", { credentials: "include" });
+  return res.ok ? ((await res.json()) as ProjectListWire[]) : [];
+}
+
+/**
+ * The project a root key names, for the two members that navigate by one.
+ *
+ * Tolerates the branchless "owner/repo" keys older studios wrote into Recent: they cannot say which
+ * branch they meant, so the catalogue's default branch answers for them — the same branch that
+ * project's Projects row opens. Null when the key is neither form, or names nothing this account
+ * can reach.
+ */
+export async function resolveRootKey(rootKey: string): Promise<CloudProject | null> {
+  const parsed = parseRootKey(rootKey);
+  if (parsed) {
+    return parsed;
+  }
+  const legacy = /^([^/@]+)\/([^/@]+)$/.exec(rootKey);
+  if (!legacy) {
+    return null;
+  }
+  const [, owner, repo] = legacy;
+  const catalogue = await fetchProjects().catch(() => []);
+  const match = catalogue.find((p) => p.owner === owner && p.name === repo);
+  return match ? { owner: match.owner, repo: match.name, branch: match.defaultBranch } : null;
+}
+
 /**
  * Bound mode (project non-null) drives one repo+branch session; project-less mode (null, the
  * /studio route) exposes only the catalogue surface — listProjects/listStarters/createProject and
@@ -311,7 +350,17 @@ export function parseRootKey(root: string): CloudProject | null {
  */
 export function createCloudPlatform(project: CloudProject | null): StudioPlatform {
   const base = project ? sessionBase(project) : "";
-  const root = project ? `${project.owner}/${project.repo}` : "";
+  /* The ROOT KEY, branch included — not a bare "owner/repo". This value is the project's identity
+     everywhere the shell keeps one: `probeRootProject` hands it to the recent-projects list, and
+     `setWindowProject` reopens a project by parsing it back with `parseRootKey`, which answers null
+     for a branchless key. So every Recent row a bound session had written was a click that did
+     nothing — no navigation, no error, and `deduped: true` telling the caller the open had been
+     handled — while the SAME project opened fine from the Projects catalogue, whose entries carry
+     the branch (`listProjects` below builds them with `projectRootKey`). Agreeing with the catalogue
+     also restores the welcome screen's dedupe (it matches the two lists by root, so the project
+     stopped appearing in both) and gives a branch its own Recent row, which is what a root key that
+     names a branch is for. */
+  const root = project ? projectRootKey(project) : "";
   /**
    * One multiplexed collab socket per session; per-doc handles come from openDoc. Memoized as a
    * promise so concurrent first opens share the connection instead of racing two sockets.
@@ -630,6 +679,45 @@ export function createCloudPlatform(project: CloudProject | null): StudioPlatfor
     },
 
     /**
+     * The extensions THIS WORKER bundles — not the shipped first-party catalogue.
+     *
+     * A Worker ships a fixed set of extension packages (specs/extensions.md §5.5), decided by the
+     * platform build rather than by this repository's `extensions/` tree, so the gateway is the
+     * only thing that knows. Everything it returns is therefore `bundled: true`: enabling one is a
+     * `project.json` write alone, and an extension the Worker does not bundle is dropped from the
+     * registry before composition — advertising it would promise a toggle that silently does
+     * nothing.
+     *
+     * `installed` here means DECLARED. Nothing resolves a module in a Worker: `addPackage` is a
+     * manifest edit and resolution happens later in Pages CI, so the manifest is the only fact this
+     * adapter has, and it is the one the reader is being asked about.
+     *
+     * Degrades to an EMPTY list, which is the whole contract: a session whose gateway predates this
+     * route must offer nothing rather than five extensions three of which it cannot load.
+     */
+    async listExtensionCatalog(): Promise<ExtensionCatalogEntry[]> {
+      try {
+        const res = await api("/extension-catalog");
+        if (!res.ok) {
+          return [];
+        }
+        const entries = (await res.json()) as ExtensionCatalogEntry[];
+        const pkg = await readPackageJson();
+        const declared = new Set([
+          ...Object.keys((pkg["dependencies"] ?? {}) as Record<string, string>),
+          ...Object.keys((pkg["devDependencies"] ?? {}) as Record<string, string>),
+        ]);
+        for (const entry of entries) {
+          entry.bundled = true;
+          entry.installed = declared.has(entry.name);
+        }
+        return entries;
+      } catch {
+        return [];
+      }
+    },
+
+    /**
      * The session's generated entry documents, composed server-side from the core schemas and each
      * enabled extension's fragments (extensions.md §5.2) and returned PRE-BUNDLED — Monaco and the
      * AI assistant register them as inline objects and never fetch (studio.md §4.2.1).
@@ -928,17 +1016,7 @@ export function createCloudPlatform(project: CloudProject | null): StudioPlatfor
     // ─── Project catalogue & navigation (Studio welcome / New Project UI) ──
 
     async listProjects(): Promise<ProjectListEntry[]> {
-      const res = await fetch("/api/v1/projects", { credentials: "include" });
-      if (!res.ok) {
-        return [];
-      }
-      const entries = (await res.json()) as {
-        fullName: string;
-        owner: string;
-        name: string;
-        defaultBranch: string;
-        permission: string;
-      }[];
+      const entries = await fetchProjects();
       return entries.map((p) => ({
         name: p.fullName,
         root: projectRootKey({ owner: p.owner, repo: p.name, branch: p.defaultBranch }),
@@ -956,8 +1034,15 @@ export function createCloudPlatform(project: CloudProject | null): StudioPlatfor
 
     /** Welcome/recents open path: navigate this tab into the project's editor. */
     async setWindowProject(rootKey: string) {
-      const target = parseRootKey(rootKey);
-      if (target && typeof location !== "undefined") {
+      const target = await resolveRootKey(rootKey);
+      /* Throw rather than fall through: `deduped` tells the caller the open was handled, so an
+         unresolvable key answered "done" and left the user looking at the screen they clicked on.
+         The throw reaches `openRecentProject`'s catch, which reports the failure and drops the
+         entry — the right end for a row naming a project this account can no longer open. */
+      if (!target) {
+        throw new Error(`No project to open at ${rootKey}`);
+      }
+      if (typeof location !== "undefined") {
         location.assign(editUrl(target));
       }
       // Navigation unloads the page; deduped stops the caller's follow-up work.
@@ -965,8 +1050,13 @@ export function createCloudPlatform(project: CloudProject | null): StudioPlatfor
     },
 
     async openProjectInNewWindow(rootKey: string) {
-      const target = parseRootKey(rootKey);
-      if (target && typeof window !== "undefined") {
+      const target = await resolveRootKey(rootKey);
+      // Same contract as setWindowProject: the caller reports "Opened in another window" on any
+      // Resolved call, so a key that opens nothing has to fail rather than answer.
+      if (!target) {
+        throw new Error(`No project to open at ${rootKey}`);
+      }
+      if (typeof window !== "undefined") {
         window.open(editUrl(target), "_blank", "noopener");
       }
       // `_blank` always makes a tab; a browser tab already showing this project is not something

@@ -115,6 +115,9 @@ const handlerMocks = {
   ),
   fetchProjectSchemas: mock(() => Promise.resolve({ project: { type: "object" } })),
   listDirectory: mock(() => Promise.resolve([{ name: "hello.txt", type: "file" }])),
+  listExtensionCatalog: mock(() =>
+    Promise.resolve([{ name: "@jxsuite/feed", sections: [], source: "first-party" }]),
+  ),
   listExtensions: mock(() => Promise.resolve([{ specifier: "@jxsuite/parser" }])),
   listFormats: mock(() => Promise.resolve([{ format: "markdown" }])),
   locateFile: mock(() => Promise.resolve("located/file.json")),
