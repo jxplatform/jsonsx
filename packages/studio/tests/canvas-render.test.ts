@@ -38,6 +38,7 @@ import { shell } from "../src/shell";
 import { setFormats } from "../src/format/format-host";
 import { setEditZoom } from "../src/canvas/canvas-utils";
 import { resetEditWidths, setEditWidth } from "../src/canvas/edit-width";
+import { resetDiffViews, setDiffView } from "../src/canvas/diff-view";
 import { MARKDOWN_FORMAT } from "./format-fixture";
 import { createCommandRegistry } from "../src/commands/registry";
 import { makeContext } from "../src/commands/context";
@@ -123,6 +124,16 @@ interface FakeEditor {
 }
 const createdModels: FakeModel[] = [];
 const createdEditors: FakeEditor[] = [];
+interface FakeDiffEditor {
+  _model: { original: FakeModel; modified: FakeModel } | null;
+  _options: Record<string, unknown>;
+  _diffKey?: string;
+  container: HTMLElement;
+  dispose: ReturnType<typeof mock>;
+  getModel: () => { original: FakeModel; modified: FakeModel } | null;
+  setModel: (model: { original: FakeModel; modified: FakeModel } | null) => void;
+}
+const createdDiffEditors: FakeDiffEditor[] = [];
 
 /**
  * Wait until the source editor's floating mount has actually landed.
@@ -224,6 +235,23 @@ void mock.module("monaco-editor/editor", () => ({
       };
       createdModels.push(m);
       return m;
+    },
+    /* The comparison's editor. A DIFFERENT Monaco type from `create` above: it owns two models
+       rather than one, and disposing it has to dispose both or their URIs stay claimed and the next
+       mount throws on a URI nobody can see. */
+    createDiffEditor: (container: HTMLElement, options: Record<string, unknown>) => {
+      const ed: FakeDiffEditor = {
+        _model: null,
+        _options: options,
+        container,
+        dispose: mock(() => {}),
+        getModel: () => ed._model,
+        setModel: (model: { original: FakeModel; modified: FakeModel } | null) => {
+          ed._model = model;
+        },
+      };
+      createdDiffEditors.push(ed);
+      return ed;
     },
     setModelMarkers: () => {},
   },
@@ -505,10 +533,13 @@ beforeEach(() => {
   }
   createdModels.length = 0;
   createdEditors.length = 0;
+  createdDiffEditors.length = 0;
   canvasPanels.length = 0;
   surface.prevCanvasMode = null;
   surfaceForPane("primary").panzoomWrap = null;
   surfaceForPane("primary").monacoEditor = null;
+  surfaceForPane("primary").monacoDiffEditor = null;
+  resetDiffViews();
   view.functionEditor = null;
   surfaceForPane("primary").centerObserver = null;
   surfaceForPane("primary").renderGeneration = 0;
@@ -1511,6 +1542,120 @@ describe("git-diff mode", () => {
     // Diff panels are never live-patchable
     expect(orig!.ready).toBe(false);
     expect(curr!.ready).toBe(false);
+  });
+
+  test("the Code view mounts a diff editor over the two texts, and no artboards", async () => {
+    openSyncedTab();
+    setMode("git-diff");
+    ctx.gitDiffState = {
+      currentContent: '{"tagName":"div"}',
+      filePath: "/project/index.json",
+      originalContent: '{"tagName":"section"}',
+    };
+    setDiffView("primary", "code");
+    renderCanvas();
+    await flush();
+
+    expect(createdDiffEditors).toHaveLength(1);
+    const ed = createdDiffEditors[0]!;
+    // Read-only on BOTH sides: one of them is a committed version with nowhere on disk to go.
+    expect(ed._options.readOnly).toBe(true);
+    expect(ed._options.originalEditable).toBe(false);
+    expect(ed.getModel()?.original.getValue()).toBe('{"tagName":"section"}');
+    expect(ed.getModel()?.modified.getValue()).toBe('{"tagName":"div"}');
+    // No pan/zoom surface and no artboards: a comparison read as text has neither.
+    expect(canvasPanels.length).toBe(0);
+    expect(stageEl().querySelector(".panzoom-wrap")).toBeNull();
+    expect(stageEl().querySelector(".diff-code-editor")).not.toBeNull();
+  });
+
+  test("the two models take disjoint URIs, and neither is the file's own", async () => {
+    /* A source editor, a Code lens and a comparison can all want one path at once, and two models
+       on one URI throws. Disjoint URIs make the collision unrepresentable rather than refused. */
+    openSyncedTab();
+    setMode("git-diff");
+    ctx.gitDiffState = {
+      currentContent: "{}",
+      filePath: "index.json",
+      originalContent: "{}",
+    };
+    setDiffView("primary", "code");
+    renderCanvas();
+    await flush();
+
+    const uris = createdModels.map((m) => String(m.uri));
+    expect(new Set(uris).size).toBe(uris.length);
+    expect(uris.some((u) => u.includes("/head/"))).toBe(true);
+    expect(uris.some((u) => u.includes("/work/"))).toBe(true);
+    expect(uris).not.toContain("file:///index.json");
+  });
+
+  test("leaving the Code view disposes the editor AND both models", async () => {
+    // Monaco never disposes models a caller created, and a leaked model keeps its URI claimed —
+    // Which is the same throw one mount later, on a stage that looks merely empty.
+    openSyncedTab();
+    setMode("git-diff");
+    ctx.gitDiffState = {
+      currentContent: "{}",
+      filePath: "index.json",
+      originalContent: "{}",
+    };
+    setDiffView("primary", "code");
+    renderCanvas();
+    await flush();
+    const ed = createdDiffEditors[0]!;
+    const models = createdModels.slice(-2);
+
+    setMode("design");
+    renderCanvas();
+    await flush();
+
+    expect(ed.dispose).toHaveBeenCalled();
+    for (const m of models) {
+      expect(m.dispose).toHaveBeenCalled();
+    }
+    expect(surfaceForPane("primary").monacoDiffEditor).toBeNull();
+  });
+
+  test("a second synchronous render inside the cold load mounts exactly one diff editor", async () => {
+    /* The documented duplicate-mount race, in its diff shape: `renderCanvasImpl` writes
+       `prevCanvasMode` BEFORE the mount, so a second render during the cold Monaco load sees
+       `modeChanged === false` and a still-null slot and falls through to mount again — and the
+       second `createModel` claims a URI the first registered. */
+    openSyncedTab();
+    setMode("git-diff");
+    ctx.gitDiffState = {
+      currentContent: "{}",
+      filePath: "index.json",
+      originalContent: "{}",
+    };
+    setDiffView("primary", "code");
+    renderCanvas();
+    renderCanvas();
+    await flush();
+    expect(createdDiffEditors).toHaveLength(1);
+  });
+
+  test("switching back to Visual disposes the code editor and draws the artboards", async () => {
+    openSyncedTab();
+    setMode("git-diff");
+    ctx.gitDiffState = {
+      currentContent: '{"tagName":"div"}',
+      filePath: "/project/index.json",
+      originalContent: '{"tagName":"div"}',
+    };
+    setDiffView("primary", "code");
+    renderCanvas();
+    await flush();
+    const ed = createdDiffEditors[0]!;
+
+    setDiffView("primary", "visual");
+    surface.prevCanvasMode = null;
+    renderCanvas();
+    await flush();
+
+    expect(ed.dispose).toHaveBeenCalled();
+    expect(canvasPanels.length).toBe(2);
   });
 
   test("unparseable JSON falls back to a parse-failure document", async () => {

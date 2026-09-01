@@ -7,6 +7,7 @@
     "docs/start/install/index.html": 27600
   },
   "files": {
-    "search-index.json": 375000
-  }
+    "search-index.json": 395000
+  },
+  "$ratchet-search-index": "Change review's documentation (studio/publish/source-control.md gains a 'Read a change' section, plus a Diff section in interface/modes.md and one in logic/code.md) moved the index 392824 -> 394495 gz bytes, +1671. The 375000 ceiling was already being met on TOLERANCE rather than under the ceiling: main sat at 104.8%, with 926 bytes of the 5% allowance left, so this was the growth that happened to cross rather than the growth that was unusual. Raised to just above the measured figure so the index is under its CEILING again and the tolerance is headroom for noise rather than the thing holding it up. The index is a pure function of the docs corpus, and this repository requires a behaviour change to ship its documentation in the same change set, so it grows whenever the docs do; the lever if it needs shrinking is the corpus the search client actually needs, not the prose."
 }

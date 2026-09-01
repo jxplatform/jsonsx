@@ -898,6 +898,15 @@ function renderCanvasImpl(surface: CanvasSurface) {
     hardClearCanvasWrap(canvasWrap);
   }
 
+  /* LEAVING THE COMPARISON ENTIRELY, which is the one exit the git-diff branch cannot cover.
+     The Visual/Code switch inside that branch disposes this itself, and so does a pane teardown —
+     but a mode change OUT of git-diff reaches neither, and `hardClearCanvasWrap` above only detaches
+     the DOM. A diff editor left alive holds two models whose URIs stay claimed, so reopening the
+     comparison later finds a live editor for a stale pair of texts. */
+  if (modeChanged && canvasMode !== "git-diff") {
+    disposeDiffEditor(surface);
+  }
+
   /* There are no `editingFunction` / `editingFormula` branches here, and that is the point.
      Both used to RETURN from this function, which is what made the logic editors a takeover: the
      stage kept whatever DOM it was last painted with and stopped tracking the document. P8 moved
