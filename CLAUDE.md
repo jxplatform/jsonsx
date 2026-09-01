@@ -34,53 +34,17 @@ Conventions:
 
 ## The Electrobun SDK is vendored, and typechecking depends on it
 
-Electrobun 2 publishes **no SDK to npm**: `node_modules/electrobun` is a command bootstrap whose
-`exports` map sends every specifier — `electrobun`, `electrobun/main`, `electrobun/view`, types
-included — to `lib/moved.cjs`, a module whose entire body is `throw new Error(...)`. The real SDK
-reaches a project only when Hutch downloads that release's core archive and copies it into a
-gitignored `.hutch/devkit`. That is a network step, so a clone could not typecheck
-`packages/desktop` at all and CI had to run `bunx electrobun prepare` before it could reach `tsc`.
+Electrobun 2 publishes **no SDK to npm**: `node_modules/electrobun` is a command bootstrap whose `exports` map sends every specifier — `electrobun`, `electrobun/main`, `electrobun/view`, types included — to `lib/moved.cjs`, a module whose entire body is `throw new Error(...)`. The real SDK reaches a project only when Hutch downloads that release's core archive and copies it into a gitignored `.hutch/devkit`. That is a network step, so a clone could not typecheck `packages/desktop` at all and CI had to run `bunx electrobun prepare` before it could reach `tsc`.
 
-So the SDK's TypeScript sources are vendored: **`vendor/electrobun`, a git submodule pinned to the
-exact release the `electrobun` devDependency names.** `packages/desktop/tsconfig.json` maps
-`electrobun/*` straight into `vendor/electrobun/package/src`.
+So the SDK's TypeScript sources are vendored: **`vendor/electrobun`, a git submodule pinned to the exact release the `electrobun` devDependency names.** `packages/desktop/tsconfig.json` maps `electrobun/*` straight into `vendor/electrobun/package/src`.
 
-- **`bun run electrobun:verify` is the gate; `bun run electrobun:sync` is the fixer**
-  (`scripts/check-electrobun-vendor.ts`). The root `postinstall` runs the fixer softly, so an
-  ordinary `bun install` leaves a working tree that typechecks. CI runs `--init`, which materialises
-  and narrows the submodule but deliberately **does not move the gitlink** — moving it is exactly
-  how a Dependabot bump would stop looking like a mismatch.
-- **The version has two writers**, the pin and the gitlink, and the gate is what keeps them
-  together. A Dependabot `electrobun` bump goes red here; `bun run electrobun:sync` then committing
-  the moved gitlink is the whole follow-up.
-- **Hutch still owns builds.** `.hutch/devkit` is the build sysroot, the submodule is the typecheck
-  sysroot, and they are one release rather than two sources of truth — the projection is a verbatim
-  copy of the same directories (196 of 197 files byte-identical at 2.0.1). The gate compares
-  VERSIONS, not bytes, on purpose: upstream's release artifact and its git tag legitimately differ,
-  and `--init` reports those byte differences without failing on them.
-- **The checkout is sparse**, and that is load-bearing rather than thrift. Upstream interleaves ~40
-  `*.test.ts` with its sources and ships a `.md` among them; at a tracked path those would be
-  collected by a root-level `bun test`, rewritten by `bun run format:md`, and globbed by
-  `check-coverage-manifest.ts`. Narrowed to the five directories the entry points reach, it is 1 MB
-  instead of 26 MB and none of that happens.
-- **A tracked path is not ignored by anything implicitly.** oxlint walks the tree honouring
-  `.gitignore` — which is what actually excludes `node_modules`, `dist` and the old `.hutch/devkit`,
-  and why `.oxlintignore` is inert (oxlint's ignore file is `.eslintignore`, via `--ignore-path`,
-  and the lint script passes neither). `vendor` therefore needs an explicit entry in **both**
-  `.oxlintrc.json` and `.oxlintrc.typecheck.json`, plus `.oxfmtrc.json` and root `bunfig.toml`.
-- **The Nix derivation is the fifth of those, and the one that cost a release.** `package.nix`
-  takes the whole repository as `src`, so a tracked path is part of the tree whose NAR hash IS the
-  store path `nix run github:jxsuite/jx/release` resolves — and `vendor/electrobun` is the one
-  tracked path whose PRESENCE depends on how the tree was fetched. GitHub's tarball materialises the
-  gitlink as an empty directory; nix's git-tree source for a checkout omits it. The submodule is
-  uninitialised either way, so no build phase notices — but two empty directories are two NAR
-  entries, and `desktop-v5.0.0` had two store paths for one commit. CI published `sq57vgab…` and
-  every consumer asked for `671d1spz…`: the push succeeded, the closure was complete, and the cache
-  was useless (#250). `src` now filters `vendor` so the two agree by construction, asserted in
-  `electrobun-config.test.ts` and re-checked against a live `nix eval` on nix.yml's publish leg.
-- **`.d.ts` remains impossible.** `TS4094` in the SDK's own `index.ts` blocks declaration emit, so
-  `skipLibCheck` cannot help and `packages/desktop` keeps its own tsconfig. That carve-out is
-  asserted, not just written down, in `packages/desktop/tests/electrobun-config.test.ts`.
+- **`bun run electrobun:verify` is the gate; `bun run electrobun:sync` is the fixer** (`scripts/check-electrobun-vendor.ts`). The root `postinstall` runs the fixer softly, so an ordinary `bun install` leaves a working tree that typechecks. CI runs `--init`, which materialises and narrows the submodule but deliberately **does not move the gitlink** — moving it is exactly how a Dependabot bump would stop looking like a mismatch.
+- **The version has two writers**, the pin and the gitlink, and the gate is what keeps them together. A Dependabot `electrobun` bump goes red here; `bun run electrobun:sync` then committing the moved gitlink is the whole follow-up.
+- **Hutch still owns builds.** `.hutch/devkit` is the build sysroot, the submodule is the typecheck sysroot, and they are one release rather than two sources of truth — the projection is a verbatim copy of the same directories (196 of 197 files byte-identical at 2.0.1). The gate compares VERSIONS, not bytes, on purpose: upstream's release artifact and its git tag legitimately differ, and `--init` reports those byte differences without failing on them.
+- **The checkout is sparse**, and that is load-bearing rather than thrift. Upstream interleaves ~40 `*.test.ts` with its sources and ships a `.md` among them; at a tracked path those would be collected by a root-level `bun test`, rewritten by `bun run format:md`, and globbed by `check-coverage-manifest.ts`. Narrowed to the five directories the entry points reach, it is 1 MB instead of 26 MB and none of that happens.
+- **A tracked path is not ignored by anything implicitly.** oxlint walks the tree honouring `.gitignore` — which is what actually excludes `node_modules`, `dist` and the old `.hutch/devkit`, and why `.oxlintignore` is inert (oxlint's ignore file is `.eslintignore`, via `--ignore-path`, and the lint script passes neither). `vendor` therefore needs an explicit entry in **both** `.oxlintrc.json` and `.oxlintrc.typecheck.json`, plus `.oxfmtrc.json` and root `bunfig.toml`.
+- **The Nix derivation is the fifth of those, and the one that cost a release.** `package.nix` takes the whole repository as `src`, so a tracked path is part of the tree whose NAR hash IS the store path `nix run github:jxsuite/jx/release` resolves — and `vendor/electrobun` is the one tracked path whose PRESENCE depends on how the tree was fetched. GitHub's tarball materialises the gitlink as an empty directory; nix's git-tree source for a checkout omits it. The submodule is uninitialised either way, so no build phase notices — but two empty directories are two NAR entries, and `desktop-v5.0.0` had two store paths for one commit. CI published `sq57vgab…` and every consumer asked for `671d1spz…`: the push succeeded, the closure was complete, and the cache was useless (#250). `src` now filters `vendor` so the two agree by construction, asserted in `electrobun-config.test.ts` and re-checked against a live `nix eval` on nix.yml's publish leg.
+- **`.d.ts` remains impossible.** `TS4094` in the SDK's own `index.ts` blocks declaration emit, so `skipLibCheck` cannot help and `packages/desktop` keeps its own tsconfig. That carve-out is asserted, not just written down, in `packages/desktop/tests/electrobun-config.test.ts`.
 
 ## Dependency Autopilot
 
@@ -148,10 +112,8 @@ release-please writes the release pull request body with changelog text HTML-esc
 `feat(compiler): responsive images — <picture> per format…` did exactly that: `schema` and `starters` fell out of three consecutive releases, and `@jxsuite/starters` sat at 1.2.2 on npm while `@jxsuite/create@1.3.2` shipped depending on `^1.5.0`, so `npm install @jxsuite/create` was unresolvable. The bug is upstream and still present in release-please 17.11.1, so the defence is to keep the text out of the changelog. **Backticks do not help** — the escaping happens on raw text.
 
 - The rule and the full write-up live in `commitlint.config.ts` (`changelog-safe-angle-brackets`).
-- `.husky/commit-msg` applies it as you commit; `checks` runs
-  `bun scripts/check-changelog-safety.ts` over the pull request's commits, because a hook is skippable with `--no-verify` and that is how the subject landed.
-- Only the **subject** and `BREAKING CHANGE:` notes are judged — nothing else reaches a changelog,
-  so a commit body may still contain markup.
+- `.husky/commit-msg` applies it as you commit; `checks` runs `bun scripts/check-changelog-safety.ts` over the pull request's commits, because a hook is skippable with `--no-verify` and that is how the subject landed.
+- Only the **subject** and `BREAKING CHANGE:` notes are judged — nothing else reaches a changelog, so a commit body may still contain markup.
 
 ### A crashed `release-please` job disables the whole pipeline on the re-run
 
@@ -184,29 +146,20 @@ What is no longer watched, and where it would surface instead: a run where relea
 
 Iterating a starter inside Studio runs `bun install` in that starter's root, and a starter pins **published** `@jxsuite/*` versions because it is a template a user scaffolds from. The install therefore materialises a real `@jxsuite/schema` beside a workspace that is far ahead of it, and anything resolving from that root reads the published copy. This silently produced a starter entry schema narrower than the starter's own content for six weeks.
 
-- **`bun run schema:generate-all` cleans first** (`schema:clean-roots` →
-  `scripts/check-shadowed-core.ts --fix`). It removes only `node_modules/@jxsuite/*` and the stray lockfile; third-party dependencies stay, because the install is what makes the starter preview. A workspace **symlink** is never removed — that is `examples/`, a workspace member, and it is the correct answer.
-- **Never put the cleanup in a starter's `package.json`.** `@jxsuite/starters` publishes `sites/`,
-  so those manifests ship to users; a `postinstall` there would delete the dependencies they just installed. The monorepo has the workspace being shadowed, so the monorepo owns the cleanup.
-- `packages/compiler`'s schema loader is independently hermetic — a first-party `*.json` schema
-  resolves from the host or throws — so schema composition is safe regardless. The cleanup defends everything else that resolves normally.
-- `bun run schema:verify` proves the committed core **and** all 52 per-project entry documents match
-  their generators. `schema:validate-all` answers a different question (documents against schemas) and cannot see a stale schema.
+- **`bun run schema:generate-all` cleans first** (`schema:clean-roots` → `scripts/check-shadowed-core.ts --fix`). It removes only `node_modules/@jxsuite/*` and the stray lockfile; third-party dependencies stay, because the install is what makes the starter preview. A workspace **symlink** is never removed — that is `examples/`, a workspace member, and it is the correct answer.
+- **Never put the cleanup in a starter's `package.json`.** `@jxsuite/starters` publishes `sites/`, so those manifests ship to users; a `postinstall` there would delete the dependencies they just installed. The monorepo has the workspace being shadowed, so the monorepo owns the cleanup.
+- `packages/compiler`'s schema loader is independently hermetic — a first-party `*.json` schema resolves from the host or throws — so schema composition is safe regardless. The cleanup defends everything else that resolves normally.
+- `bun run schema:verify` proves the committed core **and** all 52 per-project entry documents match their generators. `schema:validate-all` answers a different question (documents against schemas) and cannot see a stale schema.
 
 ## Stale schemas fix themselves
 
 Every committed schema in this repository is a build output — the seven core artifacts `bun run generate:schema` writes under `packages/schema/`, and the `project.schema.json` / `document.schema.json` pair `bun run schema:generate-all` composes into each of the 26 project roots. They are committed because editors, `jx validate` and every published `@jxsuite/schema` consumer read them off disk, not because anybody authors them. So the policy is the screenshot policy: **a generator produces the bytes, and you review the meaning.**
 
-- **`bun run schema:verify` is the gate** (`scripts/check-schema-freshness.ts`), and
-  **`bun run schema:sync` is the fixer.** The gate regenerates, reports drift as the JSON Pointers that moved, and puts the working tree back exactly as it found it; `--fix` leaves the result on disk. Never hand-edit a committed schema — the fix belongs in the generator or the source it reads.
-- **The file set is DERIVED, not listed.** It is every tracked `*schema.json`. The gate this
-  replaced was a shell one-liner whose two `git diff` pathspecs were each narrower than the generator they followed: it regenerated all seven core artifacts and looked at ONE, so a stale `class-schema.json`, `project-schema.json` or `schemas/project.core.schema.json` passed green. Verified by stamping a marker into `class-schema.json` and watching the old `schema:verify` exit 0.
-- **`.github/workflows/schemas.yml` backfills it**, exactly as `screenshots.yml` does for pictures:
-  it regenerates on every pull request, pushes the result to the branch, and posts one comment saying which pointers moved. Four things differ from that lane deliberately — no `paths:` filter (the whole job is under 30 seconds), Dependabot is **not** excluded (a `@webref/*` bump rewrites the core schema by construction, and there is no human on that branch), no `github.actor` refusal (the generators are deterministic, so the run its own push triggers pushes nothing — termination is a fixed point, not a guard), and a changed schema is **not** neutral, because a contract change is exactly the kind of thing a reviewer must read.
-- **The trunk leg is not decoration.** Two branches can each be green alone and stale together: one
-  moves the core, the other adds or regenerates a project root before it lands. Git merges that without a conflict, no per-branch check can see it, and `main` is stale from the second merge onward. `main` requires a pull request, so the lane opens one on a single reused `chore/schema-drift` branch. When the report says _nothing in this diff explains it_, that is what happened.
-- **`schema:verify` stays a hard red X in `checks`** even though the lane fixes the same drift. The
-  lane cannot push to a fork, and a required check is what keeps a stale schema off `main` when it cannot. The red X naming the problem and the lane fixing it is the intended sequence, not a duplicate.
+- **`bun run schema:verify` is the gate** (`scripts/check-schema-freshness.ts`), and **`bun run schema:sync` is the fixer.** The gate regenerates, reports drift as the JSON Pointers that moved, and puts the working tree back exactly as it found it; `--fix` leaves the result on disk. Never hand-edit a committed schema — the fix belongs in the generator or the source it reads.
+- **The file set is DERIVED, not listed.** It is every tracked `*schema.json`. The gate this replaced was a shell one-liner whose two `git diff` pathspecs were each narrower than the generator they followed: it regenerated all seven core artifacts and looked at ONE, so a stale `class-schema.json`, `project-schema.json` or `schemas/project.core.schema.json` passed green. Verified by stamping a marker into `class-schema.json` and watching the old `schema:verify` exit 0.
+- **`.github/workflows/schemas.yml` backfills it**, exactly as `screenshots.yml` does for pictures: it regenerates on every pull request, pushes the result to the branch, and posts one comment saying which pointers moved. Four things differ from that lane deliberately — no `paths:` filter (the whole job is under 30 seconds), Dependabot is **not** excluded (a `@webref/*` bump rewrites the core schema by construction, and there is no human on that branch), no `github.actor` refusal (the generators are deterministic, so the run its own push triggers pushes nothing — termination is a fixed point, not a guard), and a changed schema is **not** neutral, because a contract change is exactly the kind of thing a reviewer must read.
+- **The trunk leg is not decoration.** Two branches can each be green alone and stale together: one moves the core, the other adds or regenerates a project root before it lands. Git merges that without a conflict, no per-branch check can see it, and `main` is stale from the second merge onward. `main` requires a pull request, so the lane opens one on a single reused `chore/schema-drift` branch. When the report says _nothing in this diff explains it_, that is what happened.
+- **`schema:verify` stays a hard red X in `checks`** even though the lane fixes the same drift. The lane cannot push to a fork, and a required check is what keeps a stale schema off `main` when it cannot. The red X naming the problem and the lane fixing it is the intended sequence, not a duplicate.
 
 ## Specs & User-Documentation Policy
 

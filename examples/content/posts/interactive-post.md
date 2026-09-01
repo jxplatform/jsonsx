@@ -11,8 +11,7 @@ This post demonstrates embedding Jx custom elements inside markdown using direct
 ## A Simple Callout
 
 :::info-box{type="warning"}
-This is **important** content rendered inside a custom element.
-The component receives `type` as a prop from the directive attribute.
+This is **important** content rendered inside a custom element. The component receives `type` as a prop from the directive attribute.
 :::
 
 ## Inline Components

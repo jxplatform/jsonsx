@@ -2,9 +2,9 @@
 
 ## Static HTML Compiler, Custom Element Emitter, and Island Detector
 
-**Version:** 0.4.3-draft
-**Status:** Partial
-**Updated:** 2026-09-01
+**Version:** 0.4.3-draft\
+**Status:** Partial\
+**Updated:** 2026-09-01\
 **License:** MIT
 
 ---
@@ -54,12 +54,7 @@ Bare strings and numbers in `children` arrays compile to text nodes in all three
 
 ## 3. Output Tiers
 
-> **Status: Partial.** The tiers themselves are complete. One property of the emitted page is not:
-> every tier emits an **inline** import map, and a project declaring a colour-scheme query also gets
-> an inline pre-paint script, so no tier emits a Content-Security-Policy yet — though both inline
-> blocks are now constants a hash can name. See §13. The page no longer loads anything from a third
-> party: the import map resolves to `/assets/` (§12), and bare `$elements` and `$head` specifiers
-> are bundled and copied there too (`site-architecture.md` §8.7).
+> **Status: Partial.** The tiers themselves are complete. One property of the emitted page is not: every tier emits an **inline** import map, and a project declaring a colour-scheme query also gets an inline pre-paint script, so no tier emits a Content-Security-Policy yet — though both inline blocks are now constants a hash can name. See §13. The page no longer loads anything from a third party: the import map resolves to `/assets/` (§12), and bare `$elements` and `$head` specifiers are bundled and copied there too (`site-architecture.md` §8.7).
 
 | Component surface                        | Compiler output                                 |
 | ---------------------------------------- | ----------------------------------------------- |
@@ -83,33 +78,16 @@ For each custom element, the compiler emits a self-contained ES module:
 
 1. Imports for `@vue/reactivity` and `lit-html`
 2. Imports for `$elements` dependencies (sub-component registrations)
-3. Imports for Function-def `$src` sidecars — in site builds, bundleable
-   specifiers (`npm:…`, `./relative`) are rewritten to their `/assets/`
-   bundle URL (spec.md §5.3 "Compiled-site delivery"). The local binding is
-   always the `state` key, so an entry whose `$export` names a different export
-   is imported under an alias (`import { filterLeads as filtered }`)
+3. Imports for Function-def `$src` sidecars — in site builds, bundleable specifiers (`npm:…`, `./relative`) are rewritten to their `/assets/` bundle URL (spec.md §5.3 "Compiled-site delivery"). The local binding is always the `state` key, so an entry whose `$export` names a different export is imported under an alias (`import { filterLeads as filtered }`)
 4. `class extends HTMLElement` with reactive state and lit-html template
 5. Static CSS extracted to a `<style>` block
 6. `customElements.define()` registration call
 
-Lifecycle conformance (spec.md §16.4): `connectedCallback` invokes
-`state.onMount(state)` on a microtask after the first render, and
-`disconnectedCallback` invokes `state.onUnmount(state)` — the same contract as
-the runtime's interpreted elements.
+Lifecycle conformance (spec.md §16.4): `connectedCallback` invokes `state.onMount(state)` on a microtask after the first render, and `disconnectedCallback` invokes `state.onUnmount(state)` — the same contract as the runtime's interpreted elements.
 
-`$prototype: "Request"` entries initialize to `null` and fetch from
-`connectedCallback`, after the `$props`/property merge so a templated `url`
-interpolates the values the parent passed in. Each fetch runs inside its own
-`effect()`, so a reactive URL re-fetches when its inputs change; the runner joins the element's
-effect registry and is stopped on `disconnectedCallback` (§4.4). A `manual` entry emits no fetch.
-Handler parameters bind by name per spec.md §5.3 4d, and a bodyless `$src` entry
-is emitted as a computed or a callable according to the same section's
-classification rule.
+`$prototype: "Request"` entries initialize to `null` and fetch from `connectedCallback`, after the `$props`/property merge so a templated `url` interpolates the values the parent passed in. Each fetch runs inside its own `effect()`, so a reactive URL re-fetches when its inputs change; the runner joins the element's effect registry and is stopped on `disconnectedCallback` (§4.4). A `manual` entry emits no fetch. Handler parameters bind by name per spec.md §5.3 4d, and a bodyless `$src` entry is emitted as a computed or a callable according to the same section's classification rule.
 
-The emitted module is named after the component's `tagName` — matching the
-loader `<script>` and the CSS sidecar (site-architecture.md §12.4) — and
-`$elements` import specifiers are derived from the dependency's tag for the same
-reason.
+The emitted module is named after the component's `tagName` — matching the loader `<script>` and the CSS sidecar (site-architecture.md §12.4) — and `$elements` import specifiers are derived from the dependency's tag for the same reason.
 
 ### 4.2 Example
 
@@ -211,8 +189,7 @@ Until 0.3.0 the compiler lowered a ref by replacing `/` with `.` and pasting the
 
 ### 4.4 Property Bridge
 
-`connectedCallback` takes props from three sources, in order — a `data-jx-props` payload, literal
-`props.*` attributes, then JS properties set before connection — and registers the render effect:
+`connectedCallback` takes props from three sources, in order — a `data-jx-props` payload, literal `props.*` attributes, then JS properties set before connection — and registers the render effect:
 
 ```js
 connectedCallback() {
@@ -234,14 +211,9 @@ connectedCallback() {
 }
 ```
 
-The `props.*` attribute form is how a JSON-authored instance and an island-rendered map body both
-deliver props, and it mirrors the interpreted runtime; values are strings, and because HTML
-lowercases attribute names a matching state key must be lowercase. A `$props` entry whose value is a
-template string is emitted as a binding, not as quoted text.
+The `props.*` attribute form is how a JSON-authored instance and an island-rendered map body both deliver props, and it mirrors the interpreted runtime; values are strings, and because HTML lowercases attribute names a matching state key must be lowercase. A `$props` entry whose value is a template string is emitted as a binding, not as quoted text.
 
-**Effect teardown.** Every effect the element creates — render, dynamic host styles, Request
-auto-fetch — is registered in one list and `stop()`ed in `disconnectedCallback`. Calling an
-`@vue/reactivity` runner re-runs its effect rather than ending it, so teardown must use `stop()`.
+**Effect teardown.** Every effect the element creates — render, dynamic host styles, Request auto-fetch — is registered in one list and `stop()`ed in `disconnectedCallback`. Calling an `@vue/reactivity` runner re-runs its effect rather than ending it, so teardown must use `stop()`.
 
 ### 4.5 Nested CSS
 
@@ -260,8 +232,7 @@ user-card:hover {
 }
 ```
 
-Both declarations are RULES, and the base one is emitted first, so the state block overrides it at
-equal specificity by source order (`spec.md` §9.1).
+Both declarations are RULES, and the base one is emitted first, so the state block overrides it at equal specificity by source order (`spec.md` §9.1).
 
 ### 4.6 `$elements` Dependencies
 
@@ -285,20 +256,13 @@ template() {
 }
 ```
 
-The callback binds `item` and `index`, and — when the map's templates reference
-it — `$map` as well, so the `${$map.item…}`/`${$map.index}` forms named in
-spec.md §6.6 resolve against the same object the interpreter passes to its
-template evaluator. Template rewriting applies throughout the map body, `id` and
-`className` on descendants included.
+The callback binds `item` and `index`, and — when the map's templates reference it — `$map` as well, so the `${$map.item…}`/`${$map.index}` forms named in spec.md §6.6 resolve against the same object the interpreter passes to its template evaluator. Template rewriting applies throughout the map body, `id` and `className` on descendants included.
 
-A handler bound inside the map assigns that object to `state.$map` before
-invoking, so bodies can read `state.$map.index`/`state.$map.item` per spec.md
-§10.2. Handlers outside a map are emitted unchanged.
+A handler bound inside the map assigns that object to `state.$map` before invoking, so bodies can read `state.$map.index`/`state.$map.item` per spec.md §10.2. Handlers outside a map are emitted unchanged.
 
 ### 4.8 `$switch` Compilation
 
-A `$switch` compiles to a case-keyed lookup over lit templates, matched on the discriminant's string
-form (spec.md §14.1) with an empty template as the fallback:
+A `$switch` compiles to a case-keyed lookup over lit templates, matched on the discriminant's string form (spec.md §14.1) with an empty template as the fallback:
 
 ```js
 ${{
@@ -307,15 +271,7 @@ ${{
 }[String(s.currentRoute)]}
 ```
 
-**A shared subtree is hoisted, not repeated.** A branching construct — `$switch`, or a `tagName`
-chosen at creation (spec.md §8.6) — writes one template per branch, so a subtree the authored
-document names once was emitted once per branch into the bundle. Any subtree that would repeat is
-lifted into a `const _cN = html`…`` declared inside `template()`, above the `return`, and the
-branches reference it. The declaration is inside the method, not at module scope, so it is rebuilt
-per render and reads the same state alias the template does. A map body gets its own declarations
-inside its callback, because they close over that callback's `item`/`index`. Branches that emit
-distinct subtrees are left inline, and a chosen `tagName` whose candidates disagree about being
-preformatted is not hoisted, since `white-space` decides how the subtree itself is indented.
+**A shared subtree is hoisted, not repeated.** A branching construct — `$switch`, or a `tagName` chosen at creation (spec.md §8.6) — writes one template per branch, so a subtree the authored document names once was emitted once per branch into the bundle. Any subtree that would repeat is lifted into a `const _cN = html`…`` declared inside `template()`, above the `return`, and the branches reference it. The declaration is inside the method, not at module scope, so it is rebuilt per render and reads the same state alias the template does. A map body gets its own declarations inside its callback, because they close over that callback's `item`/`index`. Branches that emit distinct subtrees are left inline, and a chosen `tagName` whose candidates disagree about being preformatted is not hoisted, since `white-space` decides how the subtree itself is indented.
 
 > **Status: Implemented.** `compile-element.js` produces complete lit-html custom element modules.
 
@@ -609,9 +565,7 @@ Processed images are cached to `.cache/images/manifest.json` to avoid redundant 
 
 When `images.service` is `"cloudflare"`, the Sharp variant pipeline is skipped entirely. Image optimization becomes pure markup — no code is generated or deployed:
 
-- `transformImageNodes()` rewrites eligible `<img>` srcsets to Cloudflare [transform-via-URL](https://developers.cloudflare.com/images/transform-images/transform-via-url/) entries, one per configured width ≤ the original width:
-  `/cdn-cgi/image/width=<w>,quality=<q>,fit=scale-down,format=auto/<src>?v=<contentHash8>`
-  `format=auto` lets Cloudflare negotiate AVIF/WebP per browser; `quality` is the config's `quality.webp` value. The original `src` is preserved as fallback. Sharp is used only for a header-only dimension read (memoized per build).
+- `transformImageNodes()` rewrites eligible `<img>` srcsets to Cloudflare [transform-via-URL](https://developers.cloudflare.com/images/transform-images/transform-via-url/) entries, one per configured width ≤ the original width: `/cdn-cgi/image/width=<w>,quality=<q>,fit=scale-down,format=auto/<src>?v=<contentHash8>` `format=auto` lets Cloudflare negotiate AVIF/WebP per browser; `quality` is the config's `quality.webp` value. The original `src` is preserved as fallback. Sharp is used only for a header-only dimension read (memoized per build).
 - Remote https sources from `images.remoteDomains` hostnames get the same treatment with the full URL as the transform source — every configured width is emitted (dimensions unknown; `fit=scale-down` prevents upscaling) and no `v` hash is appended.
 - These URLs are served by Cloudflare's zone-level Image Transformations feature, which must be enabled in the dashboard; they do not resolve on `*.pages.dev` / `*.workers.dev` preview hosts. The build prints a reminder.
 
@@ -633,95 +587,37 @@ In `site-build`, the pipeline integrates at step 6 (per-route compilation):
 
 When `isDynamic()` returns false for an entire document, the compiler emits plain HTML/CSS with zero JavaScript.
 
-**A boolean attribute is emitted by family, not stringified.** `buildAttrs()` defers to
-`booleanAttrValue()` in `@jxsuite/runtime` (spec.md §8.3): a presence attribute resolving to `false`
-is omitted and one resolving to `true` is emitted bare — `open`, never `open="true"` — while every
-`aria-*` and the three enumerated HTML attributes keep the written word in both directions.
+**A boolean attribute is emitted by family, not stringified.** `buildAttrs()` defers to `booleanAttrValue()` in `@jxsuite/runtime` (spec.md §8.3): a presence attribute resolving to `false` is omitted and one resolving to `true` is emitted bare — `open`, never `open="true"` — while every `aria-*` and the three enumerated HTML attributes keep the written word in both directions.
 
-Two things are specific to the static emitter. Absence has to be expressible HERE because it cannot
-be expressed before it: a template that resolves to nothing falls back to its own source text, which
-is what keeps an unresolvable binding alive for the client, so `false` is the only value that can
-mean "omit". And the emitter shares the rule with the runtime rather than restating it, because the
-same document is rendered both ways — a page whose `<details>` is closed when built and open when
-hydrated is the defect this prevents.
+Two things are specific to the static emitter. Absence has to be expressible HERE because it cannot be expressed before it: a template that resolves to nothing falls back to its own source text, which is what keeps an unresolvable binding alive for the client, so `false` is the only value that can mean "omit". And the emitter shares the rule with the runtime rather than restating it, because the same document is rendered both ways — a page whose `<details>` is closed when built and open when hydrated is the defect this prevents.
 
-**An empty expansion is not a collapse.** A repeater is expanded into static markup only when the
-expansion actually produces nodes. When `items` resolves to an empty array at build time there is
-nothing to prerender, so the repeater definition is kept for the client to bind — replacing it with
-the empty expansion would discard the binding and the list could never populate. This holds for a
-repeater in the whole-`children` position and for one among siblings. A repeater whose `items` cannot
-be resolved at build time is likewise left in place, and a non-empty expansion still prerenders with
-no JavaScript for the list.
+**An empty expansion is not a collapse.** A repeater is expanded into static markup only when the expansion actually produces nodes. When `items` resolves to an empty array at build time there is nothing to prerender, so the repeater definition is kept for the client to bind — replacing it with the empty expansion would discard the binding and the list could never populate. This holds for a repeater in the whole-`children` position and for one among siblings. A repeater whose `items` cannot be resolved at build time is likewise left in place, and a non-empty expansion still prerenders with no JavaScript for the list.
 
-**Runtime-only reads are left unresolved.** Prerender evaluates `${state.…}`
-templates against the build-time scope, but a state entry whose value only exists
-after hydration — a bodyless `$src` Function, a `$prototype: "Request"`, or a
-template entry reading either — has no build-time value to substitute. Resolving
-one anyway would replace the template in the emitted HTML with the placeholder's
-text, destroying the client-side binding rather than merely getting it wrong, so
-such a template is emitted unresolved for the client to populate. A read that
-_calls_ the entry is unaffected: invoking a build-time callable, such as a named
-formula (spec.md §19.4c), still evaluates during prerender.
+**Runtime-only reads are left unresolved.** Prerender evaluates `${state.…}` templates against the build-time scope, but a state entry whose value only exists after hydration — a bodyless `$src` Function, a `$prototype: "Request"`, or a template entry reading either — has no build-time value to substitute. Resolving one anyway would replace the template in the emitted HTML with the placeholder's text, destroying the client-side binding rather than merely getting it wrong, so such a template is emitted unresolved for the client to populate. A read that _calls_ the entry is unaffected: invoking a build-time callable, such as a named formula (spec.md §19.4c), still evaluates during prerender.
 
-**An entry a handler writes to is runtime-only.** A plain `{ "type": "string" }` entry holds a
-perfectly ordinary build-time value, so nothing else distinguishes it from a constant — but if any
-handler in the document assigns to it, baking `${state.x}` replaces the template and the element is
-dead for the life of the page, not merely stale. Before the main pass the scope builder scans every
-handler body in the document for writes to `state.x` — assignment (`=`, `+=`, `++`, …) and in-place
-array mutation (`push`, `splice`, `sort`, …) alike — and marks each target runtime-only. A mutating
-`$expression` contributes its `target` pointer the same way. The scan is narrow on purpose: an entry
-nothing ever writes stays bakeable, so prerendered content survives for SEO.
+**An entry a handler writes to is runtime-only.** A plain `{ "type": "string" }` entry holds a perfectly ordinary build-time value, so nothing else distinguishes it from a constant — but if any handler in the document assigns to it, baking `${state.x}` replaces the template and the element is dead for the life of the page, not merely stale. Before the main pass the scope builder scans every handler body in the document for writes to `state.x` — assignment (`=`, `+=`, `++`, …) and in-place array mutation (`push`, `splice`, `sort`, …) alike — and marks each target runtime-only. A mutating `$expression` contributes its `target` pointer the same way. The scan is narrow on purpose: an entry nothing ever writes stays bakeable, so prerendered content survives for SEO.
 
-**The mark is transitive, and order-independent.** A `$prototype: "Function"` whose body returns is
-stored in the build scope as its already-evaluated _result_, so a template reading it sees an
-ordinary value and would bake it. A computed that reads a runtime-only entry is therefore
-runtime-only in turn, as is a template entry that reads one. The marks are propagated to a fixpoint
-after the main pass, so declaration order does not decide the answer, and a computed over constants
-alone still bakes.
+**The mark is transitive, and order-independent.** A `$prototype: "Function"` whose body returns is stored in the build scope as its already-evaluated _result_, so a template reading it sees an ordinary value and would bake it. A computed that reads a runtime-only entry is therefore runtime-only in turn, as is a template entry that reads one. The marks are propagated to a fixpoint after the main pass, so declaration order does not decide the answer, and a computed over constants alone still bakes.
 
-> **Known limitation.** A `$src` handler's assignments live in a JS file the scope builder does not
-> open, so an entry written only from there is still baked. Declaring the same entry's writer in the
-> document, or reading the entry through a `Request`/`$src` value, restores the mark.
+> **Known limitation.** A `$src` handler's assignments live in a JS file the scope builder does not open, so an entry written only from there is still baked. Declaring the same entry's writer in the document, or reading the entry through a `Request`/`$src` value, restores the mark.
 
-**An array is only stripped when nothing still reads it.** A build-time repeater expansion consumes
-its `items`, after which the array would be dead weight in client state. But a map expansion is one
-consumer, not the only one: the same array is routinely also read by a computed at runtime. An array
-state entry is therefore dropped only when no surviving state definition and no surviving node in
-the document still references it — as `${state.x}`, as a bare `state.x` in a handler or computed
-body, or as a `#/state/x` pointer — iterated to a fixpoint, since rescuing one array can reveal a
-read of another. An entry the author marked `timing: "compiler"` is exempt and is always stripped:
-that declaration is the author saying the data is build-time only.
+**An array is only stripped when nothing still reads it.** A build-time repeater expansion consumes its `items`, after which the array would be dead weight in client state. But a map expansion is one consumer, not the only one: the same array is routinely also read by a computed at runtime. An array state entry is therefore dropped only when no surviving state definition and no surviving node in the document still references it — as `${state.x}`, as a bare `state.x` in a handler or computed body, or as a `#/state/x` pointer — iterated to a fixpoint, since rescuing one array can reveal a read of another. An entry the author marked `timing: "compiler"` is exempt and is always stripped: that declaration is the author saying the data is build-time only.
 
 ### 8.2 CSS Extraction
 
 All static `style` definitions are extracted into a single `<style>` block in `<head>`.
 
-Nested selectors and at-rule groups are emitted per `spec.md` §9.2, including the popover states
-(`:popover-open`, `::backdrop`, `:popover-open::backdrop`) and the DECLARATION-body at-rules
-(`@position-try`, `@property`, `@font-face`, `@counter-style`), whose block carries no selector and
-is not scoped to the element whose `style` object declares it.
+Nested selectors and at-rule groups are emitted per `spec.md` §9.2, including the popover states (`:popover-open`, `::backdrop`, `:popover-open::backdrop`) and the DECLARATION-body at-rules (`@position-try`, `@property`, `@font-face`, `@counter-style`), whose block carries no selector and is not scoped to the element whose `style` object declares it.
 
-The nesting is resolved by `buildStyleRules` (`@jxsuite/runtime/css`), the same function the runtime
-(`spec.md` §9.6) and the site-style builder call, so a document previewed in Studio and the page
-this emits resolve the same tree. The compiler keeps what is its own: the `#id` / `.jx-N` handle
-preference, the `:host` translation of §16.6, and the `</style` escaping below.
+The nesting is resolved by `buildStyleRules` (`@jxsuite/runtime/css`), the same function the runtime (`spec.md` §9.6) and the site-style builder call, so a document previewed in Studio and the page this emits resolve the same tree. The compiler keeps what is its own: the `#id` / `.jx-N` handle preference, the `:host` translation of §16.6, and the `</style` escaping below.
 
-Component stylesheets are extracted the same way. A page inlines the CSS of every light-DOM
-component it uses, appended after the page block so the cascade is unchanged, and emits no
-`<link rel="stylesheet">` for them — one render-blocking request per component was a page's entire
-critical request chain, for sheets averaging about 2 kB. The sheets are still written to
-`dist/components/<tag>.css` for anything that references them directly. A component in shadow mode
-is unaffected: its sheet is linked from inside the declarative shadow root.
+Component stylesheets are extracted the same way. A page inlines the CSS of every light-DOM component it uses, appended after the page block so the cascade is unchanged, and emits no `<link rel="stylesheet">` for them — one render-blocking request per component was a page's entire critical request chain, for sheets averaging about 2 kB. The sheets are still written to `dist/components/<tag>.css` for anything that references them directly. A component in shadow mode is unaffected: its sheet is linked from inside the declarative shadow root.
 
-The trade is deliberate. Inlined CSS repeats on every page instead of caching across navigations;
-it is small, it compresses against the markup around it, and a round trip on a phone costs more
-than the bytes do.
+The trade is deliberate. Inlined CSS repeats on every page instead of caching across navigations; it is small, it compresses against the markup around it, and a round trip on a phone costs more than the bytes do.
 
-CSS inlined into a `<style>` element has `</style` escaped as `<\/style` — an HTML parser ends the
-element at that sequence wherever it appears, and style values are author data.
+CSS inlined into a `<style>` element has `</style` escaped as `<\/style` — an HTML parser ends the element at that sequence wherever it appears, and style values are author data.
 
-> **Status: Implemented.** `compile-static.js` handles zero-JS output; `site-build`'s
-> `injectComponentScripts` inlines the component sheets.
+> **Status: Implemented.** `compile-static.js` handles zero-JS output; `site-build`'s `injectComponentScripts` inlines the component sheets.
 
 ---
 
@@ -739,21 +635,11 @@ For dynamic documents that are not custom elements, the compiler emits:
 
 ### 9.2 `$switch` on a Dynamic Page
 
-A `$switch` node compiles to a render binding on its container element, mirroring the mapped-array
-binding in the same target: the container carries `data-bind :render="_swN"`, and the module holds a
-case-keyed lookup over lit templates matched on `String(discriminant)`, with an empty template as
-the fallback. The discriminant may be a `#/state/…` pointer or a template string. An external `$ref`
-case cannot be fetched at compile time and is skipped, exactly as in the static renderer.
+A `$switch` node compiles to a render binding on its container element, mirroring the mapped-array binding in the same target: the container carries `data-bind :render="_swN"`, and the module holds a case-keyed lookup over lit templates matched on `String(discriminant)`, with an empty template as the fallback. The discriminant may be a `#/state/…` pointer or a template string. An external `$ref` case cannot be fetched at compile time and is skipped, exactly as in the static renderer.
 
-The container is emitted **empty**, with the matched case supplied at hydration. lit's `render`
-inserts into a container rather than replacing its existing children, so a prerendered branch would
-survive alongside the rendered one — the same reason the mapped-array binding prerenders nothing.
+The container is emitted **empty**, with the matched case supplied at hydration. lit's `render` inserts into a container rather than replacing its existing children, so a prerendered branch would survive alongside the rendered one — the same reason the mapped-array binding prerenders nothing.
 
-> **Status: Implemented.** Previously `buildClientNode` had no `$switch` branch at all: the node
-> fell through to the generic element path, which emitted a container and then looked for `children`
-> to recurse into. `cases` is not `children`, so the subtree was never visited and the page compiled
-> to an empty `<div>` with the content missing and no error — while the same node through the
-> element target (§4.8) emitted every branch correctly.
+> **Status: Implemented.** Previously `buildClientNode` had no `$switch` branch at all: the node fell through to the generic element path, which emitted a container and then looked for `children` to recurse into. `cases` is not `children`, so the subtree was never visited and the page compiled to an empty `<div>` with the content missing and no error — while the same node through the element target (§4.8) emitted every branch correctly.
 
 ---
 
@@ -788,26 +674,11 @@ See the [Site Architecture Specification](site-architecture.md) for the full mul
 
 ### `attrHelperSource()` — the boolean-attribute rule, inlined for a generated module
 
-The element and client targets emit modules that load with `lit-html` and `@vue/reactivity` and
-nothing else, so they cannot call `booleanAttrValue` — they carry a copy whose enumerated-name list
-is serialized from `@jxsuite/runtime`'s `enumeratedAttrNames()`. A test asserts the emitted literal
-still equals that export, which is what keeps the four writers of the rule one decision (spec.md
-§8.3).
+The element and client targets emit modules that load with `lit-html` and `@vue/reactivity` and nothing else, so they cannot call `booleanAttrValue` — they carry a copy whose enumerated-name list is serialized from `@jxsuite/runtime`'s `enumeratedAttrNames()`. A test asserts the emitted literal still equals that export, which is what keeps the four writers of the rule one decision (spec.md §8.3).
 
 ### `compileStyles(def)` — CSS extraction from component tree
 
-Project-level emission order is: base `:root` (custom properties) and `body` (direct
-properties) rules first, then conditional `@`-blocks, so equal-specificity overrides win by
-source order. Inside a project-level `@`-block, custom properties land on `:root`, direct
-properties on `body`, and selector-keyed sub-objects on their own selector. Blocks keyed by a
-pure `prefers-color-scheme` query dual-emit per the forced-scheme contract (spec §9.5): a
-media-guarded copy (`:where(:root:not([data-color-scheme]))`) plus an unconditional forced
-copy (`:root:where([data-color-scheme="…"])`), both specificity-neutral via `:where()`.
-When any `$media` value is a pure scheme query, `compileStyles` also emits the `color-scheme`
-declaration triplet on `:root` (suppressed when the author sets `colorScheme` in project
-style), and the compilation targets inject the pre-paint scheme-restore `<script>`
-(`colorSchemePrePaintScript()`) into `<head>` ahead of all style blocks — the site pipeline
-does this via the merged head (`prePaintScheme: false` disables the target-level copy).
+Project-level emission order is: base `:root` (custom properties) and `body` (direct properties) rules first, then conditional `@`-blocks, so equal-specificity overrides win by source order. Inside a project-level `@`-block, custom properties land on `:root`, direct properties on `body`, and selector-keyed sub-objects on their own selector. Blocks keyed by a pure `prefers-color-scheme` query dual-emit per the forced-scheme contract (spec §9.5): a media-guarded copy (`:where(:root:not([data-color-scheme]))`) plus an unconditional forced copy (`:root:where([data-color-scheme="…"])`), both specificity-neutral via `:where()`. When any `$media` value is a pure scheme query, `compileStyles` also emits the `color-scheme` declaration triplet on `:root` (suppressed when the author sets `colorScheme` in project style), and the compilation targets inject the pre-paint scheme-restore `<script>` (`colorSchemePrePaintScript()`) into `<head>` ahead of all style blocks — the site pipeline does this via the merged head (`prePaintScheme: false` disables the target-level copy).
 
 ### `collectServerEntries(doc)` — Find all `timing: "server"` entries
 
@@ -823,76 +694,20 @@ does this via the merged head (`prePaintScheme: false` disables the target-level
 
 ## 12. Sidecar Bundling
 
-The site build bundles Function-def `$src` modules for the browser
-(`packages/compiler/src/site/bundler.ts`; behavior contract in spec.md §5.3
-"Compiled-site delivery"):
+The site build bundles Function-def `$src` modules for the browser (`packages/compiler/src/site/bundler.ts`; behavior contract in spec.md §5.3 "Compiled-site delivery"):
 
-- **Collection**: during page/component/island emission, every bundleable
-  `$src` specifier (`npm:<pkg>[/subpath]`, `./relative` — `.ts` allowed) is
-  rewritten to its deterministic `/assets/<slug>.js` URL and registered;
-  lowered defs contribute additional specifiers via `$bundle`
-  (extensions.md §8.3). Relative specifiers resolve against their declaring
-  document's directory and key on the project-relative resolved path; two
-  distinct entries colliding on one slug is a build error. Non-Function
-  `$src` (`.class.json` descriptors) and absolute/URL specifiers are never
-  touched.
-- **Bundling** runs once after routes, components, and the worker are
-  generated: one self-contained ESM bundle per unique specifier, with
-  `@vue/reactivity` and `lit-html` left external (the page importmap provides
-  them). `timing: "compiler"` code is never bundled.
-- **The server target**: when `build.adapter` is set, the generated worker
-  entry (§6) is bundled self-contained through the same backend —
-  `workerBundleOptions(adapter)` maps cloudflare adapters to
-  `workerd`/`worker` resolution conditions with `cloudflare:*`/`node:*`
-  external (nodejs_compat provides builtins), and node/bun to platform-native
-  bundling. Extension mounts, connectors, hono, and user server modules are
-  inlined, so `dist/` deploys and runs without `node_modules` — verified by
-  importing the bundled worker from an empty directory in tests. The former
-  copy of server sources into `dist/components/` is gone.
-- **The client runtime**: `@vue/reactivity` and `lit-html` are bundled from
-  **this package's** dependencies into `/assets/vue-reactivity.js` and
-  `/assets/lit-html.js`, and the emitted import map points there. They resolve
-  from the compiler rather than the project because the compiler is what
-  depends on those versions — a project that never installed them still gets
-  the runtime its output was compiled against. If neither resolves, the map
-  falls back to the CDN URLs with a warning, since a page with no runtime is
-  worse than a page with a third-party one. Emitted once per build, and only
-  when some page actually carries an import map.
+- **Collection**: during page/component/island emission, every bundleable `$src` specifier (`npm:<pkg>[/subpath]`, `./relative` — `.ts` allowed) is rewritten to its deterministic `/assets/<slug>.js` URL and registered; lowered defs contribute additional specifiers via `$bundle` (extensions.md §8.3). Relative specifiers resolve against their declaring document's directory and key on the project-relative resolved path; two distinct entries colliding on one slug is a build error. Non-Function `$src` (`.class.json` descriptors) and absolute/URL specifiers are never touched.
+- **Bundling** runs once after routes, components, and the worker are generated: one self-contained ESM bundle per unique specifier, with `@vue/reactivity` and `lit-html` left external (the page importmap provides them). `timing: "compiler"` code is never bundled.
+- **The server target**: when `build.adapter` is set, the generated worker entry (§6) is bundled self-contained through the same backend — `workerBundleOptions(adapter)` maps cloudflare adapters to `workerd`/`worker` resolution conditions with `cloudflare:*`/`node:*` external (nodejs_compat provides builtins), and node/bun to platform-native bundling. Extension mounts, connectors, hono, and user server modules are inlined, so `dist/` deploys and runs without `node_modules` — verified by importing the bundled worker from an empty directory in tests. The former copy of server sources into `dist/components/` is gone.
+- **The client runtime**: `@vue/reactivity` and `lit-html` are bundled from **this package's** dependencies into `/assets/vue-reactivity.js` and `/assets/lit-html.js`, and the emitted import map points there. They resolve from the compiler rather than the project because the compiler is what depends on those versions — a project that never installed them still gets the runtime its output was compiled against. If neither resolves, the map falls back to the CDN URLs with a warning, since a page with no runtime is worse than a page with a third-party one. Emitted once per build, and only when some page actually carries an import map.
 
-  **The set is read back out of the finished HTML**, not recorded where a map
-  is written. A page acquires a map by more than one route — the component
-  injector adds one, and the page-template tiers (§3) each emit their own —
-  and a set filled at one of those sites describes the build only when that
-  site is the one that ran. Recording only the component injector's meant a
-  project with interactivity but no components shipped a map naming
-  `/assets/vue-reactivity.js` with no `dist/assets/` at all: 404 on both
-  modules, a blank page, and a build reporting success with zero errors. What
-  the shipped HTML names and what the build writes are therefore one set,
-  derived from the artifact rather than from an intention. Prefix keys
-  (`"lit-html/"`) and CDN fallbacks are excluded: neither names a file this
-  build produces.
+  **The set is read back out of the finished HTML**, not recorded where a map is written. A page acquires a map by more than one route — the component injector adds one, and the page-template tiers (§3) each emit their own — and a set filled at one of those sites describes the build only when that site is the one that ran. Recording only the component injector's meant a project with interactivity but no components shipped a map naming `/assets/vue-reactivity.js` with no `dist/assets/` at all: 404 on both modules, a blank page, and a build reporting success with zero errors. What the shipped HTML names and what the build writes are therefore one set, derived from the artifact rather than from an intention. Prefix keys (`"lit-html/"`) and CDN fallbacks are excluded: neither names a file this build produces.
 
-- **Backends**: `Bun.build` when the build runs under Bun; esbuild
-  (dynamically imported, a `@jxsuite/compiler` dependency) under plain Node.
-  Options are minimal and identical (`format: esm`, browser target). Browser
-  bundles are **minified**; `build.minify: false` opts out, and non-browser
-  targets stay readable because their output is read off a stack trace rather
-  than parsed on a phone. Browser bundles define `process.env.NODE_ENV` as `"production"`:
-  the substitution matters (a browser has no `process`) but the resolution
-  matters more, because that value decides which `exports` condition a package
-  offers. Bun reads it from the build's own `define` and assumes development
-  without it, so the two backends were resolving different files —
-  `lit-html`'s 31 kB development build under Bun against its 10 kB production
-  build under esbuild. `JX_BUNDLER=esbuild` forces the fallback. Byte-level
-  output may still differ between backends — the two minifiers agree on
-  semantics, not on bytes — so a repo tracking `dist/` should build with one
-  backend consistently.
+- **Backends**: `Bun.build` when the build runs under Bun; esbuild (dynamically imported, a `@jxsuite/compiler` dependency) under plain Node. Options are minimal and identical (`format: esm`, browser target). Browser bundles are **minified**; `build.minify: false` opts out, and non-browser targets stay readable because their output is read off a stack trace rather than parsed on a phone. Browser bundles define `process.env.NODE_ENV` as `"production"`: the substitution matters (a browser has no `process`) but the resolution matters more, because that value decides which `exports` condition a package offers. Bun reads it from the build's own `define` and assumes development without it, so the two backends were resolving different files — `lit-html`'s 31 kB development build under Bun against its 10 kB production build under esbuild. `JX_BUNDLER=esbuild` forces the fallback. Byte-level output may still differ between backends — the two minifiers agree on semantics, not on bytes — so a repo tracking `dist/` should build with one backend consistently.
 
-  Component modules (`dist/components/<tag>.js`) are emitted source rather than
-  bundles and are **not** minified; only what passes through the bundler is.
+  Component modules (`dist/components/<tag>.js`) are emitted source rather than bundles and are **not** minified; only what passes through the bundler is.
 
-> **Status: Implemented** via `site-build` steps 6d (bundling) and 6e
-> (extension `emit`, extensions.md §8.4).
+> **Status: Implemented** via `site-build` steps 6d (bundling) and 6e (extension `emit`, extensions.md §8.4).
 
 ---
 
@@ -909,8 +724,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Appendix A — Production Dependency Stack
 
-Served from the site under `/assets/` (§12), not from a CDN. Sizes are the bundles this build
-actually emits — minified ESM — measured with `gzip -9`:
+Served from the site under `/assets/` (§12), not from a CDN. Sizes are the bundles this build actually emits — minified ESM — measured with `gzip -9`:
 
 | Package           | Raw       | gzip        | Purpose                                |
 | ----------------- | --------- | ----------- | -------------------------------------- |
@@ -918,14 +732,9 @@ actually emits — minified ESM — measured with `gzip -9`:
 | `lit-html`        | 7.3 kB    | 3.3 kB      | `html`, `render()`                     |
 | **Total**         | **28 kB** | **11.1 kB** |                                        |
 
-Un-minified the same two bundles were 48.7 kB and 10.6 kB raw (59 kB, 14.8 kB gzip). The raw
-column is the one that matters most: it is the source a low-end phone parses and compiles before
-anything can paint, and compression does nothing for that. Minified, `@vue/reactivity` lands within
-a kilobyte of the `reactivity.esm-browser.prod.js` build Vue ships itself, so no export-condition
-change is needed to reach it.
+Un-minified the same two bundles were 48.7 kB and 10.6 kB raw (59 kB, 14.8 kB gzip). The raw column is the one that matters most: it is the source a low-end phone parses and compiles before anything can paint, and compression does nothing for that. Minified, `@vue/reactivity` lands within a kilobyte of the `reactivity.esm-browser.prod.js` build Vue ships itself, so no export-condition change is needed to reach it.
 
-An earlier revision of this table claimed ~7 kB and ~3 kB (~10 kB total); those figures described
-neither file.
+An earlier revision of this table claimed ~7 kB and ~3 kB (~10 kB total); those figures described neither file.
 
 ## Changelog
 

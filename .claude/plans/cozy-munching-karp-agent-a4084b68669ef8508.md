@@ -332,26 +332,18 @@ After migration, this needs to become an effect watching `tab.session.ui.activeS
 
 ## Answers to Specific Questions
 
-**Q1: Incremental or big bang?**
-Incremental, file-by-file. `getState()` is a compatibility shim reading from `activeTab.value` — removing one caller at a time is safe.
+**Q1: Incremental or big bang?** Incremental, file-by-file. `getState()` is a compatibility shim reading from `activeTab.value` — removing one caller at a time is safe.
 
-**Q2: Replacement pattern per caller?**
-See Phase 1-2 above. Pattern: replace `getState()` with `activeTab.value`, map fields per the provided mapping table.
+**Q2: Replacement pattern per caller?** See Phase 1-2 above. Pattern: replace `getState()` with `activeTab.value`, map fields per the provided mapping table.
 
-**Q3: What happens to `_update()` and `_updateSession()` in studio.js?**
-They become unnecessary once no caller uses `update(newState)` or the flat `S`. The `_updateSession` logic for `pendingInlineEdit` moves to an effect. Post-render hooks become effects.
+**Q3: What happens to `_update()` and `_updateSession()` in studio.js?** They become unnecessary once no caller uses `update(newState)` or the flat `S`. The `_updateSession` logic for `pendingInlineEdit` moves to an effect. Post-render hooks become effects.
 
-**Q4: What happens to `update()` in store.js after migration?**
-Deleted. Any remaining callers of `update(newState)` must migrate to either `transactDoc` (for document changes) or direct reactive writes (for session changes).
+**Q4: What happens to `update()` in store.js after migration?** Deleted. Any remaining callers of `update(newState)` must migrate to either `transactDoc` (for document changes) or direct reactive writes (for session changes).
 
-**Q5: panel-events.js?**
-See Phase 3. Reads become `activeTab.value.*`. Writes become direct property assignments. The `setState(hoverNode(S, path))` pattern becomes `activeTab.value.session.hover = path`. The ctx object shrinks.
+**Q5: panel-events.js?** See Phase 3. Reads become `activeTab.value.*`. Writes become direct property assignments. The `setState(hoverNode(S, path))` pattern becomes `activeTab.value.session.hover = path`. The ctx object shrinks.
 
-**Q6: shortcuts.js?**
-See Phase 4. The `S` / `setS` pattern is replaced by `activeTab.value` reads and direct writes. Zoom, selection, navigation all write directly to the reactive tab.
+**Q6: shortcuts.js?** See Phase 4. The `S` / `setS` pattern is replaced by `activeTab.value` reads and direct writes. Zoom, selection, navigation all write directly to the reactive tab.
 
-**Q7: Autosave?**
-Moves from `addUpdateMiddleware` to an effect watching `activeTab.value.doc.dirty`. Reads from `activeTab.value` instead of `S`.
+**Q7: Autosave?** Moves from `addUpdateMiddleware` to an effect watching `activeTab.value.doc.dirty`. Reads from `activeTab.value` instead of `S`.
 
-**Q8: Navigation (pushDocument/popDocument)?**
-These pure functions return new flat state. They need to be rewritten as imperative mutations on `activeTab.value` — push to `tab.session.documentStack`, swap `tab.doc.document`, clear selection, etc. Alternatively, keep them as logic helpers that compute new values, then apply those values to the reactive tab.
+**Q8: Navigation (pushDocument/popDocument)?** These pure functions return new flat state. They need to be rewritten as imperative mutations on `activeTab.value` — push to `tab.session.documentStack`, swap `tab.doc.document`, clear selection, etc. Alternatively, keep them as logic helpers that compute new values, then apply those values to the reactive tab.

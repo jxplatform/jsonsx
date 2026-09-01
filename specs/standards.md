@@ -2,9 +2,9 @@
 
 ## Which External Standards Jx Adopts, and How That Is Recorded
 
-**Version:** 0.1.15-draft
-**Status:** Partial
-**Updated:** 2026-08-17
+**Version:** 0.1.15-draft\
+**Status:** Partial\
+**Updated:** 2026-08-17\
 **License:** MIT
 
 ---
@@ -244,30 +244,15 @@ An entry names the spec that will own it. When that section is written, the entr
 
 ## 12. Normative Keywords
 
-> **Status: Implemented.** The convention below governs every specification in `specs/`, and
-> `bun run docs:status` fails if a specification uses one of these keywords while this section is
-> missing or names a different set.
+> **Status: Implemented.** The convention below governs every specification in `specs/`, and `bun run docs:status` fails if a specification uses one of these keywords while this section is missing or names a different set.
 
-The key words **MUST**, **MUST NOT**, **REQUIRED**, **SHALL**, **SHALL NOT**, **SHOULD**,
-**SHOULD NOT**, **RECOMMENDED**, **NOT RECOMMENDED**, **MAY** and **OPTIONAL** in the Jx
-specifications are to be interpreted as described in BCP 14
-([RFC 2119](https://www.rfc-editor.org/rfc/rfc2119), [RFC 8174](https://www.rfc-editor.org/rfc/rfc8174))
-when, and only when, they appear in all capitals, as shown here.
+The key words **MUST**, **MUST NOT**, **REQUIRED**, **SHALL**, **SHALL NOT**, **SHOULD**, **SHOULD NOT**, **RECOMMENDED**, **NOT RECOMMENDED**, **MAY** and **OPTIONAL** in the Jx specifications are to be interpreted as described in BCP 14 ([RFC 2119](https://www.rfc-editor.org/rfc/rfc2119), [RFC 8174](https://www.rfc-editor.org/rfc/rfc8174)) when, and only when, they appear in all capitals, as shown here.
 
-The "and only when" half is what makes the rest of the corpus readable. These specifications are
-explanatory prose, and they use "must", "should" and "may" in their ordinary English senses on
-almost every page — a sentence saying the build "must" find a layout describes what happens, it does
-not impose a conformance requirement on an implementer. RFC 8174 exists so a document can do both,
-and declaring it here turns a corpus-wide informality into a deliberate distinction rather than an
-ambiguity a reader has to resolve sentence by sentence.
+The "and only when" half is what makes the rest of the corpus readable. These specifications are explanatory prose, and they use "must", "should" and "may" in their ordinary English senses on almost every page — a sentence saying the build "must" find a layout describes what happens, it does not impose a conformance requirement on an implementer. RFC 8174 exists so a document can do both, and declaring it here turns a corpus-wide informality into a deliberate distinction rather than an ambiguity a reader has to resolve sentence by sentence.
 
-The capitalized forms are therefore **rare and load-bearing**: a reader who meets one should
-understand that an implementation doing otherwise is non-conformant, not merely unusual.
+The capitalized forms are therefore **rare and load-bearing**: a reader who meets one should understand that an implementation doing otherwise is non-conformant, not merely unusual.
 
-This section is the whole declaration. Individual specifications do not repeat the boilerplate, and
-a specification that uses a keyword needs no BCP 14 row of its own. Deleting this section while any
-specification still uses a capitalized keyword would leave those requirements undefined, which is
-the failure the gate exists to make loud.
+This section is the whole declaration. Individual specifications do not repeat the boilerplate, and a specification that uses a keyword needs no BCP 14 row of its own. Deleting this section while any specification still uses a capitalized keyword would leave those requirements undefined, which is the failure the gate exists to make loud.
 
 ## Changelog
 

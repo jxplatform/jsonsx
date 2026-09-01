@@ -94,15 +94,10 @@ These commands guard this directory, but none of them live in it: each is a scri
 
 ## Surprises
 
-- **A relative `../foo.md` link publishes broken**, because the site serves the target verbatim
-  rather than rewriting it to a URL. It is the failure that looks right while you write it: the
-  relative form is exactly what resolves in a Markdown preview. `docs:links` is the gate.
-- **A `spec:` anchor breaks when someone renumbers a spec heading**, which is why spec sections are
-  edited in place and never renumbered or removed. The failure surfaces here, not in the spec.
-- **The screenshots lane's normal outcome is a bot commit, not a red X.** It re-captures, pushes the
-  images and the lock to your branch, and comments with the pages each changed image appears on. Go re-read those pages: whether the paragraph beside a moved surface is now wrong is a judgement no check makes.
-- **Behavior changes land with their docs.** Every plan for behavior-changing work carries a
-  "Specs & docs" step, and the code, the spec edit, and the page update go in one change set.
+- **A relative `../foo.md` link publishes broken**, because the site serves the target verbatim rather than rewriting it to a URL. It is the failure that looks right while you write it: the relative form is exactly what resolves in a Markdown preview. `docs:links` is the gate.
+- **A `spec:` anchor breaks when someone renumbers a spec heading**, which is why spec sections are edited in place and never renumbered or removed. The failure surfaces here, not in the spec.
+- **The screenshots lane's normal outcome is a bot commit, not a red X.** It re-captures, pushes the images and the lock to your branch, and comments with the pages each changed image appears on. Go re-read those pages: whether the paragraph beside a moved surface is now wrong is a judgement no check makes.
+- **Behavior changes land with their docs.** Every plan for behavior-changing work carries a "Specs & docs" step, and the code, the spec edit, and the page update go in one change set.
 
 ## Publishing
 

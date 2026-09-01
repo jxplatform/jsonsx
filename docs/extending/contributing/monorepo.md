@@ -114,8 +114,7 @@ Versions are release-please's job. Every publishable workspace is a component in
 Two branches:
 
 - **`main`** is the trunk. Every PR targets it, and it is the tip of development.
-- **`release`** holds only released code. CI fast-forwards it to each `desktop-v*` release commit,
-  but only after that release's installers are attached and `nix build` succeeds at the tag. It is what a NixOS user pins (`nix run github:jxsuite/jx/release`), so it must never point at a tree that does not build. Nothing pushes to it by hand.
+- **`release`** holds only released code. CI fast-forwards it to each `desktop-v*` release commit, but only after that release's installers are attached and `nix build` succeeds at the tag. It is what a NixOS user pins (`nix run github:jxsuite/jx/release`), so it must never point at a tree that does not build. Nothing pushes to it by hand.
 
   The release builds the flake on **two** architectures. Only the x86_64 leg gates the branch; the aarch64 leg is advisory, because it had never been built before and a failure there must not strand the users who do have a working architecture. Promoting it is a one-line change to `advance-release-branch`'s `needs`, and it should happen once arm has been green for a few releases.
 
@@ -127,10 +126,8 @@ Two branches:
 
 Two places ship `@jxsuite/*` version ranges to people outside this repo, and neither is a workspace, so `bun install` never resolves them:
 
-- `packages/starters/sites/*/package.json`: `@jxsuite/starters` publishes `sites/`, so these are the
-  ranges a scaffolded project installs, and the ones Studio installs when it iterates a starter.
-- `packages/create/template-versions.json`: the ranges `create` stamps into every project it
-  generates, including starter clones, whose `package.json` it rebuilds from scratch.
+- `packages/starters/sites/*/package.json`: `@jxsuite/starters` publishes `sites/`, so these are the ranges a scaffolded project installs, and the ones Studio installs when it iterates a starter.
+- `packages/create/template-versions.json`: the ranges `create` stamps into every project it generates, including starter clones, whose `package.json` it rebuilds from scratch.
 
 Both are **generated**. `bun run templates:check` blocks in CI; `bun run templates:sync` is the fixer. Never hand-edit `template-versions.json`.
 

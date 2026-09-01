@@ -159,19 +159,10 @@ Format classes describe their Studio control surface declaratively in a top-leve
 
 ### What declaring both capabilities buys you
 
-Studio derives two of its surfaces from `parse` and `serialize` rather than from any list of format
-names, so a format extension reaches both by declaring them:
+Studio derives two of its surfaces from `parse` and `serialize` rather than from any list of format names, so a format extension reaches both by declaring them:
 
-- **The New File format picker** offers your extension when some installed class declares BOTH
-  `parse` and `serialize` for it. Both are needed: without `parse` the file cannot be opened after
-  it is created, and without `serialize` its first save falls through to another format and writes
-  that format's bytes into it. (This is why the parser extension's `Csv`, which parses rows and has
-  no serializer, is not offered; a `.csv` is still creatable through the picker's **Other…** row.
-  `Csv` declares `rewrite` instead, which buys it the refactor and not this picker.)
-- **Convert Format…** offers your format as a conversion endpoint when it declares both capabilities
-  **and** `page` or `component` in `documentKinds`. That membership is what says `parse` returns a
-  Jx document rather than content entries, and the compiler already relies on it to build its page
-  and component globs, so there is no separate declaration to make.
+- **The New File format picker** offers your extension when some installed class declares BOTH `parse` and `serialize` for it. Both are needed: without `parse` the file cannot be opened after it is created, and without `serialize` its first save falls through to another format and writes that format's bytes into it. (This is why the parser extension's `Csv`, which parses rows and has no serializer, is not offered; a `.csv` is still creatable through the picker's **Other…** row. `Csv` declares `rewrite` instead, which buys it the refactor and not this picker.)
+- **Convert Format…** offers your format as a conversion endpoint when it declares both capabilities **and** `page` or `component` in `documentKinds`. That membership is what says `parse` returns a Jx document rather than content entries, and the compiler already relies on it to build its page and component globs, so there is no separate declaration to make.
 
 `.json` is the endpoint both surfaces share, because no registry ever claims it.
 

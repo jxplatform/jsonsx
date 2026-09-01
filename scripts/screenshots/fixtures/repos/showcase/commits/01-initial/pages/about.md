@@ -7,7 +7,5 @@ title: "About Showcase"
 
 ## About
 
-A page that exists in the history and not in the working tree, so the Source Control panel has a
-deletion to render.
-::
+A page that exists in the history and not in the working tree, so the Source Control panel has a deletion to render. ::
 :::

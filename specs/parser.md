@@ -2,9 +2,9 @@
 
 ## Content Formats and the Reference Format-Extension Classes
 
-**Version:** 0.2.10-draft
-**Status:** Partial
-**Updated:** 2026-08-27
+**Version:** 0.2.10-draft\
+**Status:** Partial\
+**Updated:** 2026-08-27\
 **License:** MIT
 
 ---
@@ -40,11 +40,7 @@ Built on the `unified` / `remark` pipeline (markdown) and a minimal RFC 4180 par
 
 ## 3. `Markdown` — the markdown format class
 
-> **Status: Partial.** The class and every capability ship. Two derived values are **correct only
-> for Latin script**: `slugifyHeading` strips on an ASCII-only character class, so a heading in any
-> other script slugifies to the empty string and falls back to `section`, `section-2`, … — which
-> means the deep-linkable anchors this section promises are not delivered for those documents; and
-> `$wordCount`/`$readingTime` split on whitespace, which reports a CJK article as one word. See §10.
+> **Status: Partial.** The class and every capability ship. Two derived values are **correct only for Latin script**: `slugifyHeading` strips on an ASCII-only character class, so a heading in any other script slugifies to the empty string and falls back to `section`, `section-2`, … — which means the deep-linkable anchors this section promises are not delivered for those documents; and `$wordCount`/`$readingTime` split on whitespace, which reports a CJK article as one word. See §10.
 
 A single class carrying every capability (`Markdown.class.json`):
 
@@ -98,15 +94,7 @@ The same table is where YAML's media type lives. Frontmatter is YAML, and so is 
 | `$readingTime` | `number` | Estimated reading time in minutes           |
 | `$wordCount`   | `number` | Word count                                  |
 
-**Heading anchors.** `processMarkdown` assigns every `h1`–`h6` in `$children`
-a slug `id` (`slugifyHeading` in `transpile.ts`: lowercase, punctuation
-stripped, spaces → hyphens) with document-order deduplication — the first
-occurrence is unsuffixed, repeats get `-2`, `-3`, …. `$toc` entries are built
-from the same walk (`assignHeadingIds`), so rendered anchors and `$toc[i].id`
-always agree; pre-existing ids are respected and still claim their slug.
-Rendered pages are therefore deep-linkable to sections
-(`/docs/<slug>/#<heading-id>`), which site search and TOC UIs rely on.
-`transpileJxMarkdown` (the component path) is unaffected.
+**Heading anchors.** `processMarkdown` assigns every `h1`–`h6` in `$children` a slug `id` (`slugifyHeading` in `transpile.ts`: lowercase, punctuation stripped, spaces → hyphens) with document-order deduplication — the first occurrence is unsuffixed, repeats get `-2`, `-3`, …. `$toc` entries are built from the same walk (`assignHeadingIds`), so rendered anchors and `$toc[i].id` always agree; pre-existing ids are respected and still claim their slug. Rendered pages are therefore deep-linkable to sections (`/docs/<slug>/#<heading-id>`), which site search and TOC UIs rely on. `transpileJxMarkdown` (the component path) is unaffected.
 
 ---
 
@@ -205,46 +193,26 @@ Because the rewrite happens in the loader, every consumer of `projectData` — s
 
 ### 9.3 Date coercion
 
-> **Status: Implemented.** `coerceEntryDates` runs in the content loader between a format class's
-> `load` and `validateEntries` — the one point that holds both the entries and the schema, since
-> `Csv.load` receives a schema and `Markdown.load` does not.
+> **Status: Implemented.** `coerceEntryDates` runs in the content loader between a format class's `load` and `validateEntries` — the one point that holds both the entries and the schema, since `Csv.load` receives a schema and `Markdown.load` does not.
 
-A field the content-type schema declares as `format: "date"` or `format: "date-time"` is normalized
-to RFC 3339:
+A field the content-type schema declares as `format: "date"` or `format: "date-time"` is normalized to RFC 3339:
 
 | Declared    | Stored                                                  |
 | ----------- | ------------------------------------------------------- |
 | `date`      | `YYYY-MM-DD`                                            |
 | `date-time` | `YYYY-MM-DDTHH:MM:SSZ` — **UTC**, no fractional seconds |
 
-**Why a string and not a `Date`.** `JSON.stringify(new Date("2025-03-04"))` yields an instant, so a
-Studio save would rewrite `2025-03-04` as `2025-03-04T00:00:00.000Z` — which is _March 3_ west of
-UTC. A `Temporal.PlainDate` is semantically right and fails differently: `<` and `>` on one yield
-`NaN`, and §6's sort compares with exactly those.
+**Why a string and not a `Date`.** `JSON.stringify(new Date("2025-03-04"))` yields an instant, so a Studio save would rewrite `2025-03-04` as `2025-03-04T00:00:00.000Z` — which is _March 3_ west of UTC. A `Temporal.PlainDate` is semantically right and fails differently: `<` and `>` on one yield `NaN`, and §6's sort compares with exactly those.
 
-**Why UTC.** Mixed offsets do not sort lexicographically: `2025-03-04T01:00:00+02:00` sorts _after_
-`2025-03-04T00:00:00Z` as text and is _earlier_ in fact. Normalizing makes the sort correct by
-construction rather than correct by accident for ISO 8601.
+**Why UTC.** Mixed offsets do not sort lexicographically: `2025-03-04T01:00:00+02:00` sorts _after_ `2025-03-04T00:00:00Z` as text and is _earlier_ in fact. Normalizing makes the sort correct by construction rather than correct by accident for ISO 8601.
 
-**Accepted**, in order: a `Date` instance, an RFC 3339 string, a bare `YYYY-MM-DD`. **Everything
-else is refused**, left exactly as authored, and reported naming the collection, entry, field and
-value. `03/04/2025` is March 4th or April 3rd depending on the reader and `new Date()` resolves it
-by implementation-defined rules, so guessing is the failure this pass exists to prevent — refusing
-is the feature.
+**Accepted**, in order: a `Date` instance, an RFC 3339 string, a bare `YYYY-MM-DD`. **Everything else is refused**, left exactly as authored, and reported naming the collection, entry, field and value. `03/04/2025` is March 4th or April 3rd depending on the reader and `new Date()` resolves it by implementation-defined rules, so guessing is the failure this pass exists to prevent — refusing is the feature.
 
-When coercion rewrote a value the authored text is kept at `_meta.rawDates[field]`, because a
-collection that genuinely means "7pm local" has had that thrown away by the normalized instant.
+When coercion rewrote a value the authored text is kept at `_meta.rawDates[field]`, because a collection that genuinely means "7pm local" has had that thrown away by the normalized instant.
 
-**`_meta.mtime`.** Every loaded entry carries its source file's modification time as RFC 3339. It is
-the only date a file always has, so it is the fallback a feed uses when the frontmatter carries none
-(`site-architecture.md` §6.7) — and it is what would let the sitemap stop giving every page
-generated from one template that template's `<lastmod>`.
+**`_meta.mtime`.** Every loaded entry carries its source file's modification time as RFC 3339. It is the only date a file always has, so it is the fallback a feed uses when the frontmatter carries none (`site-architecture.md` §6.7) — and it is what would let the sitemap stop giving every page generated from one template that template's `<lastmod>`.
 
-**A schemaless collection is not covered.** `MarkdownCollection` (§6) globs and sorts without a
-content-type schema, so nothing can know which of its frontmatter fields is a date. Its default
-`sortBy: "frontmatter.date"` compares text, which is correct for `YYYY-MM-DD` and wrong for an
-offset date-time. Declaring the field in a content type is what fixes it; inferring would mean
-guessing, which §9.3 refuses everywhere else.
+**A schemaless collection is not covered.** `MarkdownCollection` (§6) globs and sorts without a content-type schema, so nothing can know which of its frontmatter fields is a date. Its default `sortBy: "frontmatter.date"` compares text, which is correct for `YYYY-MM-DD` and wrong for an offset date-time. Declaring the field in a content type is what fixes it; inferring would mean guessing, which §9.3 refuses everywhere else.
 
 ## 10. Standards Alignment
 

@@ -2,9 +2,9 @@
 
 ## Platform Abstraction, Project Loading, and Component Scoping
 
-**Version:** 0.4.9-draft
-**Status:** Pending
-**Updated:** 2026-08-31
+**Version:** 0.4.9-draft\
+**Status:** Pending\
+**Updated:** 2026-08-31\
 **License:** MIT
 
 ---
@@ -93,45 +93,13 @@ The canonical `StudioPlatform` interface is `packages/studio/src/types.ts` — r
 | **Multi-window / shell** | `openProjectInNewWindow?`, `pickProject?`, `newWindow?`, `setWindowProject?`, `getProjectRoot?`, `getAppInfo?`, `getSettings?`, `patchSettings?`                                                                               |
 | **Canvas**               | `canvasUrl?`, `canvasUrlDeferred?`, `documentBaseUrl?`, `assetSpace?`, `assetCapabilities?`                                                                                                                                    |
 
-**Every path across the PAL is project-relative, in both directions.** A caller passes
-`components/card.json`, and a member that reports paths reports them in that same space — including
-the refactor members, whose reports name files the sweep found. Where a backend speaks a different
-space, the adapter translates, and it translates in ONE direction only: an adapter that both
-prefixes a request and strips a prefix off the reply is asserting that the backend echoes its own
-input space, which is a property of a particular route rather than of the protocol. The dev server's
-own convention is stated in `server.md` §4.1.
+**Every path across the PAL is project-relative, in both directions.** A caller passes `components/card.json`, and a member that reports paths reports them in that same space — including the refactor members, whose reports name files the sweep found. Where a backend speaks a different space, the adapter translates, and it translates in ONE direction only: an adapter that both prefixes a request and strips a prefix off the reply is asserting that the backend echoes its own input space, which is a property of a particular route rather than of the protocol. The dev server's own convention is stated in `server.md` §4.1.
 
-**User settings are written as PATCHES, never as the whole map.** `patchSettings({ set, remove })`
-must leave a key named by neither exactly as it found it, and answers with the store as it then
-stands. A whole-map write cannot express "change this one thing", so every writer implicitly claims
-the whole store: on the chromium launcher, where each window is its own process with its own browser
-profile and therefore its own `localStorage`, a welcome window holding no settings overwrote the
-credentials another window had just stored — and a `settings.json` was left holding one key of the
-three its owner had configured. The rule also preserves keys the writing build does not know: one
-written by a newer version, or by hand. A backend applies the patch under a lock that spans the read
-and the write, so two concurrent patches compose rather than one overwriting the other.
+**User settings are written as PATCHES, never as the whole map.** `patchSettings({ set, remove })` must leave a key named by neither exactly as it found it, and answers with the store as it then stands. A whole-map write cannot express "change this one thing", so every writer implicitly claims the whole store: on the chromium launcher, where each window is its own process with its own browser profile and therefore its own `localStorage`, a welcome window holding no settings overwrote the credentials another window had just stored — and a `settings.json` was left holding one key of the three its owner had configured. The rule also preserves keys the writing build does not know: one written by a newer version, or by hand. A backend applies the patch under a lock that spans the read and the write, so two concurrent patches compose rather than one overwriting the other.
 
-**The canvas needs project files at a URL, not behind `readFile`.** It renders in an iframe, and the
-renderer resolves a component `$ref` by fetching it, so a platform must be able to say where the
-project tree is served. `documentBaseUrl` is that declaration. It defaults to
-`<canvas origin>/<projectRoot>/`, which is already right for any backend serving the tree from its
-web root — the dev server and the desktop loopback both do — and **MUST** be set by a platform whose
-`projectRoot` is an identifier rather than a served path. It may be absolute or root-relative; a
-root-relative value is resolved against the canvas origin, because the canvas composes it as
-`new URL(path, base)` and a relative base throws rather than resolving — which fails the whole
-canvas MOUNT, not one fetch. A host that answers a missing file with a
-single-page fallback compounds a wrong base rather than exposing it: the shell arrives at HTTP 200,
-so the fetch succeeds and the failure surfaces from the JSON parser instead.
+**The canvas needs project files at a URL, not behind `readFile`.** It renders in an iframe, and the renderer resolves a component `$ref` by fetching it, so a platform must be able to say where the project tree is served. `documentBaseUrl` is that declaration. It defaults to `<canvas origin>/<projectRoot>/`, which is already right for any backend serving the tree from its web root — the dev server and the desktop loopback both do — and **MUST** be set by a platform whose `projectRoot` is an identifier rather than a served path. It may be absolute or root-relative; a root-relative value is resolved against the canvas origin, because the canvas composes it as `new URL(path, base)` and a relative base throws rather than resolving — which fails the whole canvas MOUNT, not one fetch. A host that answers a missing file with a single-page fallback compounds a wrong base rather than exposing it: the shell arrives at HTTP 200, so the fetch succeeds and the failure surfaces from the JSON parser instead.
 
-**A platform also declares what its ORIGIN answers.** `documentBaseUrl` says where the project tree
-is served; `assetSpace` says whether the canvas document's own origin serves the published SITE URL
-space as well. They are different questions, and only the first has a default that is usually right.
-A backend serving the tree from its web root answers both by construction — the dev server and the
-desktop loopback do, and declare nothing. A platform on a shared editor origin declares
-`assetSpace: "repo"` **together with** `documentBaseUrl`, and Studio then addresses every media
-reference as a project file under that base rather than as a site URL (`studio.md` §3.4). Neither
-declaration is discoverable: a single-page fallback answers a missing asset with the shell at HTTP
-200, so there is nothing for the canvas to detect.
+**A platform also declares what its ORIGIN answers.** `documentBaseUrl` says where the project tree is served; `assetSpace` says whether the canvas document's own origin serves the published SITE URL space as well. They are different questions, and only the first has a default that is usually right. A backend serving the tree from its web root answers both by construction — the dev server and the desktop loopback do, and declare nothing. A platform on a shared editor origin declares `assetSpace: "repo"` **together with** `documentBaseUrl`, and Studio then addresses every media reference as a project file under that base rather than as a site URL (`studio.md` §3.4). Neither declaration is discoverable: a single-page fallback answers a missing asset with the shell at HTTP 200, so there is nothing for the canvas to detect.
 
 **Core vs. optional, and degradation.** Required members are the minimal backend every platform implements. Optional members (marked `?` in the interface) each back an optional protocol route; Studio feature-detects them and degrades gracefully when they are absent — hiding the corresponding UI or falling back to a client-side path. Each optional route's `degradation` note in `STUDIO_ROUTES` records exactly what turns off (e.g. no `collab` → Studio edits solo with file-level saves; no `importSite` → the New Project modal hides its Import tab).
 
@@ -197,46 +165,21 @@ if (!hasPlatform()) {
 
 ### 3.5 Leaving the Webview
 
-**Both** desktop launchers register Studio's preview-navigation override
-(`@jxsuite/studio/preview-navigate`) so a link clicked in Preview mode goes to the **user's default
-browser** via an `openExternal` RPC, not to the editor's own window. Following a link in Preview
-exists to see the page behave like the deployed thing — routing, history, devtools — and neither a
-webview nor a frameless Chromium `--app` window is that; navigating either would also replace the
-editor. `View: Open in Browser` (§9.5) and the sign-in redirect (§3.6) use the same seam.
+**Both** desktop launchers register Studio's preview-navigation override (`@jxsuite/studio/preview-navigate`) so a link clicked in Preview mode goes to the **user's default browser** via an `openExternal` RPC, not to the editor's own window. Following a link in Preview exists to see the page behave like the deployed thing — routing, history, devtools — and neither a webview nor a frameless Chromium `--app` window is that; navigating either would also replace the editor. `View: Open in Browser` (§9.5) and the sign-in redirect (§3.6) use the same seam.
 
-**Leaving the webview is one-way.** Nothing on this side can bring a browser tab back: no page can
-raise a background tab, and handing the OS opener a URL it already has open opens a DUPLICATE rather
-than switching to the existing one. That is why a live preview retargets its own tab over its reload
-channel (specs/studio.md §10.1) instead of asking the opener a second time, and why doing so reports
-where to look rather than pretending to raise anything.
+**Leaving the webview is one-way.** Nothing on this side can bring a browser tab back: no page can raise a background tab, and handing the OS opener a URL it already has open opens a DUPLICATE rather than switching to the existing one. That is why a live preview retargets its own tab over its reload channel (specs/studio.md §10.1) instead of asking the opener a second time, and why doing so reports where to look rather than pretending to raise anything.
 
-The Bun side hands the URL over in two steps, and the second is not redundancy. ElectroBun's
-`Utils.openExternal` comes from `electrobun/bun` — the module the chromium launcher is defined by
-never loading — so when that is the only path, **every** URL on that build is silently dropped: a
-preview click did nothing at all and sign-in reported "Could not open a browser". The fallback hands
-the URL to the desktop's own opener (`xdg-open`, `open`, `rundll32 url.dll,FileProtocolHandler`) as a
-single argument with no shell, and only for `http`, `https` and `mailto`. The scheme restriction is
-the point of having a list at all: an opener resolves a scheme to whatever handler the desktop
-registered for it, and the pages whose links arrive here are a project's own content.
+The Bun side hands the URL over in two steps, and the second is not redundancy. ElectroBun's `Utils.openExternal` comes from `electrobun/bun` — the module the chromium launcher is defined by never loading — so when that is the only path, **every** URL on that build is silently dropped: a preview click did nothing at all and sign-in reported "Could not open a browser". The fallback hands the URL to the desktop's own opener (`xdg-open`, `open`, `rundll32 url.dll,FileProtocolHandler`) as a single argument with no shell, and only for `http`, `https` and `mailto`. The scheme restriction is the point of having a list at all: an opener resolves a scheme to whatever handler the desktop registered for it, and the pages whose links arrive here are a project's own content.
 
-Refusal is a **return value**, not an exception — `{ ok: false }` — because both steps can decline
-without anything going wrong. A caller that branches only on a rejection loses the click, which is
-what both platform adapters did before. On a genuine refusal Studio's own `window.open` default
-applies.
+Refusal is a **return value**, not an exception — `{ ok: false }` — because both steps can decline without anything going wrong. A caller that branches only on a rejection loses the click, which is what both platform adapters did before. On a genuine refusal Studio's own `window.open` default applies.
 
 ### 3.6 Signing In
 
 > **Status: Implemented.**
 
-The desktop signs in to a provider with the **loopback redirect** of
-[RFC 8252](https://www.rfc-editor.org/rfc/rfc8252) §7.3, protected by
-[PKCE](https://www.rfc-editor.org/rfc/rfc7636). The browser Studio keeps GitHub's device flow, and
-must: it has no loopback server to redirect to, and GitHub's device endpoints send no CORS headers,
-so the page cannot reach them either.
+The desktop signs in to a provider with the **loopback redirect** of [RFC 8252](https://www.rfc-editor.org/rfc/rfc8252) §7.3, protected by [PKCE](https://www.rfc-editor.org/rfc/rfc7636). The browser Studio keeps GitHub's device flow, and must: it has no loopback server to redirect to, and GitHub's device endpoints send no CORS headers, so the page cannot reach them either.
 
-**The device flow is the wrong tool for a desktop app.** RFC 8628 designed it for clients that
-cannot show a browser or take typed input. A desktop app has both, and paying that price anyway
-means the user copies a code between two windows while the app polls a token endpoint on a timer.
+**The device flow is the wrong tool for a desktop app.** RFC 8628 designed it for clients that cannot show a browser or take typed input. A desktop app has both, and paying that price anyway means the user copies a code between two windows while the app polls a token endpoint on a timer.
 
 Four properties are load-bearing, and each is a real attack or a real failure if dropped:
 
@@ -247,34 +190,13 @@ Four properties are load-bearing, and each is a real attack or a real failure if
 | `state` is unguessable, single-use, and compared in constant time | Any local page can navigate a browser to the callback; without this the app adopts an attacker's account                    |
 | The provider's page opens in the **user's own browser**           | §8.12 — an embedded webview can read what the user types into the provider's login form, and carries no existing session    |
 
-**No client secret is sent.** A desktop app cannot keep one (§8.5): shipping it puts it in every
-copy of the binary, where it is a secret in name only. The PKCE verifier is what authenticates the
-exchange.
+**No client secret is sent.** A desktop app cannot keep one (§8.5): shipping it puts it in every copy of the binary, where it is a secret in name only. The PKCE verifier is what authenticates the exchange.
 
-**The callback route is exempt from the project server's token gate, and only from that.** The
-provider redirects the user's browser to the `redirect_uri` it was given, and a page cannot append a
-secret to a URL it does not compose — a token gate there would make the flow impossible rather than
-safe. The Host check and Fetch Metadata still apply (§4.2 of `server.md`), and an IdP redirect is
-exactly the one cross-site shape the strict policy admits: a top-level GET document navigation. The
-callback page carries `Referrer-Policy: no-referrer`, because the authorization code is in that
-request's query string until it is exchanged.
+**The callback route is exempt from the project server's token gate, and only from that.** The provider redirects the user's browser to the `redirect_uri` it was given, and a page cannot append a secret to a URL it does not compose — a token gate there would make the flow impossible rather than safe. The Host check and Fetch Metadata still apply (§4.2 of `server.md`), and an IdP redirect is exactly the one cross-site shape the strict policy admits: a top-level GET document navigation. The callback page carries `Referrer-Policy: no-referrer`, because the authorization code is in that request's query string until it is exchanged.
 
-**Where the token rests.** In the app's own config directory, in a file written owner-only
-(`0600`), **not** in `localStorage` and **not** in the settings store — the settings store is handed
-to the webview wholesale by `getSettings`. The RPC surface answers _whether_ a token exists and
-performs a sign-in; it never returns the store. The limitation is stated rather than hidden: the
-file is plaintext, and another process running as the same user can read it. The OS keychain is the
-right answer and a native dependency per platform; this is strictly better than a browser storage
-entry and no better than that.
+**Where the token rests.** In the app's own config directory, in a file written owner-only (`0600`), **not** in `localStorage` and **not** in the settings store — the settings store is handed to the webview wholesale by `getSettings`. The RPC surface answers _whether_ a token exists and performs a sign-in; it never returns the store. The limitation is stated rather than hidden: the file is plaintext, and another process running as the same user can read it. The OS keychain is the right answer and a native dependency per platform; this is strictly better than a browser storage entry and no better than that.
 
-**Which store a credential belongs in** is decided by one question, and the two stores exist to
-answer it differently: **does the webview have to send this credential itself?** The GitHub token
-does not — only the launcher's sign-in flow touches it — so it lives in `credentials.json` and the
-webview is never handed it. The AI provider key does: the browser sends it as `X-Api-Key` on every
-request to the proxy, so withholding it from the webview and then transmitting it from the webview
-would be the same trust boundary with more moving parts. It therefore stays in the settings store.
-Both files are written owner-only, so the property that actually protects a credential at rest — a
-copied profile, a backup, another account on the machine — does not depend on which one it is in.
+**Which store a credential belongs in** is decided by one question, and the two stores exist to answer it differently: **does the webview have to send this credential itself?** The GitHub token does not — only the launcher's sign-in flow touches it — so it lives in `credentials.json` and the webview is never handed it. The AI provider key does: the browser sends it as `X-Api-Key` on every request to the proxy, so withholding it from the webview and then transmitting it from the webview would be the same trust boundary with more moving parts. It therefore stays in the settings store. Both files are written owner-only, so the property that actually protects a credential at rest — a copied profile, a backup, another account on the machine — does not depend on which one it is in.
 
 ---
 
@@ -468,11 +390,7 @@ A live preview under the fields shows the resolved destination (`/home/you/Sites
 
 ## 5. Backend API Contract
 
-> **Status: Implemented.** Both halves are specified. The route table is canonical and complete,
-> and the failure shape is RFC 9457 `application/problem+json` from the `PROBLEM_TYPES` registry in
-> `@jxsuite/protocol` — one table, generated into the docs beside the routes, so a backend
-> implementer reads the failure vocabulary in the same breath as the success one. `server.md` §4.3
-> holds the reasoning, including the three surfaces that deliberately stay 200.
+> **Status: Implemented.** Both halves are specified. The route table is canonical and complete, and the failure shape is RFC 9457 `application/problem+json` from the `PROBLEM_TYPES` registry in `@jxsuite/protocol` — one table, generated into the docs beside the routes, so a backend implementer reads the failure vocabulary in the same breath as the success one. `server.md` §4.3 holds the reasoning, including the three surfaces that deliberately stay 200.
 
 The Backend API Contract defines the operations that any Studio backend must support. The current `@jxsuite/server` endpoints map directly to these operations. Other backends (ElectroBun Bun process, cloud API) implement the same operations through their own transport.
 
@@ -894,41 +812,19 @@ On NixOS, ElectroBun cannot be built in a Nix sandbox, and system Chromium provi
       └────────────────────┘
 ```
 
-The backend is `createProjectServer()` from `@jxsuite/server` — the same loopback-bound factory
-each ElectroBun window stands up (§7.1), with the same token gate, the same `/__studio__/` asset
-namespace and the same WS-RPC dispatch. It is **not** the dev server, and Studio does **not**
-register the dev-server adapter: `packages/desktop/src/chromium/platform.ts` is this launcher's own
-PAL implementation, translating each member into a WS request against `chromium/index.ts`'s handler
-map. `packages/desktop/tests/_rpc-parity.ts` reads the request names back out of `rpc-schema.ts` and
-fails when either launcher declares one it does not answer.
+The backend is `createProjectServer()` from `@jxsuite/server` — the same loopback-bound factory each ElectroBun window stands up (§7.1), with the same token gate, the same `/__studio__/` asset namespace and the same WS-RPC dispatch. It is **not** the dev server, and Studio does **not** register the dev-server adapter: `packages/desktop/src/chromium/platform.ts` is this launcher's own PAL implementation, translating each member into a WS request against `chromium/index.ts`'s handler map. `packages/desktop/tests/_rpc-parity.ts` reads the request names back out of `rpc-schema.ts` and fails when either launcher declares one it does not answer.
 
-The WS carries traffic in both directions. Frames with an `id` answer something the shell asked;
-frames with a `method` and **no** `id` are the launcher speaking first (`ProjectServerHandle.push`),
-which is how filesystem events reach the sidebar and how a focus request reaches a window.
+The WS carries traffic in both directions. Frames with an `id` answer something the shell asked; frames with a `method` and **no** `id` are the launcher speaking first (`ProjectServerHandle.push`), which is how filesystem events reach the sidebar and how a focus request reaches a window.
 
 ### 9.2 Launcher (`chromium/index.ts`)
 
 The entry point performs, in order:
 
-1. Resolves the project root: the first positional argument, else `JSONSX_PROJECT_ROOT`, else the
-   working directory **but only when it holds a `project.json`** — unless `JX_STUDIO_NO_PROJECT`
-   marks it a welcome window (§9.4). A root that was named is taken at its word; the one nobody
-   typed has to prove itself, because the launcher is also started from a desktop entry and from a
-   shell sitting anywhere. Adopting a directory that is not a project bought nothing — the shell
-   shows the welcome screen either way, since `probeRootProject` reads the same `project.json` —
-   and cost a recursive filesystem watch of, in the reported case, the whole home directory
-   (what such a watcher will and will not descend into is `server.md` §3.1)
+1. Resolves the project root: the first positional argument, else `JSONSX_PROJECT_ROOT`, else the working directory **but only when it holds a `project.json`** — unless `JX_STUDIO_NO_PROJECT` marks it a welcome window (§9.4). A root that was named is taken at its word; the one nobody typed has to prove itself, because the launcher is also started from a desktop entry and from a shell sitting anywhere. Adopting a directory that is not a project bought nothing — the shell shows the welcome screen either way, since `probeRootProject` reads the same `project.json` — and cost a recursive filesystem watch of, in the reported case, the whole home directory (what such a watcher will and will not descend into is `server.md` §3.1)
 2. **Raises an existing window instead of opening a second one** for a project already open (§9.4)
-3. Locates a Chromium binary via `CHROMIUM_BIN` or PATH (`chromium`, `chromium-browser`,
-   `google-chrome`, `google-chrome-stable`); this binary is also the import pipeline's browser
+3. Locates a Chromium binary via `CHROMIUM_BIN` or PATH (`chromium`, `chromium-browser`, `google-chrome`, `google-chrome-stable`); this binary is also the import pipeline's browser
 4. Starts `createProjectServer()` on an ephemeral loopback port, and hosts the sign-in redirect on it
-5. Points the session's filesystem-event sink at the server's push channel, so the sidebar is live.
-   **Registering the sink is what starts the watcher, and the session watches a project or nothing
-   at all:** with no `project.json` at the root it logs one line and declines, because that is the
-   same root `probeRootProject` reports as "no project" — a recursive watch of it would be a scan
-   of a user's directory tree on behalf of a project the window is not showing. Nothing is lost by
-   waiting, since every way a project can arrive (`openProject`, `createProject`,
-   `setWindowProject`) re-roots the session and arms the watcher then
+5. Points the session's filesystem-event sink at the server's push channel, so the sidebar is live. **Registering the sink is what starts the watcher, and the session watches a project or nothing at all:** with no `project.json` at the root it logs one line and declines, because that is the same root `probeRootProject` reports as "no project" — a recursive watch of it would be a scan of a user's directory tree on behalf of a project the window is not showing. Nothing is lost by waiting, since every way a project can arrive (`openProject`, `createProject`, `setWindowProject`) re-roots the session and arms the watcher then
 6. Publishes itself in the window registry and starts watching for focus requests
 7. Launches Chromium with app-mode flags:
    - `--app=<serverUrl>/__studio__/index.html?token=<rpcToken>` — frameless window, gated surface
@@ -948,38 +844,16 @@ The flake's `packages.default` produces a fully sandboxed NixOS package:
 - **Install phase** copies `packages/`, `extensions/` and `node_modules` into the nix store with plain `cp -r`, then deletes dangling symlinks (`find … -xtype l -delete`) rather than dereferencing with `cp -rL`. The prune is why `packages/desktop/tests/nix-bundle-completeness.test.ts` exists: it reads the copied directories back out of `package.nix` and asserts every `@jxsuite/*` dependency of the desktop app lands under one of them, after `extensions/parser` was once pruned out of the bundle silently
 - **Wrapper** creates a `jx-studio` binary that runs `bun run packages/desktop/src/chromium/index.ts` with `CHROMIUM_BIN` and `JX_STUDIO_ASSETS` pre-set to nix store paths. The first positional argument is the **project root**; there is no flag surface
 
-**The desktop entry and the window have to agree.** A taskbar or dock does not read the process,
-the title or `--class`: it takes the window's Wayland `app_id` (X11: `WM_CLASS`) and looks for an
-entry claiming it. Two things were in the way, and each hid the other:
+**The desktop entry and the window have to agree.** A taskbar or dock does not read the process, the title or `--class`: it takes the window's Wayland `app_id` (X11: `WM_CLASS`) and looks for an entry claiming it. Two things were in the way, and each hid the other:
 
-- The entry was installed through `desktopItems`, which takes the **store path's basename** — so it
-  shipped as `<hash>-jx-studio.desktop`, an id that changed with every rebuild. It is installed by
-  hand at a fixed name now.
-- Chromium derives an `--app` window's id from the shell URL and the profile directory and
-  **ignores `--class`** — measured across two ports and two `--user-data-dir` values, all producing
-  `chrome-127.0.0.1____studio___index.html-Default`, and there is no switch to override it
-  (`--wm-class-name` / `--wm-class-class` are Electron's, and absent from the binary).
+- The entry was installed through `desktopItems`, which takes the **store path's basename** — so it shipped as `<hash>-jx-studio.desktop`, an id that changed with every rebuild. It is installed by hand at a fixed name now.
+- Chromium derives an `--app` window's id from the shell URL and the profile directory and **ignores `--class`** — measured across two ports and two `--user-data-dir` values, all producing `chrome-127.0.0.1____studio___index.html-Default`, and there is no switch to override it (`--wm-class-name` / `--wm-class-class` are Electron's, and absent from the binary).
 
-So the entry declares that derived string in `StartupWMClass`, which makes a file in
-`packages/desktop/` depend on a URL composed in `chromium/index.ts`. `chromium/app-id.ts` owns the
-derivation and the shell path the launcher builds the URL from, and the test beside it asserts the
-entry carries exactly what the launcher produces — because the failure mode is silent. Nothing
-errors; the icon is a generic square, and everything else about the app still works, which is why
-it survived in the app launcher (which reads the file, never the window) while the taskbar showed
-nothing.
+So the entry declares that derived string in `StartupWMClass`, which makes a file in `packages/desktop/` depend on a URL composed in `chromium/index.ts`. `chromium/app-id.ts` owns the derivation and the shell path the launcher builds the URL from, and the test beside it asserts the entry carries exactly what the launcher produces — because the failure mode is silent. Nothing errors; the icon is a generic square, and everything else about the app still works, which is why it survived in the app launcher (which reads the file, never the window) while the taskbar showed nothing.
 
-**That is the taskbar/dock icon, and it is a different mechanism from the window's own icon.** A
-window's title bar and alt-tab thumbnail are not drawn from `StartupWMClass` or the `.desktop`
-entry at all — a system `chromium --app` process has no native app icon of its own to give them, so
-Chromium falls back to the loaded page's favicon. `studioShellHtml()` now links one (`STUDIO_FAVICON`,
-studio.md §11.2), which is what lets the window itself show the Jx icon rather than a generic one;
-the two icons can drift independently, and fixing one does not touch the other.
+**That is the taskbar/dock icon, and it is a different mechanism from the window's own icon.** A window's title bar and alt-tab thumbnail are not drawn from `StartupWMClass` or the `.desktop` entry at all — a system `chromium --app` process has no native app icon of its own to give them, so Chromium falls back to the loaded page's favicon. `studioShellHtml()` now links one (`STUDIO_FAVICON`, studio.md §11.2), which is what lets the window itself show the Jx icon rather than a generic one; the two icons can drift independently, and fixing one does not touch the other.
 
-**Which ref a consumer gets.** `packages/desktop/package.nix` builds `src = lib.cleanSource ../..`
-— whatever tree was fetched — so the ref names the release. `main` is the development trunk and
-gives the tip; **`release` holds only released code**, advanced by CI to each `desktop-v*` tag once
-that tag has both produced its installers and passed a real `nix build`. A NixOS user therefore
-pins the branch, not the trunk:
+**Which ref a consumer gets.** `packages/desktop/package.nix` builds `src = lib.cleanSource ../..` — whatever tree was fetched — so the ref names the release. `main` is the development trunk and gives the tip; **`release` holds only released code**, advanced by CI to each `desktop-v*` tag once that tag has both produced its installers and passed a real `nix build`. A NixOS user therefore pins the branch, not the trunk:
 
 ```
 $ nix run github:jxsuite/jx/release
@@ -988,163 +862,71 @@ $ nix build github:jxsuite/jx/release && ./result/bin/jx-studio [project-root]
 
 Locally, `nix build` (no ref) builds the working tree, which is what a contributor wants.
 
-**And the consumer downloads it.** The release publishes `packages.<system>.default` to
-`https://jxsuite.cachix.org`, and the flake's own `nixConfig` names that cache, so
-`nix run github:jxsuite/jx/release` fetches the app rather than producing it. What is published is
-essentially one store path. Everything else in the runtime closure — Chromium, Bun, glibc — is
-already on `cache.nixos.org`, and any path carrying a cache's signature is filtered out of the
-push, so what remains is precisely the `bun install` plus `bun run build` a user would otherwise
-run. Their build-time inputs are never fetched either: Nix does not realise the inputs of a
-derivation whose output it can substitute, which is why the ~1000 npm tarball derivations `bun.nix`
-pins do not have to be published for the substitution to be complete.
+**And the consumer downloads it.** The release publishes `packages.<system>.default` to `https://jxsuite.cachix.org`, and the flake's own `nixConfig` names that cache, so `nix run github:jxsuite/jx/release` fetches the app rather than producing it. What is published is essentially one store path. Everything else in the runtime closure — Chromium, Bun, glibc — is already on `cache.nixos.org`, and any path carrying a cache's signature is filtered out of the push, so what remains is precisely the `bun install` plus `bun run build` a user would otherwise run. Their build-time inputs are never fetched either: Nix does not realise the inputs of a derivation whose output it can substitute, which is why the ~1000 npm tarball derivations `bun.nix` pins do not have to be published for the substitution to be complete.
 
-The push is best-effort by design — a cache is an optimisation, and failing it must not fail the
-job `release` advances behind, whose worst case is the behaviour that preceded the cache. What is
-not best-effort is **noticing**. `verify-cache` runs after the branch moves and asks two things of
-the released ref: does the cache hold the path evaluation produces, and does `nix build
---max-jobs 0` — substitute or fail — succeed against `github:jxsuite/jx/release`. Either answering
-no opens an issue. The second question is also the only check anywhere that the store path CI
-published is the one a consumer's flake fetch evaluates to; CI builds a git checkout and a user
-builds a GitHub tarball, and nothing else in the pipeline would notice if those stopped agreeing.
+The push is best-effort by design — a cache is an optimisation, and failing it must not fail the job `release` advances behind, whose worst case is the behaviour that preceded the cache. What is not best-effort is **noticing**. `verify-cache` runs after the branch moves and asks two things of the released ref: does the cache hold the path evaluation produces, and does `nix build --max-jobs 0` — substitute or fail — succeed against `github:jxsuite/jx/release`. Either answering no opens an issue. The second question is also the only check anywhere that the store path CI published is the one a consumer's flake fetch evaluates to; CI builds a git checkout and a user builds a GitHub tarball, and nothing else in the pipeline would notice if those stopped agreeing.
 
-Nix honours a flake's `nixConfig` substituters only for a user in `trusted-users`, so an
-unprivileged NixOS account ignores the cache and builds from source anyway. That is a property of
-Nix rather than of this packaging, and the install page carries the `nix.settings` form that
-survives it.
+Nix honours a flake's `nixConfig` substituters only for a user in `trusted-users`, so an unprivileged NixOS account ignores the cache and builds from source anyway. That is a property of Nix rather than of this packaging, and the install page carries the `nix.settings` form that survives it.
 
-`release` never advances to a commit whose flake does not build: `.github/workflows/nix.yml` builds
-`.#default` at the tag and asserts the wrapper's `CHROMIUM_BIN` and `JX_STUDIO_ASSETS` resolve, and
-the branch moves only if that succeeds. When it does not, the branch stays where it is and an issue
-is opened — a stale ref that works beats a fresh one that does not. The same workflow runs on any
-pull request touching `flake.nix`, `bun.nix`, `bun.lock` or `packages/desktop/**`, which is the
-first time the flake has been built by CI at all.
+`release` never advances to a commit whose flake does not build: `.github/workflows/nix.yml` builds `.#default` at the tag and asserts the wrapper's `CHROMIUM_BIN` and `JX_STUDIO_ASSETS` resolve, and the branch moves only if that succeeds. When it does not, the branch stays where it is and an issue is opened — a stale ref that works beats a fresh one that does not. The same workflow runs on any pull request touching `flake.nix`, `bun.nix`, `bun.lock` or `packages/desktop/**`, which is the first time the flake has been built by CI at all.
 
-**Both architectures are built; only one is a gate.** `meta.platforms` has always claimed
-`aarch64-linux`, and nothing had ever built it — the `forThisHost` filter that trims `bun.nix` to
-the host's `os`/`cpu` had only been exercised on x86_64. The release therefore runs a second leg on
-an arm runner, and that leg is **advisory**: it is absent from `advance-release-branch`'s `needs`,
-because a first-ever aarch64 failure freezing `release` would strand every x86 user over an
-architecture nobody has received yet. It becomes a gate once it has been green across several
-releases.
+**Both architectures are built; only one is a gate.** `meta.platforms` has always claimed `aarch64-linux`, and nothing had ever built it — the `forThisHost` filter that trims `bun.nix` to the host's `os`/`cpu` had only been exercised on x86_64. The release therefore runs a second leg on an arm runner, and that leg is **advisory**: it is absent from `advance-release-branch`'s `needs`, because a first-ever aarch64 failure freezing `release` would strand every x86 user over an architecture nobody has received yet. It becomes a gate once it has been green across several releases.
 
-**The workflow also runs on pushes to `main`, and that trigger is about the cache rather than the
-check.** A GitHub Actions cache is branch-scoped: a pull request may read the default branch's
-cache, never another pull request's. With no run on `main` there is no base cache to inherit, so
-each PR would refetch from scratch the roughly one thousand fixed-output npm tarball derivations
-`bun.nix` pins — the half of the closure `cache.nixos.org` does not carry and never will, because
-those derivations exist only here. A release-PR merge consequently builds twice, once through the
-`push` trigger and once through release-please's `workflow_call`; they sit in different concurrency
-groups, and the `push` leg is what leaves `main` warm for the next PR.
+**The workflow also runs on pushes to `main`, and that trigger is about the cache rather than the check.** A GitHub Actions cache is branch-scoped: a pull request may read the default branch's cache, never another pull request's. With no run on `main` there is no base cache to inherit, so each PR would refetch from scratch the roughly one thousand fixed-output npm tarball derivations `bun.nix` pins — the half of the closure `cache.nixos.org` does not carry and never will, because those derivations exist only here. A release-PR merge consequently builds twice, once through the `push` trigger and once through release-please's `workflow_call`; they sit in different concurrency groups, and the `push` leg is what leaves `main` warm for the next PR.
 
 ### 9.4 Windows Are Processes
 
 > **Status: Implemented.**
 
-An ElectroBun window is a `BrowserWindow` inside one process, so its window manager is a `Map`
-(§7.1). Chromium owns its own browser process, and the only thing that lives exactly as long as one
-`--app` window is the launcher that started it — so **on this build a window is a process**, and
-`newWindow` / `openProjectInNewWindow` spawn another launcher rather than another object.
+An ElectroBun window is a `BrowserWindow` inside one process, so its window manager is a `Map` (§7.1). Chromium owns its own browser process, and the only thing that lives exactly as long as one `--app` window is the launcher that started it — so **on this build a window is a process**, and `newWindow` / `openProjectInNewWindow` spawn another launcher rather than another object.
 
-That makes the window list the one thing a `Map` cannot be: an answer that spans processes. It is a
-directory of one small owner-only file per window, named for its pid:
+That makes the window list the one thing a `Map` cannot be: an answer that spans processes. It is a directory of one small owner-only file per window, named for its pid:
 
 ```
 <data>/jx-studio/windows/<pid>.json     ← written and deleted by that window, nobody else
 <data>/jx-studio/windows/<pid>.focus    ← written by ANOTHER window to ask this one forward
 ```
 
-**One writer per file is the whole concurrency design.** Nothing read-modify-writes a shared
-document, so two launchers starting at the same instant cannot lose each other's row, and a launcher
-that dies without cleaning up leaves a row whose pid no longer resolves — pruned by the next window
-to read the directory, with no daemon to have missed the death. `JX_STUDIO_WINDOWS_DIR` relocates
-the store, which is what keeps a test run out of the real user's windows.
+**One writer per file is the whole concurrency design.** Nothing read-modify-writes a shared document, so two launchers starting at the same instant cannot lose each other's row, and a launcher that dies without cleaning up leaves a row whose pid no longer resolves — pruned by the next window to read the directory, with no daemon to have missed the death. `JX_STUDIO_WINDOWS_DIR` relocates the store, which is what keeps a test run out of the real user's windows.
 
-**A focus request is a file, not a signal.** A pid the OS has recycled would receive a signal meant
-for a process that no longer exists, and `SIGUSR2` terminates a process that installed no handler.
-A file only the real launcher watches for is inert to anyone else. The request is consumed before
-the window is raised, so a window asked twice comes forward twice.
+**A focus request is a file, not a signal.** A pid the OS has recycled would receive a signal meant for a process that no longer exists, and `SIGUSR2` terminates a process that installed no handler. A file only the real launcher watches for is inert to anyone else. The request is consumed before the window is raised, so a window asked twice comes forward twice.
 
-**Raising is the page's job.** Nothing on the Bun side can bring a Chromium `--app` window forward,
-so the launcher relays the request to its shell as a `focusWindow` push and the page calls
-`window.focus()`. A window manager that refuses the raise leaves the window where it is.
+**Raising is the page's job.** Nothing on the Bun side can bring a Chromium `--app` window forward, so the launcher relays the request to its shell as a `focusWindow` push and the page calls `window.focus()`. A window manager that refuses the raise leaves the window where it is.
 
-**Every window needs a profile directory of its own**, because Chromium's process singleton is keyed
-on it: two windows sharing one directory would be one browser process, and the second launcher's
-window would be handed to the first launcher's browser pointing at a server about to die. A
-project's window uses `<root>/.jx/chromium-profile`, so its Studio layout, theme and open tabs
-survive a restart; a welcome window has no project to key on and takes the lowest `welcome-<n>` slot
-no live window is using. The parent chooses the child's directory (`JX_STUDIO_PROFILE_DIR`) because
-only the parent can see which ones are taken.
+**Every window needs a profile directory of its own**, because Chromium's process singleton is keyed on it: two windows sharing one directory would be one browser process, and the second launcher's window would be handed to the first launcher's browser pointing at a server about to die. A project's window uses `<root>/.jx/chromium-profile`, so its Studio layout, theme and open tabs survive a restart; a welcome window has no project to key on and takes the lowest `welcome-<n>` slot no live window is using. The parent chooses the child's directory (`JX_STUDIO_PROFILE_DIR`) because only the parent can see which ones are taken.
 
-**Dedupe is by normalized root** — resolved, symlinks followed, case-folded on Windows — and it
-applies at three points: launching for a project already open (which raises that window and exits),
-`openProjectInNewWindow`, and `setWindowProject`. The third excludes the calling window, so
-re-rooting never dedupes against itself.
+**Dedupe is by normalized root** — resolved, symlinks followed, case-folded on Windows — and it applies at three points: launching for a project already open (which raises that window and exits), `openProjectInNewWindow`, and `setWindowProject`. The third excludes the calling window, so re-rooting never dedupes against itself.
 
 ### 9.5 What This Build Does Not Implement, and Why
 
-Two PAL families are absent on purpose, and their absence is a claim recorded in
-`CHROMIUM_RPC_EXEMPT`:
+Two PAL families are absent on purpose, and their absence is a claim recorded in `CHROMIUM_RPC_EXEMPT`:
 
-- **The self-updater.** This build is installed and replaced by whatever packaged it. It has no feed
-  to check, so it answers the About screen through `appInfo` — version, channel (`system` when the
-  Nix wrapper's `JX_STUDIO_ASSETS` is set, `development` otherwise), commit — and reports **no**
-  update status rather than an "Up to date" it never verified. ElectroBun answers the same request
-  from its updater, so the About screen has one shape and each launcher fills in only what it knows.
-- **Client-side window decorations.** Studio draws minimize/maximize/close only when the launcher
-  exposes `windowControls`, which ElectroBun does because its `BrowserWindow` is frameless. A
-  Chromium `--app` window is decorated by the desktop environment, and a second set of buttons
-  inside the page would minimize and close nothing.
+- **The self-updater.** This build is installed and replaced by whatever packaged it. It has no feed to check, so it answers the About screen through `appInfo` — version, channel (`system` when the Nix wrapper's `JX_STUDIO_ASSETS` is set, `development` otherwise), commit — and reports **no** update status rather than an "Up to date" it never verified. ElectroBun answers the same request from its updater, so the About screen has one shape and each launcher fills in only what it knows.
+- **Client-side window decorations.** Studio draws minimize/maximize/close only when the launcher exposes `windowControls`, which ElectroBun does because its `BrowserWindow` is frameless. A Chromium `--app` window is decorated by the desktop environment, and a second set of buttons inside the page would minimize and close nothing.
 
-Everything else the ElectroBun launcher implements, this one implements: `previewSite` and the
-overlay pair behind `View: Open in Browser`, `buildSite` behind `Build Site`,
-`subscribeFileEvents` behind the live sidebar, `findReferences`,
-`importSite`, the data and secrets surfaces, the native folder and project pickers (via the XDG
-desktop portal, §8.2.1), and sign-in (§3.6).
+Everything else the ElectroBun launcher implements, this one implements: `previewSite` and the overlay pair behind `View: Open in Browser`, `buildSite` behind `Build Site`, `subscribeFileEvents` behind the live sidebar, `findReferences`, `importSite`, the data and secrets surfaces, the native folder and project pickers (via the XDG desktop portal, §8.2.1), and sign-in (§3.6).
 
 ---
 
 ## 10. SaaS / Cloud Mode
 
-> **Status: Partial.** The adapter shipped and is deployed; §10.2's storage model is not what it was
-> built on. This section said **Future** for as long as the cloud editor had been live, which is the
-> failure mode a status marker exists to prevent — so what follows separates what runs from what is
-> still a sketch.
+> **Status: Partial.** The adapter shipped and is deployed; §10.2's storage model is not what it was built on. This section said **Future** for as long as the cloud editor had been live, which is the failure mode a status marker exists to prevent — so what follows separates what runs from what is still a sketch.
 
 ### 10.1 Cloud Platform Adapter
 
-> **Status: Implemented.** `packages/studio/src/platforms/cloud.ts`, registered by the studio entry
-> rather than by the shell — see §3.3 and the `yjs` singleton note there.
+> **Status: Implemented.** `packages/studio/src/platforms/cloud.ts`, registered by the studio entry rather than by the shell — see §3.3 and the `yjs` singleton note there.
 
 A cloud adapter replaces filesystem operations with API calls to a remote service. The project root becomes a project ID rather than a filesystem path. All PAL methods translate to REST or WebSocket calls to the cloud API.
 
-Concretely, the shipped adapter is session-bound: every call goes to
-`/api/v1/p/:owner/:repo/:branch/studio/*` with cookie auth, so the "project id" is the triple in the
-path. It reports `id: "cloud"`, `canvasUrl: "/canvas.html"` and `openProjectPicker: "repo-list"` —
-that last one routes New Project through Studio's own repository picker over `listRepos` +
-`importProject`, so `openProject()` is never called (§3.4). It implements the full git family, the
-identity and publish members, `subscribeFileEvents` over SSE, and `collab`. It deliberately omits
-`pickDirectory`, `importSite`, the package install family, `gitClone`, `resolveClass` and
-`codeService`; each degrades exactly as its protocol route's `degradation` field describes, which is
-what makes an omission a documented state rather than a break.
+Concretely, the shipped adapter is session-bound: every call goes to `/api/v1/p/:owner/:repo/:branch/studio/*` with cookie auth, so the "project id" is the triple in the path. It reports `id: "cloud"`, `canvasUrl: "/canvas.html"` and `openProjectPicker: "repo-list"` — that last one routes New Project through Studio's own repository picker over `listRepos` + `importProject`, so `openProject()` is never called (§3.4). It implements the full git family, the identity and publish members, `subscribeFileEvents` over SSE, and `collab`. It deliberately omits `pickDirectory`, `importSite`, the package install family, `gitClone`, `resolveClass` and `codeService`; each degrades exactly as its protocol route's `degradation` field describes, which is what makes an omission a documented state rather than a break.
 
-**`discoverComponents` is NOT among them, and the reason it once was is worth keeping.** It returned
-nothing under a blanket "no execution of project JS" posture — but for a JSON component, discovery
-is a file read and a property lookup, and executes nothing. The posture belongs to the formats that
-genuinely need a project-supplied parser, not to the whole feature. Omitting it did not cost a
-feature list: the canvas injects the `$elements` a document's tags need only when the component
-registry is non-empty, so an empty registry meant no component was ever registered or fetched, and
-every instance rendered as an unregistered custom element — blank space where the component should
-be. An omission is only a documented state when something actually degrades gracefully.
+**`discoverComponents` is NOT among them, and the reason it once was is worth keeping.** It returned nothing under a blanket "no execution of project JS" posture — but for a JSON component, discovery is a file read and a property lookup, and executes nothing. The posture belongs to the formats that genuinely need a project-supplied parser, not to the whole feature. Omitting it did not cost a feature list: the canvas injects the `$elements` a document's tags need only when the component registry is non-empty, so an empty registry meant no component was ever registered or fetched, and every instance rendered as an unregistered custom element — blank space where the component should be. An omission is only a documented state when something actually degrades gracefully.
 
 Because a cloud project _is_ a repository, the adapter sets `createDestination: "repo"` and the New Project modal collects a repository location — owner (personal account or organization), repository name, and visibility — instead of a folder (§4.5). The adapter forwards all three to the API, which resolves the owner against the session login to choose between the personal and organization creation endpoints. Nothing about the destination is defaulted server-side.
 
 ### 10.2 Storage Backend
 
-> **Status: Partial.** The mapping below is one possible one and not the one that shipped — the
-> deployed backend is **git-backed**, a cloud project IS a repository, which is why the adapter sets
-> `createDestination: "repo"` and carries the whole git family. What IS settled, and what this
-> section now states, is the part a backend must DECLARE rather than the part it may choose.
+> **Status: Partial.** The mapping below is one possible one and not the one that shipped — the deployed backend is **git-backed**, a cloud project IS a repository, which is why the adapter sets `createDestination: "repo"` and carries the whole git family. What IS settled, and what this section now states, is the part a backend must DECLARE rather than the part it may choose.
 
 The cloud backend stores projects in a database with an abstraction equivalent to the filesystem:
 
@@ -1159,30 +941,17 @@ The same PAL interface means Studio code doesn't change — only the adapter imp
 
 #### What a storage backend MUST declare
 
-Whatever it stores projects in, a backend cannot leave these implicit: none is discoverable from the
-client, and each one fails silently when guessed.
+Whatever it stores projects in, a backend cannot leave these implicit: none is discoverable from the client, and each one fails silently when guessed.
 
-- **Where a project file is served, and in which URL space.** `documentBaseUrl` plus `assetSpace`
-  (§3.1). A backend whose files are perfectly readable through `readFile` can still be `"repo"`
-  space, because what decides it is what answers `GET /hero.jpg` on the canvas document's origin.
-- **Where an upload actually landed.** `uploadFile` answers `UploadResult { path, size? }`, and the
-  `path` is the ANSWER (`studio.md` §9.3). A backend that de-duplicates by content hash, suffixes a
-  collision, or normalizes a name MUST report the path it wrote, or the reference Studio writes into
-  the document names a file that is not there.
-- **What it will accept.** `assetCapabilities` — `maxUploadBytes`, `accept`. Optional, and absence
-  means no declared limit; a declared one lets Studio refuse before the round trip and name the
-  number.
+- **Where a project file is served, and in which URL space.** `documentBaseUrl` plus `assetSpace` (§3.1). A backend whose files are perfectly readable through `readFile` can still be `"repo"` space, because what decides it is what answers `GET /hero.jpg` on the canvas document's origin.
+- **Where an upload actually landed.** `uploadFile` answers `UploadResult { path, size? }`, and the `path` is the ANSWER (`studio.md` §9.3). A backend that de-duplicates by content hash, suffixes a collision, or normalizes a name MUST report the path it wrote, or the reference Studio writes into the document names a file that is not there.
+- **What it will accept.** `assetCapabilities` — `maxUploadBytes`, `accept`. Optional, and absence means no declared limit; a declared one lets Studio refuse before the round trip and name the number.
 
-A backend that stores bytes MUST return them losslessly. Reading a stored blob through a text
-decoder is not a display concern: a lenient UTF-8 decode is TOTAL — it answers every input,
-substituting U+FFFD for each byte it cannot represent, and reports nothing — so a backend that
-re-encodes what it read destroys the file on the next write that touches it.
+A backend that stores bytes MUST return them losslessly. Reading a stored blob through a text decoder is not a display concern: a lenient UTF-8 decode is TOTAL — it answers every input, substituting U+FFFD for each byte it cannot represent, and reports nothing — so a backend that re-encodes what it read destroys the file on the next write that touches it.
 
 ### 10.3 Collaboration
 
-> **Status: Implemented**, and not as sketched. The interface below is what this section proposed;
-> the paragraph after it is what shipped. Kept side by side because the difference is the design
-> decision: locks were replaced by convergence.
+> **Status: Implemented**, and not as sketched. The interface below is what this section proposed; the paragraph after it is what shipped. Kept side by side because the difference is the design decision: locks were replaced by convergence.
 
 The sketch was a lock-and-notify model:
 
@@ -1194,16 +963,9 @@ interface CollaborativePlatform extends StudioPlatform {
 }
 ```
 
-What shipped is one optional PAL member — `collab?: (docPath) => Promise<CollabHandle | null>` — over
-a CRDT (`@jxsuite/collab`, Yjs). There are no locks: two authors edit the same document and the
-document converges, rather than one of them being refused. The adapter probes `/collab` once and
-passes the `protocols` the backend lists to the wire client, which offers one as
-`Sec-WebSocket-Protocol`; a client that offers a subprotocol the server does not echo fails the
-connection outright ([RFC 6455 §4.1](https://www.rfc-editor.org/rfc/rfc6455#section-4.1)), so an
-unconditional offer would break co-editing against every backend that predates negotiation.
+What shipped is one optional PAL member — `collab?: (docPath) => Promise<CollabHandle | null>` — over a CRDT (`@jxsuite/collab`, Yjs). There are no locks: two authors edit the same document and the document converges, rather than one of them being refused. The adapter probes `/collab` once and passes the `protocols` the backend lists to the wire client, which offers one as `Sec-WebSocket-Protocol`; a client that offers a subprotocol the server does not echo fails the connection outright ([RFC 6455 §4.1](https://www.rfc-editor.org/rfc/rfc6455#section-4.1)), so an unconditional offer would break co-editing against every backend that predates negotiation.
 
-The member is still additive in the way this section intended: Studio checks for its presence and
-falls back to solo, file-level saves without it.
+The member is still additive in the way this section intended: Studio checks for its presence and falls back to solo, file-level saves without it.
 
 ---
 
@@ -1257,13 +1019,10 @@ Ensure desktop app matches dev-mode capabilities:
 
 ### Phase 4: Cloud Adapter ✅
 
-- [x] Define cloud API specification (REST endpoints mirroring PAL) — `@jxsuite/protocol`'s route
-      table, one contract for every adapter rather than a cloud-specific one
+- [x] Define cloud API specification (REST endpoints mirroring PAL) — `@jxsuite/protocol`'s route table, one contract for every adapter rather than a cloud-specific one
 - [x] Implement `CloudPlatform` adapter — `packages/studio/src/platforms/cloud.ts`
-- [x] Project authentication and authorization — GitHub OAuth, cookie-bound sessions per
-      `owner/repo@branch`
-- [x] Real-time collaboration via WebSocket change feed — a CRDT rather than a change feed; see
-      §10.3
+- [x] Project authentication and authorization — GitHub OAuth, cookie-bound sessions per `owner/repo@branch`
+- [x] Real-time collaboration via WebSocket change feed — a CRDT rather than a change feed; see §10.3
 
 ## 12. Standards Alignment
 

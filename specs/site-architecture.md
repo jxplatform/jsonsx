@@ -2,9 +2,9 @@
 
 ## File-Based Routing, Content Collections, Layouts, and Static Site Generation
 
-**Version:** 0.6.10-draft
-**Status:** Partial
-**Updated:** 2026-08-29
+**Version:** 0.6.10-draft\
+**Status:** Partial\
+**Updated:** 2026-08-29\
 **License:** MIT
 
 ---
@@ -242,12 +242,7 @@ Site-level declarations cascade to all pages:
 
 Pages may override any inherited value. A page declaring its own `$head` entries appends to (does not replace) the site-level `$head`. A page may shadow a site-level `state` entry with its own.
 
-**The cascade is why editing this file is editing every page.** A bare tag key in `style` compiles
-to a global rule — `h1 { … }`, not a scoped one — and components render into light DOM, so it
-applies inside every component instance too. Studio states that blast radius before the first
-keystroke rather than after the fact (`studio.md` §6.2), and edits `project.json` as a document
-under undo (`studio.md` §17), because a file whose every property reaches every route is the last
-place a silent write belongs.
+**The cascade is why editing this file is editing every page.** A bare tag key in `style` compiles to a global rule — `h1 { … }`, not a scoped one — and components render into light DOM, so it applies inside every component instance too. Studio states that blast radius before the first keystroke rather than after the fact (`studio.md` §6.2), and edits `project.json` as a document under undo (`studio.md` §17), because a file whose every property reaches every route is the last place a silent write belongs.
 
 ---
 
@@ -763,9 +758,7 @@ content/                         # Schemas live in project.json `content`
 
 ### 6.7 Syndication feeds
 
-> **Status: Implemented.** Provided by `@jxsuite/feed`, a first-party extension rather than a
-> compiler built-in: a feed is derived from a content collection, and hard-coding the compiler to
-> one extension's section is the coupling `extensions.md` §1 exists to prevent.
+> **Status: Implemented.** Provided by `@jxsuite/feed`, a first-party extension rather than a compiler built-in: a feed is derived from a content collection, and hard-coding the compiler to one extension's section is the coupling `extensions.md` §1 exists to prevent.
 
 A `feed` section names a collection and the URL prefix its entries are served under:
 
@@ -782,38 +775,17 @@ A `feed` section names a collection and the URL prefix its entries are served un
 }
 ```
 
-**Atom (RFC 4287) and JSON Feed 1.1. RSS 2.0 is deliberately not offered** — it has no standards
-body, its `<guid>` semantics were never settled, and every reader handles Atom. The omission is a
-decision rather than an oversight, which is why it is written down.
+**Atom (RFC 4287) and JSON Feed 1.1. RSS 2.0 is deliberately not offered** — it has no standards body, its `<guid>` semantics were never settled, and every reader handles Atom. The omission is a decision rather than an oversight, which is why it is written down.
 
-**Dates come from the entry, never the build.** The `date` and `updated` frontmatter fields are
-already normalized to RFC 3339 by the parser (`parser.md` §9.3); an entry with no authored date
-falls back to `_meta.mtime`. The feed-level `<updated>` is the newest **item** — a feed stamped with
-the build time re-notifies every subscriber on every deploy.
+**Dates come from the entry, never the build.** The `date` and `updated` frontmatter fields are already normalized to RFC 3339 by the parser (`parser.md` §9.3); an entry with no authored date falls back to `_meta.mtime`. The feed-level `<updated>` is the newest **item** — a feed stamped with the build time re-notifies every subscriber on every deploy.
 
-**RFC 5005.** With `archive: true`, entries beyond `pageSize` are written to
-`/feed/archive/<n>.xml`, linked by `prev-archive` and `next-archive`, each pointing back at the
-subscription document with `rel="current"`. Archives are chunked **from the oldest end**, so
-archive 1 keeps its contents as entries are added and only the newest archive changes — RFC 5005 §2
-asks that a published archive not change. When a feed holds its entire history it says so with
-`<fh:complete/>`, and only then: a document trimmed by `pageSize` is not complete even with no
-archives, and claiming otherwise would be believed.
+**RFC 5005.** With `archive: true`, entries beyond `pageSize` are written to `/feed/archive/<n>.xml`, linked by `prev-archive` and `next-archive`, each pointing back at the subscription document with `rel="current"`. Archives are chunked **from the oldest end**, so archive 1 keeps its contents as entries are added and only the newest archive changes — RFC 5005 §2 asks that a published archive not change. When a feed holds its entire history it says so with `<fh:complete/>`, and only then: a document trimmed by `pageSize` is not complete even with no archives, and claiming otherwise would be believed.
 
-**Discovery.** The `<link rel="alternate">` tags come from the `head` capability
-(`extensions.md` §8.6), not from `emit` — emitters run after every page is written and cannot reach
-a `<head>`. Both formats' links survive the merge because §8.3 keys a link on its `type` as well as
-its `rel` and `href`.
+**Discovery.** The `<link rel="alternate">` tags come from the `head` capability (`extensions.md` §8.6), not from `emit` — emitters run after every page is written and cannot reach a `<head>`. Both formats' links survive the merge because §8.3 keys a link on its `type` as well as its `rel` and `href`.
 
-**A localized collection is several feeds, not one.** When the named collection's `source` carries
-`{locale}` (§13.3), each language is published in its own URL space — `/feed.xml` and
-`/fr-ca/feed.xml` — holding only that language's entries, at that language's item URLs, and saying
-what it carries: `xml:lang` on the Atom feed element, which RFC 4287 §2 makes every child inherit,
-and JSON Feed's `language` member. One feed mixing three languages is worse than it sounds: a reader
-subscribes in theirs and receives every post three times, twice in a language they do not read.
+**A localized collection is several feeds, not one.** When the named collection's `source` carries `{locale}` (§13.3), each language is published in its own URL space — `/feed.xml` and `/fr-ca/feed.xml` — holding only that language's entries, at that language's item URLs, and saying what it carries: `xml:lang` on the Atom feed element, which RFC 4287 §2 makes every child inherit, and JSON Feed's `language` member. One feed mixing three languages is worse than it sounds: a reader subscribes in theirs and receives every post three times, twice in a language they do not read.
 
-Discovery advertises **all** of them, each with `hreflang`. The `head` capability runs before
-routing and cannot know which locale its page is in — one link per language, and the client picks,
-which is what `hreflang` on an `alternate` link is for.
+Discovery advertises **all** of them, each with `hreflang`. The `head` capability runs before routing and cannot know which locale its page is in — one link per language, and the client picks, which is what `hreflang` on an `alternate` link is for.
 
 ## 7. Data Management in Studio
 
@@ -841,8 +813,7 @@ Additionally, the **Browse** canvas mode provides a full-screen project file tab
 
 ### 7.2 Content Collection Browser
 
-The **Library** is the collection browser — an editor kind over a `GridSource`, so a collection is
-the same kind of thing as a data table and is windowed by the same primitive.
+The **Library** is the collection browser — an editor kind over a `GridSource`, so a collection is the same kind of thing as a data table and is windowed by the same primitive.
 
 | Layout       | Status          | Description                                                               |
 | ------------ | --------------- | ------------------------------------------------------------------------- |
@@ -852,14 +823,9 @@ the same kind of thing as a data table and is windowed by the same primitive.
 | **Board**    | **Implemented** | Grouped by a chosen field                                                 |
 | **Media**    | **Implemented** | Thumbnails, for the asset categories                                      |
 
-**Views are windowed, and the window is the contract.** Rendering a live runtime instance per card
-does not survive a real project: the measured case is 300 pages in one category, where the whole
-list is 300 cards and 1,830 DOM nodes against a window's 40 and 270. Previews are mounted by an
-`IntersectionObserver` and held in an LRU whose cap must exceed one window's worth — a cap smaller
-than the window thrashes against itself and re-renders continuously.
+**Views are windowed, and the window is the contract.** Rendering a live runtime instance per card does not survive a real project: the measured case is 300 pages in one category, where the whole list is 300 cards and 1,830 DOM nodes against a window's 40 and 270. Previews are mounted by an `IntersectionObserver` and held in an LRU whose cap must exceed one window's worth — a cap smaller than the window thrashes against itself and re-renders continuously.
 
-The layout is selectable per collection and remembered, along with the filter, sort, columns and
-grouping, as a **saved view**.
+The layout is selectable per collection and remembered, along with the filter, sort, columns and grouping, as a **saved view**.
 
 ### 7.3 Markdown WYSIWYG Editing (Implemented)
 
@@ -874,13 +840,9 @@ Markdown files (`.md`) open in **content mode** — a centered column WYSIWYG ca
 
 #### Frontmatter Form
 
-> **Status: Implemented.** A content entry belonging to a collection with a schema opens the **entry
-> editor**, a schema-driven form over the same widget mapping the inspector uses.
+> **Status: Implemented.** A content entry belonging to a collection with a schema opens the **entry editor**, a schema-driven form over the same widget mapping the inspector uses.
 
-**One editor, two storage shapes.** Where an entry's fields LIVE depends on its format and nothing
-else: a Markdown entry keeps them in frontmatter, a JSON entry _is_ the document. The editor reads
-and writes whichever the format declares — forking the editor per format is how a JSON entry came to
-render a blank form and discard every edit while reporting success.
+**One editor, two storage shapes.** Where an entry's fields LIVE depends on its format and nothing else: a Markdown entry keeps them in frontmatter, a JSON entry _is_ the document. The editor reads and writes whichever the format declares — forking the editor per format is how a JSON entry came to render a blank form and discard every edit while reporting success.
 
 | JSON Schema Type                     | Widget                                        |
 | ------------------------------------ | --------------------------------------------- |
@@ -897,16 +859,11 @@ render a blank form and discard every edit while reporting success.
 
 #### JSON Data Entry Editing
 
-> **Status: Implemented.** A JSON entry opens the same form as a Markdown one, generated from the
-> collection's schema. Its fields are the document's own properties — see the storage-shape rule
-> above.
+> **Status: Implemented.** A JSON entry opens the same form as a Markdown one, generated from the collection's schema. Its fields are the document's own properties — see the storage-shape rule above.
 
 #### CSV Editing
 
-> **Status: Implemented**, though not as this section imagined it. A `.csv` entry opens as a
-> **`GridSource`** rather than a bespoke `<sp-table>`, so it inherits the table, the edit buffer,
-> undo and the import path that every other tabular surface uses. Column types still derive from the
-> schema.
+> **Status: Implemented**, though not as this section imagined it. A `.csv` entry opens as a **`GridSource`** rather than a bespoke `<sp-table>`, so it inherits the table, the edit buffer, undo and the import path that every other tabular surface uses. Column types still derive from the schema.
 
 ### 7.5 Content CRUD Operations
 
@@ -922,13 +879,10 @@ render a blank form and discard every edit while reporting success.
 
 Entries with `"draft": true` (a conventional boolean field in the schema):
 
-- Shown with a "Draft" badge in the collection browser, **and on the pane tab of an open entry** —
-  the failure this guards against is publishing something the author believed was private, and that
-  belief is formed while editing, not while browsing
+- Shown with a "Draft" badge in the collection browser, **and on the pane tab of an open entry** — the failure this guards against is publishing something the author believed was private, and that belief is formed while editing, not while browsing
 - Excluded from production builds by default
 - Included in dev server builds for preview
-- A column and a filter in the Library, with an explicit "including drafts" perspective rather than
-  a hidden default
+- A column and a filter in the Library, with an explicit "including drafts" perspective rather than a hidden default
 
 ---
 
@@ -1016,19 +970,9 @@ Deduplication is by `tagName` plus the attribute that identifies the element: `n
 
 An auto-injected entry loses to an author-supplied one under the same key, including the canonical link.
 
-**`rel` values are checked against the IANA Link Relation Types registry.** A misspelled relation —
-`stylshet`, `canonicial`, `alternative` — is well-formed HTML that renders, passes every other check
-in this build, and does nothing at all: the stylesheet never loads, the canonical never
-consolidates. There is no runtime symptom, so the build says so instead.
+**`rel` values are checked against the IANA Link Relation Types registry.** A misspelled relation — `stylshet`, `canonicial`, `alternative` — is well-formed HTML that renders, passes every other check in this build, and does nothing at all: the stylesheet never loads, the canonical never consolidates. There is no runtime symptom, so the build says so instead.
 
-It is a **warning, never an error**, and reported once per distinct value across the whole build
-rather than once per page — the mistake that matters lives in the site or layout `$head` and is
-therefore on every page. Three things are deliberately not reported: registered relations
-(`link-relations.ts` snapshots the registry CSV and names the date it was taken), `shortcut` (the
-legacy spelling in `rel="shortcut icon"`, which the HTML Standard handles explicitly), and any
-absolute URI, which is RFC 8288 §2.1.2's extension mechanism and the one way to express a relation
-the registry does not carry. The snapshot going stale therefore costs one line of noise, not a
-broken build.
+It is a **warning, never an error**, and reported once per distinct value across the whole build rather than once per page — the mistake that matters lives in the site or layout `$head` and is therefore on every page. Three things are deliberately not reported: registered relations (`link-relations.ts` snapshots the registry CSV and names the date it was taken), `shortcut` (the legacy spelling in `rel="shortcut icon"`, which the HTML Standard handles explicitly), and any absolute URI, which is RFC 8288 §2.1.2's extension mechanism and the one way to express a relation the registry does not carry. The snapshot going stale therefore costs one line of noise, not a broken build.
 
 ### 8.4 Automatic SEO
 
@@ -1061,11 +1005,7 @@ Redirect sources are not pages and never appear in the sitemap.
 
 ### 8.5 Structured Data (JSON-LD)
 
-> **Status: Implemented.** A head entry's `textContent` may be an object; the compiler serializes
-> it to JSON inside the tag, and template strings **inside** the object resolve against the same
-> scope as everywhere else — a structured-data block that cannot reference the page it describes
-> would not be much use. The interpreting runtime serializes it identically, so a dev preview and a
-> built page agree.
+> **Status: Implemented.** A head entry's `textContent` may be an object; the compiler serializes it to JSON inside the tag, and template strings **inside** the object resolve against the same scope as everywhere else — a structured-data block that cannot reference the page it describes would not be much use. The interpreting runtime serializes it identically, so a dev preview and a built page agree.
 
 Pages may include JSON-LD for rich search results:
 
@@ -1094,25 +1034,13 @@ The compiler serializes the `textContent` object to a JSON string within the `<s
 
 ### 8.6 Studio SEO Panel
 
-> **Status: Implemented.** The previews live in a **modal**, `Search appearance`, rather than an
-> inspector tab: they describe the document rather than a selection, and a rendered SERP row is a
-> picture you study at width, not a field you fill in beside four others. They began as a
-> disclosure inside the Document Header card and outgrew it — the card's job is the handful of
-> values you type while writing.
+> **Status: Implemented.** The previews live in a **modal**, `Search appearance`, rather than an inspector tab: they describe the document rather than a selection, and a rendered SERP row is a picture you study at width, not a field you fill in beside four others. They began as a disclosure inside the Document Header card and outgrew it — the card's job is the handful of values you type while writing.
 
-**The preview shows the MERGED `$head`** (§8.3), not the page's own entries — a page appends to the
-site's head rather than replacing it, so a preview of the page's half would misreport every title
-that inherits. Values the page did not author are marked as inherited, naming the donor, in the same
-provenance vocabulary the inspector uses for style and props.
+**The preview shows the MERGED `$head`** (§8.3), not the page's own entries — a page appends to the site's head rather than replacing it, so a preview of the page's half would misreport every title that inherits. Values the page did not author are marked as inherited, naming the donor, in the same provenance vocabulary the inspector uses for style and props.
 
-**There is no score.** Counters and named warnings only. A number out of 100 invites optimising the
-number, and the number is not the thing.
+**There is no score.** Counters and named warnings only. A number out of 100 invites optimising the number, and the number is not the thing.
 
-**Two doors and a command.** The surface is opened by `document.openSeo` — a document-level command
-in the palette, with an `aiTool` projection — and projected onto two buttons: one at the foot of the
-Document Header card, one beside the Page panel's `Page` heading. Neither surface owns it. Two
-buttons because they are two moments: while writing the page, and while working on its head
-material.
+**Two doors and a command.** The surface is opened by `document.openSeo` — a document-level command in the palette, with an `aiTool` projection — and projected onto two buttons: one at the foot of the Document Header card, one beside the Page panel's `Page` heading. Neither surface owns it. Two buttons because they are two moments: while writing the page, and while working on its head material.
 
 For any page or content entry it shows:
 
@@ -1122,90 +1050,33 @@ For any page or content entry it shows:
 - **Schema.org editor:** Form-based JSON-LD editor for structured data
 - **Warnings:** Missing title, missing description, description too long, missing OG image
 
-The editable fields sit **below** the previews and the warnings, grouped by the preview each group
-feeds — `Search result` (description, viewport, icon) and `Social card` (the Open Graph four).
-Ungrouped they collide: Open Graph carries its own `Title`, `Description` and `Image`, so one flat
-column gave `Description` two meanings. Every field commits live, and the previews redraw with it.
+The editable fields sit **below** the previews and the warnings, grouped by the preview each group feeds — `Search result` (description, viewport, icon) and `Social card` (the Open Graph four). Ungrouped they collide: Open Graph carries its own `Title`, `Description` and `Image`, so one flat column gave `Description` two meanings. Every field commits live, and the previews redraw with it.
 
 ### 8.7 Bare Specifiers in `$head` and `$elements`
 
-> **Status: Implemented.** `rewriteNpmAsset` in `site-build.ts`; the copy step runs beside sidecar
-> bundling. Resolution runs on all three `$head` levels and both `$elements` levels — see "Every
-> level" below, which is a correction rather than an addition — package subpaths resolve through an
-> import-map prefix key, and an npm `$elements` set is bundled as one self-contained module.
+> **Status: Implemented.** `rewriteNpmAsset` in `site-build.ts`; the copy step runs beside sidecar bundling. Resolution runs on all three `$head` levels and both `$elements` levels — see "Every level" below, which is a correction rather than an addition — package subpaths resolve through an import-map prefix key, and an npm `$elements` set is bundled as one self-contained module.
 
-A `$head` entry may name a file inside an installed package by bare specifier rather than by URL —
-`"@shoelace-style/shoelace/dist/themes/light.css"`. The build **resolves it against the project
-root and copies the file into `/assets/`** under a flattened, hash-free name derived from the
-specifier: `/assets/shoelace-style-shoelace-dist-themes-light.css`. The extension is preserved,
-because both the browser and the host dispatch on it.
+A `$head` entry may name a file inside an installed package by bare specifier rather than by URL — `"@shoelace-style/shoelace/dist/themes/light.css"`. The build **resolves it against the project root and copies the file into `/assets/`** under a flattened, hash-free name derived from the specifier: `/assets/shoelace-style-shoelace-dist-themes-light.css`. The extension is preserved, because both the browser and the host dispatch on it.
 
-`$elements` entries name modules rather than files, so they are **bundled** through the same path a
-Function-def `$src` takes (`spec.md` §12) and land at the same kind of URL. Bundling rather than
-copying is what makes the package's own bare imports resolvable: the emitted import map carries two
-entries, and a component package imports far more than that.
+`$elements` entries name modules rather than files, so they are **bundled** through the same path a Function-def `$src` takes (`spec.md` §12) and land at the same kind of URL. Bundling rather than copying is what makes the package's own bare imports resolvable: the emitted import map carries two entries, and a component package imports far more than that.
 
-**Every level, not just the project's.** Both keys are legal on the project, on a layout and on a
-page, and resolution applies wherever they are written. This is stated because it did not hold: the
-`$head` pass ran over `projectConfig.$head` alone and the `$elements` pass read the layout alone, so
-the identical declaration written on a **page** was silently skipped — its stylesheet shipped as a
-bare specifier the browser resolved against the page URL, and its component modules were never
-imported at all. The page rendered unknown elements with nothing in the build log, because a
-dropped entry produced no output to be wrong.
+**Every level, not just the project's.** Both keys are legal on the project, on a layout and on a page, and resolution applies wherever they are written. This is stated because it did not hold: the `$head` pass ran over `projectConfig.$head` alone and the `$elements` pass read the layout alone, so the identical declaration written on a **page** was silently skipped — its stylesheet shipped as a bare specifier the browser resolved against the page URL, and its component modules were never imported at all. The page rendered unknown elements with nothing in the build log, because a dropped entry produced no output to be wrong.
 
-**A page whose only components come from npm still gets an import map.** The map is what makes the
-two external runtime modules resolvable, and it was emitted only alongside Jx component scripts —
-so a page with npm elements and no Jx components got modules that immediately failed on
-`Failed to resolve module specifier "lit-html"`.
+**A page whose only components come from npm still gets an import map.** The map is what makes the two external runtime modules resolvable, and it was emitted only alongside Jx component scripts — so a page with npm elements and no Jx components got modules that immediately failed on `Failed to resolve module specifier "lit-html"`.
 
-Copies and bundles share one output directory, so they share one namespace. Two different files
-that flatten to the same name is a **build error** naming both, never a last-writer-wins overwrite.
+Copies and bundles share one output directory, so they share one namespace. Two different files that flatten to the same name is a **build error** naming both, never a last-writer-wins overwrite.
 
-**A package subpath resolves through a prefix key.** A `$src` sidecar may import a _subpath_ of a
-runtime module — `lit-html/directives/class-map.js` — and a package-name external covers the
-package's subpaths as well, so the specifier survives into the bundle. The import map therefore
-carries a `/`-suffixed prefix entry beside each exact one (`"lit-html/": "/assets/lit-html/"`), and
-the build writes the subpaths it finds referenced in the emitted assets. The set is **discovered
-from the output**, never enumerated: which subpaths exist is a property of the third-party code a
-page happens to use.
+**A package subpath resolves through a prefix key.** A `$src` sidecar may import a _subpath_ of a runtime module — `lit-html/directives/class-map.js` — and a package-name external covers the package's subpaths as well, so the specifier survives into the bundle. The import map therefore carries a `/`-suffixed prefix entry beside each exact one (`"lit-html/": "/assets/lit-html/"`), and the build writes the subpaths it finds referenced in the emitted assets. The set is **discovered from the output**, never enumerated: which subpaths exist is a property of the third-party code a page happens to use.
 
-**The subpath is bundled; only the core is external.** That the package-name external covers
-subpaths is what makes the specifier survive into a page's bundle, and it is also the trap when the
-build comes to satisfy it: listing the package in `external` externalises the subpath ENTRY too, so
-the emitted asset is a re-export of the very specifier the prefix key points back at it —
-`export * from "lit-html/directives/class-map.js"` served AS
-`/assets/lit-html/directives/class-map.js`. A self-referential module has an empty namespace, so
-every page using a directive failed on an undefined import while the build reported success. The
-externals are therefore decided per import by a hook that can see the **importer**: the entry's own
-import resolves and is bundled, and everything reached through it that belongs to a runtime package
-stays external.
+**The subpath is bundled; only the core is external.** That the package-name external covers subpaths is what makes the specifier survive into a page's bundle, and it is also the trap when the build comes to satisfy it: listing the package in `external` externalises the subpath ENTRY too, so the emitted asset is a re-export of the very specifier the prefix key points back at it — `export * from "lit-html/directives/class-map.js"` served AS `/assets/lit-html/directives/class-map.js`. A self-referential module has an empty namespace, so every page using a directive failed on an undefined import while the build reported success. The externals are therefore decided per import by a hook that can see the **importer**: the entry's own import resolves and is bundled, and everything reached through it that belongs to a runtime package stays external.
 
-**The core is reached through a stub, so a page gets one copy.** A package imports its own core by
-RELATIVE path from inside itself (`../lit-html.js`), and a bundler keeps an external's specifier
-exactly as the source wrote it — a rewritten one is not honoured. The shared copy is therefore
-reached by emitting a stub at the place that relative path lands in the OUTPUT tree, re-exporting
-the bare specifier the import map already resolves. Two copies of lit on a page is a documented
-breakage, not a size regression, and a text assertion about the emitted file cannot tell the two
-apart: the guarantee is proved by loading the asset and reading its exports.
+**The core is reached through a stub, so a page gets one copy.** A package imports its own core by RELATIVE path from inside itself (`../lit-html.js`), and a bundler keeps an external's specifier exactly as the source wrote it — a rewritten one is not honoured. The shared copy is therefore reached by emitting a stub at the place that relative path lands in the OUTPUT tree, re-exporting the bare specifier the import map already resolves. Two copies of lit on a page is a documented breakage, not a size regression, and a text assertion about the emitted file cannot tell the two apart: the guarantee is proved by loading the asset and reading its exports.
 
-Discovery runs to closure rather than once, because bundling one subpath can reveal the next — a
-directive importing another directive stays external and is found on the following pass. A graph
-deeper than the pass budget is a build error rather than a silent truncation: at that depth the
-likelier explanation is a cycle in the scan than a real dependency chain.
+Discovery runs to closure rather than once, because bundling one subpath can reveal the next — a directive importing another directive stays external and is found on the following pass. A graph deeper than the pass budget is a build error rather than a silent truncation: at that depth the likelier explanation is a cycle in the scan than a real dependency chain.
 
-**An npm `$elements` set is bundled as ONE self-contained module**, with nothing external. Two
-measurements decided this. Bundling each specifier separately against an external framework
-produced output that threw before defining anything: Bun's codegen for `export *` from an external
-emits a re-export against a namespace it never imports, and a component package re-exporting its
-framework is exactly that shape. Inlining per specifier fixes the codegen and gives each component
-its own framework copy — seven of them on the demo that motivated this. Bundling the set as one
-entry gives one copy, no external and no import map: 190kb against 462kb, and correct instead of
-broken.
+**An npm `$elements` set is bundled as ONE self-contained module**, with nothing external. Two measurements decided this. Bundling each specifier separately against an external framework produced output that threw before defining anything: Bun's codegen for `export *` from an external emits a re-export against a namespace it never imports, and a component package re-exporting its framework is exactly that shape. Inlining per specifier fixes the codegen and gives each component its own framework copy — seven of them on the demo that motivated this. Bundling the set as one entry gives one copy, no external and no import map: 190kb against 462kb, and correct instead of broken.
 
-An unresolvable specifier is a build error too. It was previously rewritten to
-`/node_modules/<specifier>`, which the dev server happens to serve and which nothing copies into
-`dist/` — so the page worked while it was being written and lost the file on deploy. A missing
-dependency now fails the build that would have shipped it.
+An unresolvable specifier is a build error too. It was previously rewritten to `/node_modules/<specifier>`, which the dev server happens to serve and which nothing copies into `dist/` — so the page worked while it was being written and lost the file on deploy. A missing dependency now fails the build that would have shipped it.
 
 ---
 
@@ -1323,9 +1194,7 @@ The `.cache/` directory should be added to `.gitignore` but can optionally be co
 Setting `"service": "cloudflare"` replaces the build-time Sharp pipeline with Cloudflare [transform-via-URL](https://developers.cloudflare.com/images/transform-images/transform-via-url/) markup — no code is deployed and no bindings are required, so it works with any adapter as long as the site is served through a Cloudflare zone:
 
 - **No variants are generated at build time** — Sharp is only used to read original image dimensions (for `width`/`height` attributes), and `.cache/images/` / `dist/images/_optimized/` are not used.
-- **srcset rewriting** — eligible `<img>` nodes (same skip rules as §9.2.3) get a `srcset` of transform URLs, one per configured width ≤ the original width:
-  `/cdn-cgi/image/width=640,quality=80,fit=scale-down,format=auto/images/hero.png?v=<hash8> 640w, ...`
-  `format=auto` makes Cloudflare negotiate AVIF/WebP per browser; the single `quality` comes from `quality.webp`. The `v` param is an 8-char content hash for cache busting. The original `src` is left untouched as a fallback.
+- **srcset rewriting** — eligible `<img>` nodes (same skip rules as §9.2.3) get a `srcset` of transform URLs, one per configured width ≤ the original width: `/cdn-cgi/image/width=640,quality=80,fit=scale-down,format=auto/images/hero.png?v=<hash8> 640w, ...` `format=auto` makes Cloudflare negotiate AVIF/WebP per browser; the single `quality` comes from `quality.webp`. The `v` param is an 8-char content hash for cache busting. The original `src` is left untouched as a fallback.
 - **Remote sources** — https URLs whose hostname is in `images.remoteDomains` get the same treatment with the full URL as the transform source (every configured width is emitted since original dimensions are unknown; `fit=scale-down` prevents upscaling). The zone must allow resizing from the remote origin (Images → Transformations → Sources).
 - **Zone requirement** — Image Transformations must be enabled for the zone (Cloudflare dashboard → Images → Transformations). The build prints a reminder. These URLs do **not** resolve on `*.pages.dev` / `*.workers.dev` preview hosts — only on the production custom domain; previews fall back to the untouched `src` originals.
 
@@ -1333,9 +1202,7 @@ Setting `"service": "cloudflare"` replaces the build-time Sharp pipeline with Cl
 
 > **Status: Implemented.** `img-loading.ts`, applied by both halves of `image-transform.ts`.
 
-`loading` and `decoding` are decided **once**, by `images.lazyLoad`, for every `<img>` in the
-project — including images the optimizer skipped and images in projects with `optimize: false`.
-Declining to generate variants for an image says nothing about when the browser should fetch it.
+`loading` and `decoding` are decided **once**, by `images.lazyLoad`, for every `<img>` in the project — including images the optimizer skipped and images in projects with `optimize: false`. Declining to generate variants for an image says nothing about when the browser should fetch it.
 
 The compiler adds `loading="lazy"` and `decoding="async"` unless one of three things is true:
 
@@ -1345,15 +1212,9 @@ The compiler adds `loading="lazy"` and `decoding="async"` unless one of three th
 | The author set `loading` | Left exactly as written, `eager` or `lazy`                                                                     |
 | `fetchpriority="high"`   | Nothing is added — a high-priority lazy image is a contradiction the browser resolves by ignoring the priority |
 
-A document compiled on its own — outside a project, with no `images` config to read — gets no
-loading attributes at all. The setting is the project's, and inventing a default for a document
-that never declared one is how the previous behaviour reached the LCP image in the first place.
+A document compiled on its own — outside a project, with no `images` config to read — gets no loading attributes at all. The setting is the project's, and inventing a default for a document that never declared one is how the previous behaviour reached the LCP image in the first place.
 
-**The compiler does not guess which image is the LCP.** That depends on the viewport, not the
-document, so there is no correct static answer; `fetchpriority="high"` is how the author gives one.
-Before this contract the static emitter added `loading="lazy"` to every `<img>` that lacked one —
-outside `images.optimize`, outside the pipeline, and therefore to the LCP image as well, which is
-the one image on a page that must never be lazy.
+**The compiler does not guess which image is the LCP.** That depends on the viewport, not the document, so there is no correct static answer; `fetchpriority="high"` is how the author gives one. Before this contract the static emitter added `loading="lazy"` to every `<img>` that lacked one — outside `images.optimize`, outside the pipeline, and therefore to the LCP image as well, which is the one image on a page that must never be lazy.
 
 ### 9.3 Referencing Media
 
@@ -1425,18 +1286,7 @@ So the contract binds the engine, both ways:
 - A reference is not always a VALUE, and not always shaped like a file. `project.json`'s `copy` map names the files it copies in its **keys**, and a content collection's `source` may name a **directory**, which carries no extension for the shape rule below to recognise. Both sit at a key the engine already knows by name, so both are read by name. The other half of `copy` is the counterexample that makes the rule: its values are destinations inside `outDir`, a directory no rename inside the project can move, so they are not references and are never rewritten.
 - A rewritten reference keeps the style the author wrote, trailing slash included. A directory `source` re-emitted without one is a diff on a line the rename had no business restyling.
 
-**A file outside the project root has no project-relative name, and that is the whole of why it has
-no usage count.** A collection's `source` may point outside the project (§9.3), and the compiler and
-the dev server both publish its media at the collection's mount URL, so it renders correctly. Nothing
-else about it works, and the pieces agree with each other: the engine drops a mount resolving outside
-the root, because no project-relative path names the file and no rename inside the project could move
-it; and the editing host's file API is project-scoped by containment check, so such a file cannot be
-listed, opened or previewed either. The result is coherent rather than broken — no surface can name
-the file, so no surface reports a confident zero about it, which is the failure this section exists
-to prevent. Closing the gap is not a matter of widening the engine: it means deciding how a file
-outside the project is ADDRESSED at all, most likely a mount-relative identity rather than a
-project-relative path, which is a change to the host's file API and not to the reference engine. That
-decision is not owed until a cross-root collection ships.
+**A file outside the project root has no project-relative name, and that is the whole of why it has no usage count.** A collection's `source` may point outside the project (§9.3), and the compiler and the dev server both publish its media at the collection's mount URL, so it renders correctly. Nothing else about it works, and the pieces agree with each other: the engine drops a mount resolving outside the root, because no project-relative path names the file and no rename inside the project could move it; and the editing host's file API is project-scoped by containment check, so such a file cannot be listed, opened or previewed either. The result is coherent rather than broken — no surface can name the file, so no surface reports a confident zero about it, which is the failure this section exists to prevent. Closing the gap is not a matter of widening the engine: it means deciding how a file outside the project is ADDRESSED at all, most likely a mount-relative identity rather than a project-relative path, which is a change to the host's file API and not to the reference engine. That decision is not owed until a cross-root collection ships.
 
 Which keys carry a reference is not a fixed list. The document shapes that carry one grow with every extension that defines a media-typed prop, so an engine that enumerates key names is wrong by construction the next time one is added; what it can rely on is that a reference is a string SHAPED like a file, and that precision comes from resolving it and comparing against the file in question.
 
@@ -1444,31 +1294,13 @@ Only statically referenced files are copied into the build. A `src` computed at 
 
 ### 9.4 Studio Media Browser
 
-> **Status: Partial.** Upload, browsing, metadata and the referenced-file warning ship. Usage is
-> COMPUTED but not browsable — see the list at the end of this section, which contradicted this
-> marker for as long as both existed. The full Studio-side contract is `studio.md` §9.3 — this
-> section states only what it means for the media on disk.
+> **Status: Partial.** Upload, browsing, metadata and the referenced-file warning ship. Usage is COMPUTED but not browsable — see the list at the end of this section, which contradicted this marker for as long as both existed. The full Studio-side contract is `studio.md` §9.3 — this section states only what it means for the media on disk.
 
-**A preview resolves in the same space the canvas does.** Panel chrome — a media-picker thumbnail,
-the social card in a search-appearance preview — renders in the editor's own document, not the
-canvas, so a reference resolved for one and not the other breaks in exactly the places nobody
-photographs. The two take different things and must not be confused: a preview of what the AUTHOR
-WROTE resolves as §9.3 describes, while a preview of a FILE the browser is listing starts from the
-path and asks where that file publishes. `public/hero.jpg` is written `/hero.jpg` — a string that
-shares not one segment with it — so a preview built by prefixing a file path with a slash names a
-URL the site does not publish.
+**A preview resolves in the same space the canvas does.** Panel chrome — a media-picker thumbnail, the social card in a search-appearance preview — renders in the editor's own document, not the canvas, so a reference resolved for one and not the other breaks in exactly the places nobody photographs. The two take different things and must not be confused: a preview of what the AUTHOR WROTE resolves as §9.3 describes, while a preview of a FILE the browser is listing starts from the path and asks where that file publishes. `public/hero.jpg` is written `/hero.jpg` — a string that shares not one segment with it — so a preview built by prefixing a file path with a slash names a URL the site does not publish.
 
-**Usage is asked about the FILE, once.** A content-relative `./images/` reference previews at its
-asset-mount URL while the source keeps the authored form, so a media surface holds at least three
-names for one file and could ask under any of them. It asks under the file: §9.3 binds the engine to
-resolve every authored spelling, so a host that enumerated the spellings itself would be a second
-implementation of that rule — and the half that can fix a count but never a rewrite. Under-counting
-is what makes a delete look safe when it is not, so a delete states its reference count, and where
-the count cannot be answered it says **unknown**, never zero.
+**Usage is asked about the FILE, once.** A content-relative `./images/` reference previews at its asset-mount URL while the source keeps the authored form, so a media surface holds at least three names for one file and could ask under any of them. It asks under the file: §9.3 binds the engine to resolve every authored spelling, so a host that enumerated the spellings itself would be a second implementation of that rule — and the half that can fix a count but never a rewrite. Under-counting is what makes a delete look safe when it is not, so a delete states its reference count, and where the count cannot be answered it says **unknown**, never zero.
 
-Studio adds media to a project from four places: the Upload button on any image field, a file
-dropped on the canvas, a file dropped on the Files tree, and the Library's drop zone — which names
-its destination before the drop rather than choosing one for you. All of them write through the same core, which decides:
+Studio adds media to a project from four places: the Upload button on any image field, a file dropped on the canvas, a file dropped on the Files tree, and the Library's drop zone — which names its destination before the drop rather than choosing one for you. All of them write through the same core, which decides:
 
 - **Destination** — a document inside a content collection co-locates its media in `content/<collection>/images/` (§9.1); everything else lands in `public/`. The Files tree and the Manage view name their destination explicitly instead.
 - **Reference** — written per §9.3: `public/` contents from the site root (`/hero.jpg`), a content asset relative to its own entry (`./images/hero.jpg`) so the collection loader rewrites it to the asset mount, anything else relative to the project root.
@@ -1481,22 +1313,10 @@ Shipped:
 - **Grid/list view** of all media in the project (thumbnail grid as default, table as alternative)
 - **Upload** — drag-and-drop or a file picker, on all four surfaces above
 - **Preview** — thumbnails for images, in both the picker and the Manage view
-- **Metadata** — dimensions and file size, as a row caption in the media picker
-  (`files/media-meta.ts`: `1200 × 800 · 84 KB`). Both halves come from work already done — the size
-  from the directory listing that built the list, the pixels from the thumbnail once the browser has
-  decoded it — so a caption never costs a second download
-- **Delete** — the confirmation states the reference count, computed on the authored ref, and says
-  **unknown** rather than zero when a lane cannot be counted (`files/file-ops.ts`)
-- **Viewing** — clicking a media file in the Files tree or the Library opens it in a tab of its own
-  (`studio.md` §4.2's Media mode). It shows the asset at full size — an image, a video or audio with
-  controls, a font as a specimen, a PDF embedded — with its kind and dimensions, the site URL a
-  document would reference it by, and the list of documents that do. Before it, opening a media file
-  was not merely unsupported: it produced an error telling the author to add a format class to
-  `project.json`, which is not advice about a PNG.
-- **Usage tracking as a surface** — the Media view is that reader. The query already shipped and was
-  already correct; what was missing was anywhere to see it outside the delete confirmation, so the
-  answer to "which pages use this image?" arrived at the one moment the author had already decided.
-  A failed count still reads **unknown**, never zero.
+- **Metadata** — dimensions and file size, as a row caption in the media picker (`files/media-meta.ts`: `1200 × 800 · 84 KB`). Both halves come from work already done — the size from the directory listing that built the list, the pixels from the thumbnail once the browser has decoded it — so a caption never costs a second download
+- **Delete** — the confirmation states the reference count, computed on the authored ref, and says **unknown** rather than zero when a lane cannot be counted (`files/file-ops.ts`)
+- **Viewing** — clicking a media file in the Files tree or the Library opens it in a tab of its own (`studio.md` §4.2's Media mode). It shows the asset at full size — an image, a video or audio with controls, a font as a specimen, a PDF embedded — with its kind and dimensions, the site URL a document would reference it by, and the list of documents that do. Before it, opening a media file was not merely unsupported: it produced an error telling the author to add a format class to `project.json`, which is not advice about a PNG.
+- **Usage tracking as a surface** — the Media view is that reader. The query already shipped and was already correct; what was missing was anywhere to see it outside the delete confirmation, so the answer to "which pages use this image?" arrived at the one moment the author had already decided. A failed count still reads **unknown**, never zero.
 
 ---
 
@@ -1581,21 +1401,14 @@ Individual file `$media`, `$style`, and `$elements` merge on top of site-level d
 
 The global stylesheet is emitted in this order:
 
-1. Site-level `:root` custom properties (from `--`-prefixed keys in `style`) and `body` direct
-   properties
-2. Site-level conditional (`@--dark`, `@--md`, etc.) overrides — custom properties on `:root`,
-   direct properties on `body`; scheme-query blocks dual-emitted as a media-guarded copy plus a
-   forced `data-color-scheme` copy (spec §9.5)
+1. Site-level `:root` custom properties (from `--`-prefixed keys in `style`) and `body` direct properties
+2. Site-level conditional (`@--dark`, `@--md`, etc.) overrides — custom properties on `:root`, direct properties on `body`; scheme-query blocks dual-emitted as a media-guarded copy plus a forced `data-color-scheme` copy (spec §9.5)
 3. The `color-scheme` declaration triplet, when a scheme query is declared
 4. Layout-level styles
 5. Page-level styles
 6. Component-level styles (scoped by tag-name prefix and generated `.<tagName>-<n>` classes — there is no shadow DOM; `spec.md` §16.6)
 
-This follows the natural CSS cascade — more specific sources override less specific ones, and
-base rules always precede their conditional overrides so equal-specificity variants win by
-source order. When a scheme query is declared, the pre-paint scheme-restore `<script>` is
-injected into the merged `<head>` immediately after the charset/viewport defaults — ahead of
-every style block.
+This follows the natural CSS cascade — more specific sources override less specific ones, and base rules always precede their conditional overrides so equal-specificity variants win by source order. When a scheme query is declared, the pre-paint scheme-restore `<script>` is injected into the merged `<head>` immediately after the charset/viewport defaults — ahead of every style block.
 
 ---
 
@@ -1637,8 +1450,7 @@ Redirect rules support `:param` and `*` wildcard syntax:
 
 ### 11.3 Status Codes and Rewrites
 
-A rule is either a **redirect**, carrying an RFC 9110 §15.4 redirection status, or a **rewrite**,
-which is a different thing wearing a status code's clothes.
+A rule is either a **redirect**, carrying an RFC 9110 §15.4 redirection status, or a **rewrite**, which is a different thing wearing a status code's clothes.
 
 ```json
 {
@@ -1649,8 +1461,7 @@ which is a different thing wearing a status code's clothes.
 }
 ```
 
-A bare string is a 301. An unrecognised status is a **build error naming the rule**, not a value
-written through to the host.
+A bare string is a 301. An unrecognised status is a **build error naming the rule**, not a value written through to the host.
 
 | Status | Means                           | HTML fallback                                      |
 | ------ | ------------------------------- | -------------------------------------------------- |
@@ -1660,31 +1471,19 @@ written through to the host.
 | `307`  | Temporary, **method preserved** | **no**                                             |
 | `308`  | Permanent, **method preserved** | **no**                                             |
 
-**Why the fallback is not universal.** An HTML meta-refresh is a _client-side_ redirect: the browser
-fetches the source, then navigates. That is a fair stand-in for a 301 on a host that ignores
-`_redirects`, and a misrepresentation of a 307 or 308, which exist precisely to preserve the request
-method and body — a meta-refresh silently converts a POST into a GET. A canonical link is likewise
-correct only for 301: on a temporary redirect it asserts the permanence the status denies, so 302
-and 303 get `noindex` instead.
+**Why the fallback is not universal.** An HTML meta-refresh is a _client-side_ redirect: the browser fetches the source, then navigates. That is a fair stand-in for a 301 on a host that ignores `_redirects`, and a misrepresentation of a 307 or 308, which exist precisely to preserve the request method and body — a meta-refresh silently converts a POST into a GET. A canonical link is likewise correct only for 301: on a temporary redirect it asserts the permanence the status denies, so 302 and 303 get `noindex` instead.
 
-**A rewrite is not status 200.** It serves the destination's content _at_ the source URL, with no
-redirect at all; the `200` that reaches `_redirects` is the host's convention for saying so. It is
-written `{ "destination": …, "rewrite": true }`, and it gets **no** HTML file — a file at the source
-URL shadows the rewrite on hosts that honour `_redirects` and turns it into a redirect on the hosts
-that do not, which is wrong in both directions.
+**A rewrite is not status 200.** It serves the destination's content _at_ the source URL, with no redirect at all; the `200` that reaches `_redirects` is the host's convention for saying so. It is written `{ "destination": …, "rewrite": true }`, and it gets **no** HTML file — a file at the source URL shadows the rewrite on hosts that honour `_redirects` and turns it into a redirect on the hosts that do not, which is wrong in both directions.
 
 ### 11.4 Studio Redirect Editor
 
-> **Status: Implemented.** Redirects are edited as a `GridSource`, so they get the same table,
-> the same undo and the same import path as any other tabular data.
+> **Status: Implemented.** Redirects are edited as a `GridSource`, so they get the same table, the same undo and the same import path as any other tabular data.
 
-Three validations run over the rule set, each reporting as a Problem naming the rule, because none
-of them is visible by reading the file:
+Three validations run over the rule set, each reporting as a Problem naming the rule, because none of them is visible by reading the file:
 
 - **Chains** — a redirect whose target is itself a redirect, costing a second round trip.
 - **Loops** — a cycle, which is a broken page rather than a slow one.
-- **Shadows** — a rule for a path a real route already serves, which is dead configuration the
-  author will never find by inspection.
+- **Shadows** — a rule for a path a real route already serves, which is dead configuration the author will never find by inspection.
 
 Studio provides redirect management as a document:
 
@@ -1784,10 +1583,7 @@ jx db push               # Sync the data section's tables to their connections (
 
 ### 12.3 Incremental Builds
 
-> **Status: Pending.** No dependency graph exists. `jx build` and the dev server's pre-reload
-> rebuild are both FULL builds, so the paragraph below describes an intended design rather than
-> shipped behaviour. It is fast enough that nothing has forced the issue yet; the cost is that it
-> scales with the project rather than with the edit.
+> **Status: Pending.** No dependency graph exists. `jx build` and the dev server's pre-reload rebuild are both FULL builds, so the paragraph below describes an intended design rather than shipped behaviour. It is fast enough that nothing has forced the issue yet; the cost is that it scales with the project rather than with the edit.
 
 The build system tracks dependencies between files. When a content entry changes, only pages that reference that collection are recompiled. When a layout changes, all pages using that layout are recompiled. When `project.json` changes, everything is recompiled.
 
@@ -1805,28 +1601,13 @@ Static assets are emitted per component, with page styles inlined:
 
 ## 13. Internationalization
 
-> **Status: Partial.** §13.1–§13.5 and §13.7 ship: tags are validated and canonicalized, a route's
-> prefix decides its locale, a `{locale}` collection source expands over the declared locales, each
-> page carries the `lang` and `dir` that follow, and translations advertise one another in `<head>`
-> and in the sitemap. §13.6 is the only part that is not whole, and it is bounded rather than
-> unbuilt: a site with `build.adapter` set negotiates `Accept-Language`, and adapter-less static
-> output has no request to negotiate against.
+> **Status: Partial.** §13.1–§13.5 and §13.7 ship: tags are validated and canonicalized, a route's prefix decides its locale, a `{locale}` collection source expands over the declared locales, each page carries the `lang` and `dir` that follow, and translations advertise one another in `<head>` and in the sitemap. §13.6 is the only part that is not whole, and it is bounded rather than unbuilt: a site with `build.adapter` set negotiates `Accept-Language`, and adapter-less static output has no request to negotiate against.
 >
-> This marker previously said negotiation was absent and `{locale}` collections unread. Both had
-> shipped — §13.6 and §13.3 each said so — so the parent contradicted two of its own subsections.
-> A summary marker that restates what its children already record is a second source of truth, and
-> this one drifted; it now names the boundary and defers the rest to the sections that own it.
+> This marker previously said negotiation was absent and `{locale}` collections unread. Both had shipped — §13.6 and §13.3 each said so — so the parent contradicted two of its own subsections. A summary marker that restates what its children already record is a second source of truth, and this one drifted; it now names the boundary and defers the rest to the sections that own it.
 >
-> **Jx is not a translation system**, and this section will not become one. There is no message
-> catalogue, no `t()` and no fallback chain. A locale is a property of a _route_; what the route
-> serves is whatever the author put in that directory.
+> **Jx is not a translation system**, and this section will not become one. There is no message catalogue, no `t()` and no fallback chain. A locale is a property of a _route_; what the route serves is whatever the author put in that directory.
 >
-> That decision is recorded here and nowhere else, deliberately. Unicode MessageFormat 2.0 is the
-> format a reversal would adopt — it is stable in CLDR and it is what `Intl.MessageFormat` will be
-> when TC39 finishes with it — but it is part of UTS #35, which this specification already cites
-> as `Borrowed` (§16), and a standard may not be cited in one place and rejected in another
-> (`standards.md` §8). So there is no row to write: the decision lives in this paragraph, and
-> reversing it means designing the section that would own it first.
+> That decision is recorded here and nowhere else, deliberately. Unicode MessageFormat 2.0 is the format a reversal would adopt — it is stable in CLDR and it is what `Intl.MessageFormat` will be when TC39 finishes with it — but it is part of UTS #35, which this specification already cites as `Borrowed` (§16), and a standard may not be cited in one place and rejected in another (`standards.md` §8). So there is no row to write: the decision lives in this paragraph, and reversing it means designing the section that would own it first.
 
 ### 13.1 Locale-Based Routing
 
@@ -1865,39 +1646,19 @@ pages/
 - `/fr/about` → French
 - `/de/about` → German
 
-**Tags are BCP 47 and a malformed one is a build error.** `en_US`, `en--US` and `e` are rejected by
-the RFC 5646 grammar; `EN-us` is accepted and canonicalized to `en-US`. That case matters, because
-the same tag is compared as a string in a route table, written into `<html lang>` and later into an
-`hreflang` attribute — so there is one spelling of it, applied everywhere.
+**Tags are BCP 47 and a malformed one is a build error.** `en_US`, `en--US` and `e` are rejected by the RFC 5646 grammar; `EN-us` is accepted and canonicalized to `en-US`. That case matters, because the same tag is compared as a string in a route table, written into `<html lang>` and later into an `hreflang` attribute — so there is one spelling of it, applied everywhere.
 
-The check is **well-formedness, not registry membership**: `zz` and `xx-YY` are well-formed tags for
-languages that do not exist, and Jx does not ship a copy of the IANA registry to say otherwise.
+The check is **well-formedness, not registry membership**: `zz` and `xx-YY` are well-formed tags for languages that do not exist, and Jx does not ship a copy of the IANA registry to say otherwise.
 
-**Matching is on the first path segment, compared canonically.** A project declaring `fr-ca` is
-served from `pages/fr-ca/`; `pages/fr/` does **not** match it. Silently that would be invisible —
-every page under it would become the default locale and claim the wrong language — so a directory
-naming the _primary language_ of a declared locale is a build warning that names both spellings.
-The warning is scoped that narrowly on purpose: any two-to-eight-letter segment is a well-formed
-language tag, so warning on "looks like a tag" would fire on `/docs/` and `/api/`.
+**Matching is on the first path segment, compared canonically.** A project declaring `fr-ca` is served from `pages/fr-ca/`; `pages/fr/` does **not** match it. Silently that would be invisible — every page under it would become the default locale and claim the wrong language — so a directory naming the _primary language_ of a declared locale is a build warning that names both spellings. The warning is scoped that narrowly on purpose: any two-to-eight-letter segment is a well-formed language tag, so warning on "looks like a tag" would fire on `/docs/` and `/api/`.
 
-A `defaultLocale` absent from `locales` joins the list rather than being rejected — the pages under
-it exist either way, and no reading of that config is the one the author meant.
+A `defaultLocale` absent from `locales` joins the list rather than being rejected — the pages under it exist either way, and no reading of that config is the one the author meant.
 
-**Studio edits this block through `studio.md` §20.5**, and resolves it with this section's own
-resolver rather than a second implementation of it — which is why the resolver lives in
-`@jxsuite/schema/locale`, reachable from a package that cannot import the compiler.
+**Studio edits this block through `studio.md` §20.5**, and resolves it with this section's own resolver rather than a second implementation of it — which is why the resolver lives in `@jxsuite/schema/locale`, reachable from a package that cannot import the compiler.
 
-**`prefix-always` is checked.** The mode is a promise that every URL names its language, and a page
-outside the locale tree breaks it silently: it builds, it serves, and `localeOfRoute` calls it the
-default locale — so a site that declared "no unprefixed URLs" ships them anyway, and the only reader
-who finds out is a visitor who lands on one and sees the wrong language with no way to switch. The
-build now names every such route, once, with the whole list.
+**`prefix-always` is checked.** The mode is a promise that every URL names its language, and a page outside the locale tree breaks it silently: it builds, it serves, and `localeOfRoute` calls it the default locale — so a site that declared "no unprefixed URLs" ships them anyway, and the only reader who finds out is a visitor who lands on one and sees the wrong language with no way to switch. The build now names every such route, once, with the whole list.
 
-It is a warning rather than an error, because the author may mean it — a landing page with no
-translations, a machine-readable endpoint — and failing a build over a page that works would be the
-compiler overruling a decision it cannot see the reason for. `/` is never reported: under
-`prefix-always` the site root is the one URL that exists to send a visitor somewhere else, and
-§13.6 is what it is for.
+It is a warning rather than an error, because the author may mean it — a landing page with no translations, a machine-readable endpoint — and failing a build over a page that works would be the compiler overruling a decision it cannot see the reason for. `/` is never reported: under `prefix-always` the site root is the one URL that exists to send a visitor somewhere else, and §13.6 is what it is for.
 
 ### 13.3 Content Localization
 
@@ -1925,45 +1686,23 @@ The collection config can specify locale awareness:
 }
 ```
 
-> **Status: Implemented.** `extensions/parser/src/content-loader.ts` expands `{locale}` over the
-> declared locales, stamps each entry with the locale its directory named, and scopes route
-> expansion to it.
+> **Status: Implemented.** `extensions/parser/src/content-loader.ts` expands `{locale}` over the declared locales, stamps each entry with the locale its directory named, and scopes route expansion to it.
 
-**One content type, N directories — not N content types.** That distinction is what keeps a
-translated post the same post: it keeps one schema, one set of relationship targets, and one name in
-`$paths`, and differs only in which directory it was read from.
+**One content type, N directories — not N content types.** That distinction is what keeps a translated post the same post: it keeps one schema, one set of relationship targets, and one name in `$paths`, and differs only in which directory it was read from.
 
-Each entry carries the locale it was loaded for in `_meta.locale`, and that is load-bearing rather
-than informational. **Two translations of one post share an id** — `blog/en/hello.md` and
-`blog/fr/hello.md` are both `hello` — so a `[slug]` route expanding the whole collection would emit
-each URL twice and let the second overwrite the first. The route's own locale prefix scopes the
-expansion, so `/fr/blog/:slug` expands the French entries and no others. A collection whose entries
-carry no locale is untouched by this, whatever the route's locale happens to be.
+Each entry carries the locale it was loaded for in `_meta.locale`, and that is load-bearing rather than informational. **Two translations of one post share an id** — `blog/en/hello.md` and `blog/fr/hello.md` are both `hello` — so a `[slug]` route expanding the whole collection would emit each URL twice and let the second overwrite the first. The route's own locale prefix scopes the expansion, so `/fr/blog/:slug` expands the French entries and no others. A collection whose entries carry no locale is untouched by this, whatever the route's locale happens to be.
 
-**A `ContentEntry` lookup is scoped the same way.** Two translations share an id, so an unscoped
-lookup answers with whichever language loaded first: under `/fr-ca/…` that is the English copy,
-rendered on a page whose `<html lang>` and every `hreflang` say French. The route carries the locale
-it serves and the lookup reads it, exactly as route expansion does. A collection whose entries carry
-no locale is untouched — it is not in one language, and filtering it by the route's would empty it.
+**A `ContentEntry` lookup is scoped the same way.** Two translations share an id, so an unscoped lookup answers with whichever language loaded first: under `/fr-ca/…` that is the English copy, rendered on a page whose `<html lang>` and every `hreflang` say French. The route carries the locale it serves and the lookup reads it, exactly as route expansion does. A collection whose entries carry no locale is untouched — it is not in one language, and filtering it by the route's would empty it.
 
-**The directory is matched case-insensitively.** Two writers name it: an author who declared `fr-CA`
-most likely typed `fr-CA/`, while Studio creates the lowercase form, because a locale directory
-becomes a URL segment and the site's own URLs are lowercase. Reading one spelling only would make a
-translation somebody just created invisible to the build — the directory there, the entries there,
-and the collection loading none of them, with nothing to report. The canonical spelling wins where
-both exist, and a locale nobody has written yet reports against the tag that was declared.
+**The directory is matched case-insensitively.** Two writers name it: an author who declared `fr-CA` most likely typed `fr-CA/`, while Studio creates the lowercase form, because a locale directory becomes a URL segment and the site's own URLs are lowercase. Reading one spelling only would make a translation somebody just created invisible to the build — the directory there, the entries there, and the collection loading none of them, with nothing to report. The canonical spelling wins where both exist, and a locale nobody has written yet reports against the tag that was declared.
 
-Asset mounts expand with the source: each locale directory publishes at `/content/<type>/<locale>`,
-so a French post's `./hero.png` and its English translation's cannot collide at one URL.
+Asset mounts expand with the source: each locale directory publishes at `/content/<type>/<locale>`, so a French post's `./hero.png` and its English translation's cannot collide at one URL.
 
-A `{locale}` source in a project that declares no `i18n` locales loads nothing, with a warning
-naming the reason — there is no list to expand over, and reading the path literally is what made the
-old behavior invisible.
+A `{locale}` source in a project that declares no `i18n` locales loads nothing, with a warning naming the reason — there is no list to expand over, and reading the path literally is what made the old behavior invisible.
 
 ### 13.4 Language and Direction on the Page
 
-> **Status: Implemented.** `i18n.ts` and `locale.ts`, applied through `injectHead` and
-> `injectContext`.
+> **Status: Implemented.** `i18n.ts` and `locale.ts`, applied through `injectHead` and `injectContext`.
 
 Every page carries the language its route implies:
 
@@ -1973,37 +1712,19 @@ Every page carries the language its route implies:
 | a declared locale prefix | that locale, canonicalized |
 | neither                  | `defaults.lang`, else `en` |
 
-An explicit `$lang` wins over the route because a page really can be a French translation living at
-`/en/a-propos/`, and an author who writes that down means it. Note what §13.4 does **not** claim:
-`prefix-always` is accepted and canonicalized by §13.2, but nothing enforces it — a page outside the
-locale tree still builds and is served as the default locale. Enforcement belongs with the routing
-work in §13.2, not here.
+An explicit `$lang` wins over the route because a page really can be a French translation living at `/en/a-propos/`, and an author who writes that down means it. Note what §13.4 does **not** claim: `prefix-always` is accepted and canonicalized by §13.2, but nothing enforces it — a page outside the locale tree still builds and is served as the default locale. Enforcement belongs with the routing work in §13.2, not here.
 
-**`dir` is derived, and only appears when it is not the default.** The direction comes from the
-_script_, obtained by maximizing the tag through CLDR likely-subtags (UTS #35) and testing it
-against the ISO 15924 right-to-left set (UAX #9). It is deliberately not `Intl.Locale`'s own
-`getTextInfo()`, which answers from the language's CLDR entry and gets two ordinary cases wrong:
-`dv` (Dhivehi, written in Thaana) where an ICU build lacks its data, and `az-Arab` — Azerbaijani
-deliberately written in the Arabic script — because that language's default script is Latin. Both
-are right-to-left.
+**`dir` is derived, and only appears when it is not the default.** The direction comes from the _script_, obtained by maximizing the tag through CLDR likely-subtags (UTS #35) and testing it against the ISO 15924 right-to-left set (UAX #9). It is deliberately not `Intl.Locale`'s own `getTextInfo()`, which answers from the language's CLDR entry and gets two ordinary cases wrong: `dv` (Dhivehi, written in Thaana) where an ICU build lacks its data, and `az-Arab` — Azerbaijani deliberately written in the Arabic script — because that language's default script is Latin. Both are right-to-left.
 
-`dir="ltr"` is never written. It is HTML's default for every element, so emitting it on every page
-of a left-to-right site is noise that carries no information. An explicit `$dir` or `defaults.dir`
-is emitted verbatim, including `auto`.
+`dir="ltr"` is never written. It is HTML's default for every element, so emitting it on every page of a left-to-right site is noise that carries no information. An explicit `$dir` or `defaults.dir` is emitted verbatim, including `auto`.
 
-**The locale is readable from a template** as `$page.locale`, with `$page.dir` beside it, and the
-project's list as `$site.locales` / `$site.defaultLocale`. It lives on `$page` rather than as a
-top-level `$locale` because that is what it is — a property of the route, not a third ambient
-namespace beside `$site` and `$page` — and because `$page.locale` is the _resolved_ answer, after a
-document's own `$lang` has had its say, rather than the prefix.
+**The locale is readable from a template** as `$page.locale`, with `$page.dir` beside it, and the project's list as `$site.locales` / `$site.defaultLocale`. It lives on `$page` rather than as a top-level `$locale` because that is what it is — a property of the route, not a third ambient namespace beside `$site` and `$page` — and because `$page.locale` is the _resolved_ answer, after a document's own `$lang` has had its say, rather than the prefix.
 
 ### 13.5 Alternate Discovery
 
-> **Status: Implemented.** `localeAlternates()` in `i18n.ts`, emitted through `mergeHead` and
-> `generateSitemap`.
+> **Status: Implemented.** `localeAlternates()` in `i18n.ts`, emitted through `mergeHead` and `generateSitemap`.
 
-A translated site that does not say so is three unrelated sites to anything but a reader. Each page
-in a translation set therefore advertises the whole set, in `<head>`:
+A translated site that does not say so is three unrelated sites to anything but a reader. Each page in a translation set therefore advertises the whole set, in `<head>`:
 
 ```html
 <link href="https://example.com/about/" hreflang="en" rel="alternate" />
@@ -2011,153 +1732,71 @@ in a translation set therefore advertises the whole set, in `<head>`:
 <link href="https://example.com/about/" hreflang="x-default" rel="alternate" />
 ```
 
-and again as `xhtml:link` inside the page's `<url>` entry in `sitemap.xml`, under a
-`xmlns:xhtml` declaration the document carries only when some entry uses it.
+and again as `xhtml:link` inside the page's `<url>` entry in `sitemap.xml`, under a `xmlns:xhtml` declaration the document carries only when some entry uses it.
 
-**A translation set is a directory layout, unless a page says otherwise.** Two routes are
-translations when they share a path with the locale prefix removed: `/fr-ca/about/` and `/about/`
-share `about`. That derivation is right whenever the paths are parallel, and it is the whole mapping
-for most sites.
+**A translation set is a directory layout, unless a page says otherwise.** Two routes are translations when they share a path with the locale prefix removed: `/fr-ca/about/` and `/about/` share `about`. That derivation is right whenever the paths are parallel, and it is the whole mapping for most sites.
 
-A **localized slug** is the case it cannot reach. `/fr-ca/a-propos/` shares nothing with `/about/`,
-and translating a URL is ordinary practice rather than an edge case — the words in a path are read
-by the same person who reads the page. A document therefore declares its own identity:
+A **localized slug** is the case it cannot reach. `/fr-ca/a-propos/` shares nothing with `/about/`, and translating a URL is ordinary practice rather than an edge case — the words in a path are read by the same person who reads the page. A document therefore declares its own identity:
 
 ```json
 { "$translationKey": "about", "title": "À propos" }
 ```
 
-at `pages/fr-ca/a-propos.json`. `$translationKey` overrides the derived key exactly as `$lang`
-overrides the derived locale (§13.4), and it is the **only** new key this needs: the grouping is
-already keyed, so `hreflang`, `x-default`, the sitemap and `$page.alternates` all follow from it
-with nothing else changed. Leading and trailing slashes are trimmed, so the key can be written the
-way the URL reads.
+at `pages/fr-ca/a-propos.json`. `$translationKey` overrides the derived key exactly as `$lang` overrides the derived locale (§13.4), and it is the **only** new key this needs: the grouping is already keyed, so `hreflang`, `x-default`, the sitemap and `$page.alternates` all follow from it with nothing else changed. Leading and trailing slashes are trimmed, so the key can be written the way the URL reads.
 
-It is read in a **pre-pass**, before the first page compiles, because a page's alternates depend on
-the whole route table — a document cannot tell the build what its key is while it is being
-compiled. Pages that do not mention the key are not parsed twice for it.
+It is read in a **pre-pass**, before the first page compiles, because a page's alternates depend on the whole route table — a document cannot tell the build what its key is while it is being compiled. Pages that do not mention the key are not parsed twice for it.
 
-**Two routes claiming one language is a contradiction, and the build says so.** A set names one URL
-per language, so one of the two is dropped from it either way. What differs is whether the author
-asserted it:
+**Two routes claiming one language is a contradiction, and the build says so.** A set names one URL per language, so one of the two is dropped from it either way. What differs is whether the author asserted it:
 
-- **Declared on both** — a build error. `$translationKey` is a promise written down twice, and
-  silently advertising one of the two URLs as _the_ page in that language is a wrong answer nobody
-  downstream can detect.
-- **Derived** — a warning. Parallel paths that happen to meet (`pages/about.json` beside
-  `pages/en/about.json` under `prefix-except-default`) may be a deliberate alias, and failing a
-  build over pages that work would be the compiler overruling a decision it cannot see.
+- **Declared on both** — a build error. `$translationKey` is a promise written down twice, and silently advertising one of the two URLs as _the_ page in that language is a wrong answer nobody downstream can detect.
+- **Derived** — a warning. Parallel paths that happen to meet (`pages/about.json` beside `pages/en/about.json` under `prefix-except-default`) may be a deliberate alias, and failing a build over pages that work would be the compiler overruling a decision it cannot see.
 
-A `$paths` template that declares a key is the declared case by construction: every route it expands
-to claims the same one, and the error names them.
+A `$paths` template that declares a key is the declared case by construction: every route it expands to claims the same one, and the error names them.
 
-**A key may name its route's own parameters**, written `${slug}`, and that is what makes a
-collection's localized URLs work. One `[slug]` template expands to one route per entry, so a fixed
-key would claim a single identity for the whole collection — every entry the translation of every
-other, which the duplicate rule above reports rather than serves. `pages/fr-ca/expositions/[slug].json`
-declaring `"exhibitions/${slug}"` pairs each French post with the English one, because two
-translations of an entry share an id (§13.3) and the id is what the parameter carries.
+**A key may name its route's own parameters**, written `${slug}`, and that is what makes a collection's localized URLs work. One `[slug]` template expands to one route per entry, so a fixed key would claim a single identity for the whole collection — every entry the translation of every other, which the duplicate rule above reports rather than serves. `pages/fr-ca/expositions/[slug].json` declaring `"exhibitions/${slug}"` pairs each French post with the English one, because two translations of an entry share an id (§13.3) and the id is what the parameter carries.
 
-A parameter with no value is left as written rather than blanked, so the duplicate it produces is
-reported against a key that still says `${slug}` — which names what is wrong instead of describing
-a collection that collapsed.
+A parameter with no value is left as written rather than blanked, so the duplicate it produces is reported against a key that still says `${slug}` — which names what is wrong instead of describing a collection that collapsed.
 
 Four rules follow from what the annotation means rather than from convenience:
 
-- **Every member lists every member, itself included.** That reciprocity is the specified
-  behaviour and the thing validators check for.
-- **A page with no translations gets nothing.** A lone `hreflang` pointing at itself is noise; the
-  annotation describes a set.
-- **`x-default` names the default locale's URL**, and is omitted when the set has no default-locale
-  member — inventing one would advertise a URL that does not exist.
-- **A duplicate locale within a set is dropped rather than emitted twice.** Two routes claiming one
-  translation is a contradiction, and a single-valued annotation is the better failure.
+- **Every member lists every member, itself included.** That reciprocity is the specified behaviour and the thing validators check for.
+- **A page with no translations gets nothing.** A lone `hreflang` pointing at itself is noise; the annotation describes a set.
+- **`x-default` names the default locale's URL**, and is omitted when the set has no default-locale member — inventing one would advertise a URL that does not exist.
+- **A duplicate locale within a set is dropped rather than emitted twice.** Two routes claiming one translation is a contradiction, and a single-valued annotation is the better failure.
 
-An author-supplied alternate for the same `hreflang` wins, like every other auto-injected entry
-(§8.4). This whole section depends on the §8.3 dedup key: these links share `rel="alternate"` and
-differ only in `hreflang`, and `x-default` conventionally shares its `href` with the default
-locale's entry, so a key of `rel` + `href` alone collapsed the set into one link.
+An author-supplied alternate for the same `hreflang` wins, like every other auto-injected entry (§8.4). This whole section depends on the §8.3 dedup key: these links share `rel="alternate"` and differ only in `hreflang`, and `x-default` conventionally shares its `href` with the default locale's entry, so a key of `rel` + `href` alone collapsed the set into one link.
 
-**The same set is readable from the page**, as `$page.alternates`: an array of
-`{ code, label, url, dir, current }`, ordered by tag, which maps straight into a language switcher
-through the ordinary `{"$prototype": "Array"}` form. A switcher is the one part of a multilingual site the
-framework cannot write for the author, and without this the only way to build one is a hardcoded
-list of URLs — which goes stale the moment a page gains or loses a translation, silently, in the
-one place a reader would have used it.
+**The same set is readable from the page**, as `$page.alternates`: an array of `{ code, label, url, dir, current }`, ordered by tag, which maps straight into a language switcher through the ordinary `{"$prototype": "Array"}` form. A switcher is the one part of a multilingual site the framework cannot write for the author, and without this the only way to build one is a hardcoded list of URLs — which goes stale the moment a page gains or loses a translation, silently, in the one place a reader would have used it.
 
 Three differences from the `<head>` annotation above, each following from who reads it:
 
-- **URLs are site-absolute, not absolute.** A switcher is an internal link, and it has to work in a
-  project that has not configured `url` yet — which is every project in development. The `<head>`
-  form must be absolute because a crawler may have arrived at the page by any URL.
-- **A page with no translations gets itself**, where `<head>` gets nothing. A lone `hreflang`
-  pointing at itself is noise to a crawler; a template asking "which languages is this page in"
-  wants the honest answer, and dropping the page itself would leave a switcher unable to mark where
-  the reader is.
+- **URLs are site-absolute, not absolute.** A switcher is an internal link, and it has to work in a project that has not configured `url` yet — which is every project in development. The `<head>` form must be absolute because a crawler may have arrived at the page by any URL.
+- **A page with no translations gets itself**, where `<head>` gets nothing. A lone `hreflang` pointing at itself is noise to a crawler; a template asking "which languages is this page in" wants the honest answer, and dropping the page itself would leave a switcher unable to mark where the reader is.
 - **`x-default` is absent.** It names no language a reader could choose.
 
-`current` marks the member this route **is**, taken from the route rather than from `$page.locale`,
-because a document whose `$lang` disagrees with its directory (§13.4) is still served from that
-directory.
+`current` marks the member this route **is**, taken from the route rather than from `$page.locale`, because a document whose `$lang` disagrees with its directory (§13.4) is still served from that directory.
 
-`label` is the locale's **autonym** — its name in its own language, from CLDR — because that is what
-a reader scans a switcher for: a menu reading "French" is unreadable to exactly the person it exists
-for. It is resolved into the array rather than left to `Intl/displayName` (§13.7) because a switcher
-is a mapped array, and a map template interpolates scope values rather than evaluating expressions;
-without the field the only label available is one the author typed, which is the hand-kept table
-CLDR exists to replace.
+`label` is the locale's **autonym** — its name in its own language, from CLDR — because that is what a reader scans a switcher for: a menu reading "French" is unreadable to exactly the person it exists for. It is resolved into the array rather than left to `Intl/displayName` (§13.7) because a switcher is a mapped array, and a map template interpolates scope values rather than evaluating expressions; without the field the only label available is one the author typed, which is the hand-kept table CLDR exists to replace.
 
-Both readings are derived from one grouping, so they cannot come to disagree about which pages are
-translations of one another — a disagreement that would otherwise be invisible, because only a
-machine ever reads one of them.
+Both readings are derived from one grouping, so they cannot come to disagree about which pages are translations of one another — a disagreement that would otherwise be invisible, because only a machine ever reads one of them.
 
-**Negotiation is not this.** Discovery tells a crawler the set exists; §13.6 is what sends a
-visitor to their own language.
+**Negotiation is not this.** Discovery tells a crawler the set exists; §13.6 is what sends a visitor to their own language.
 
 ### 13.6 Locale Negotiation
 
-> **Status: Partial.** `locale-negotiation.ts` implements RFC 4647 Lookup and emits it into the
-> generated worker, so a site with `build.adapter` set negotiates. Adapter-less static output
-> cannot, permanently — see below.
+> **Status: Partial.** `locale-negotiation.ts` implements RFC 4647 Lookup and emits it into the generated worker, so a site with `build.adapter` set negotiates. Adapter-less static output cannot, permanently — see below.
 
-**Which deployments can negotiate, and which cannot.** Negotiation needs a request, and adapter-less
-static output has no runtime that sees one: `dist/` is files, and the preview server is a pure file
-mapper. That is a property of the output shape, not missing work, and it is stated here rather than
-tracked as a gap so nobody sets out to close it. A site with `build.adapter` set gets a generated
-worker, the worker sees the request, and negotiation runs there.
+**Which deployments can negotiate, and which cannot.** Negotiation needs a request, and adapter-less static output has no runtime that sees one: `dist/` is files, and the preview server is a pure file mapper. That is a property of the output shape, not missing work, and it is stated here rather than tracked as a gap so nobody sets out to close it. A site with `build.adapter` set gets a generated worker, the worker sees the request, and negotiation runs there.
 
-**A static `prefix-always` site is told about its root.** The two facts above compose into one
-deployment that is simply broken: `prefix-always` puts every page under a locale, negotiation is
-what answers `/`, and an adapter-less build has no runtime to negotiate with — so the site's front
-door is a 404 and nothing else in the build says so. The `prefix-always` check in §13.2 deliberately
-never reports `/`, because under an adapter it is handled; this is the one shape where it is not, so
-the build names it, once, with the locale a visitor would have been sent to.
+**A static `prefix-always` site is told about its root.** The two facts above compose into one deployment that is simply broken: `prefix-always` puts every page under a locale, negotiation is what answers `/`, and an adapter-less build has no runtime to negotiate with — so the site's front door is a 404 and nothing else in the build says so. The `prefix-always` check in §13.2 deliberately never reports `/`, because under an adapter it is handled; this is the one shape where it is not, so the build names it, once, with the locale a visitor would have been sent to.
 
-A warning and not a generated redirect. Which URL the root should serve is a deployment decision —
-a redirect, a language-choice page, a rewrite at the CDN — and emitting one would be the compiler
-overruling a choice it cannot see the reason for.
+A warning and not a generated redirect. Which URL the root should serve is a deployment decision — a redirect, a language-choice page, a rewrite at the CDN — and emitting one would be the compiler overruling a choice it cannot see the reason for.
 
-**The bare `/` only.** A visitor who asked for `/fr/about/` has expressed a preference far stronger
-than a header, and overriding it would make a shared link mean different things to different people.
-Under `prefix-except-default` the default locale owns `/`, so a negotiation landing there continues
-down the ordinary chain rather than redirecting to itself; under `prefix-always` nothing lives at
-`/` and the redirect is what makes the root work at all. The implementation is middleware for
-exactly that reason: one of its two outcomes is "carry on".
+**The bare `/` only.** A visitor who asked for `/fr/about/` has expressed a preference far stronger than a header, and overriding it would make a shared link mean different things to different people. Under `prefix-except-default` the default locale owns `/`, so a negotiation landing there continues down the ordinary chain rather than redirecting to itself; under `prefix-always` nothing lives at `/` and the redirect is what makes the root work at all. The implementation is middleware for exactly that reason: one of its two outcomes is "carry on".
 
-**The algorithm is RFC 4647 Lookup, not Filtering.** Filtering returns every matching tag, which is
-right for a content-negotiation menu and wrong for "which page do I send this person to". Lookup
-truncates progressively — `de-CH-1901`, then `de-CH`, then `de` — dropping a single-character
-subtag together with the one before it, since a lone `u` or `x` is an extension singleton and never
-a tag. Ranges are ordered by RFC 9110 §12.5.4 quality; `q=0` is a **refusal** and the range is
-dropped rather than ranked last. `*` selects the site's own default. The answer is always one of
-the declared locales.
+**The algorithm is RFC 4647 Lookup, not Filtering.** Filtering returns every matching tag, which is right for a content-negotiation menu and wrong for "which page do I send this person to". Lookup truncates progressively — `de-CH-1901`, then `de-CH`, then `de` — dropping a single-character subtag together with the one before it, since a lone `u` or `x` is an extension singleton and never a tag. Ranges are ordered by RFC 9110 §12.5.4 quality; `q=0` is a **refusal** and the range is dropped rather than ranked last. `*` selects the site's own default. The answer is always one of the declared locales.
 
-**`Vary: Accept-Language` is emitted on every `/` response**, redirect or not, and it is not
-optional. Without it any cache in front of the site stores the first visitor's answer and serves it
-to everyone — a site stuck in one language for every later reader, and invisible to the author,
-whose own browser was that first visitor. The redirect is **302**: its target depends on the
-request, so a permanent status would let a cache pin one reader's language for all of them. A
-`Content-Language` names the choice that was made.
+**`Vary: Accept-Language` is emitted on every `/` response**, redirect or not, and it is not optional. Without it any cache in front of the site stores the first visitor's answer and serves it to everyone — a site stuck in one language for every later reader, and invisible to the author, whose own browser was that first visitor. The redirect is **302**: its target depends on the request, so a permanent status would let a cache pin one reader's language for all of them. A `Content-Language` names the choice that was made.
 
 **Never from an IP address.** Where someone is has never been what they read.
 
@@ -2167,10 +1806,7 @@ request, so a permanent status would let a cache pin one reader's language for a
 
 > **Status: Implemented.**
 
-A document formats through **blessed `Intl` helpers**, listed once in `packages/schema/src/intl.ts`
-and read by the runtime interpreter, the compiler's emitter and the `call` operator's JSON-Schema
-description. The list lived in those places separately before, and the schema description — a prose
-sentence naming three helpers, checked by nothing — is what made a single source necessary.
+A document formats through **blessed `Intl` helpers**, listed once in `packages/schema/src/intl.ts` and read by the runtime interpreter, the compiler's emitter and the `call` operator's JSON-Schema description. The list lived in those places separately before, and the schema description — a prose sentence naming three helpers, checked by nothing — is what made a single source necessary.
 
 | Helper                    | Wraps                     | For                                                  |
 | ------------------------- | ------------------------- | ---------------------------------------------------- |
@@ -2183,45 +1819,21 @@ sentence naming three helpers, checked by nothing — is what made a single sour
 | `Intl/displayName`        | `Intl.DisplayNames`       | the name of a language, region, script or currency   |
 | `Intl/segment`            | `Intl.Segmenter`          | graphemes, words and sentences                       |
 
-**They are helpers because ECMA-402's formatters are constructors.** `new` is not in the expression
-grammar and should not be; each helper wraps construct-then-format, which is the shape an author
-wants anyway.
+**They are helpers because ECMA-402's formatters are constructors.** `new` is not in the expression grammar and should not be; each helper wraps construct-then-format, which is the shape an author wants anyway.
 
-**A helper that is given no locale uses the page's own**, and `Intl/formatDate` with no `timeZone`
-uses `UTC`. Never the host's, in either case. `new Intl.NumberFormat(undefined)` reads the build
-machine's locale, so the same document emits `1,234.5` on one machine and `1.234,5` on another and a
-site's output stops being a function of its input. The time zone is the worse of the two: a locale
-changes how a date reads, a zone can change **which day it is** — `2026-08-16T02:00Z` is the 16th in
-UTC and the 15th in New York.
+**A helper that is given no locale uses the page's own**, and `Intl/formatDate` with no `timeZone` uses `UTC`. Never the host's, in either case. `new Intl.NumberFormat(undefined)` reads the build machine's locale, so the same document emits `1,234.5` on one machine and `1.234,5` on another and a site's output stops being a function of its input. The time zone is the worse of the two: a locale changes how a date reads, a zone can change **which day it is** — `2026-08-16T02:00Z` is the 16th in UTC and the 15th in New York.
 
-`$page.locale` (§13.4) is the default because it has the same property the fixed one was chosen for
-— it is a function of the route and the document, not of the machine — and because the alternative
-is worse than it looks: a page under `/fr/` that formats a number without naming a locale used to
-render it in English, on a page whose `<html lang>` and every `hreflang` on it said French. That
-defect is invisible to whoever built the site in their own language and obvious to every reader of
-the other one. An explicit locale still wins; a scope with **no page** — a component's own state, or
-the runtime evaluated standalone — keeps `en-US`, which is what the fixed default now exists for.
+`$page.locale` (§13.4) is the default because it has the same property the fixed one was chosen for — it is a function of the route and the document, not of the machine — and because the alternative is worse than it looks: a page under `/fr/` that formats a number without naming a locale used to render it in English, on a page whose `<html lang>` and every `hreflang` on it said French. That defect is invisible to whoever built the site in their own language and obvious to every reader of the other one. An explicit locale still wins; a scope with **no page** — a component's own state, or the runtime evaluated standalone — keeps `en-US`, which is what the fixed default now exists for.
 
-**`compare` is the one worth saying out loud.** `<` and `Array.sort()` order by UTF-16 code unit,
-which puts `Zebra` before `apple` and sorts every accented word after `z`. A sorted list built any
-other way is wrong in every language with an accent.
+**`compare` is the one worth saying out loud.** `<` and `Array.sort()` order by UTF-16 code unit, which puts `Zebra` before `apple` and sorts every accented word after `z`. A sorted list built any other way is wrong in every language with an accent.
 
-**`DurationFormat` is deliberately absent.** Its baseline support is not universal, and a blessed
-global that throws on a browser Jx claims to support is worse than one that does not exist: the
-author writes a formula that works on their machine and fails on a visitor's.
+**`DurationFormat` is deliberately absent.** Its baseline support is not universal, and a blessed global that throws on a browser Jx claims to support is worse than one that does not exist: the author writes a formula that works on their machine and fails on a visitor's.
 
-**What is not built.** There is no `i18n.timeZone` key: an unread config key is the exact defect
-§13.2 records `i18n` itself having had for months, and unlike a locale a time zone is not derivable
-from anything the route already says. A **component's** own scope has no `$page`, so a formula
-inside a custom element formats in `en-US` unless the locale is passed to it — the component
-boundary is the state boundary (§10.4), and reaching across it for one value would make `$page`
-ambient in a way nothing else is.
+**What is not built.** There is no `i18n.timeZone` key: an unread config key is the exact defect §13.2 records `i18n` itself having had for months, and unlike a locale a time zone is not derivable from anything the route already says. A **component's** own scope has no `$page`, so a formula inside a custom element formats in `en-US` unless the locale is passed to it — the component boundary is the state boundary (§10.4), and reaching across it for one value would make `$page` ambient in a way nothing else is.
 
 ## 14. Deployment
 
-> **Status: Partial.** The adapters, their worker output and the response-header file all ship.
-> What does not is `vercel.json`, which is deliberate — there is no Vercel adapter, and the file
-> belongs at the repository root rather than inside `build.outDir` (Appendix C).
+> **Status: Partial.** The adapters, their worker output and the response-header file all ship. What does not is `vercel.json`, which is deliberate — there is no Vercel adapter, and the file belongs at the repository root rather than inside `build.outDir` (Appendix C).
 
 ### 14.1 Output Targets
 
@@ -2310,9 +1922,7 @@ Page and layout styles are inlined into each page's `<style>` block — there is
 
 ### 14.3 Response Headers (`_headers`)
 
-Cacheability is something only the build can decide: it chose the filenames, so it is the only party
-that knows which of them embed a content hash. Left unsaid, every host applies its own default to
-output whose lifetime it cannot see. The build therefore writes `dist/_headers`.
+Cacheability is something only the build can decide: it chose the filenames, so it is the only party that knows which of them embed a content hash. Left unsaid, every host applies its own default to output whose lifetime it cannot see. The build therefore writes `dist/_headers`.
 
 ```
 /*
@@ -2328,59 +1938,29 @@ output whose lifetime it cannot see. The build therefore writes `dist/_headers`.
 
 Two cache rules, and the reasoning is the whole design.
 
-- **`/*` revalidates.** HTML at `/about/`, `/components/*.js`, `/assets/*.js`, `sitemap.xml` — none
-  of their URLs change when their content does, so the only correct default is to check. The ETag
-  makes checking cheap.
-- **`/images/_optimized/*` is immutable** (RFC 8246). It is the one content-addressed output: the
-  filename embeds a digest of the source bytes, so a changed image is a changed URL.
-- **`/components/*` and `/assets/*` are deliberately excluded**, and a test asserts it. They are
-  named after the tag or specifier they contain, so editing a component reuses the URL. Marking
-  either immutable is a year-long cache-poisoning bug visible only to visitors who came before the
-  edit. Content-hashing those filenames is the prerequisite, not a config flag.
+- **`/*` revalidates.** HTML at `/about/`, `/components/*.js`, `/assets/*.js`, `sitemap.xml` — none of their URLs change when their content does, so the only correct default is to check. The ETag makes checking cheap.
+- **`/images/_optimized/*` is immutable** (RFC 8246). It is the one content-addressed output: the filename embeds a digest of the source bytes, so a changed image is a changed URL.
+- **`/components/*` and `/assets/*` are deliberately excluded**, and a test asserts it. They are named after the tag or specifier they contain, so editing a component reuses the URL. Marking either immutable is a year-long cache-poisoning bug visible only to visitors who came before the edit. Content-hashing those filenames is the prerequisite, not a config flag.
 
-**Which hosts read it.** `_headers` is a Cloudflare/Netlify convention, not a web standard.
-**Cloudflare Pages, Cloudflare Workers assets and Netlify** read it; **GitHub Pages and most other
-plain static hosts ignore it entirely** and serve their own `Cache-Control` — 10 minutes, in GitHub
-Pages' case, applied to everything including the content-addressed images the file marks immutable
-for a year. The build cannot know where a `dist/` is going, so it says what it can:
+**Which hosts read it.** `_headers` is a Cloudflare/Netlify convention, not a web standard. **Cloudflare Pages, Cloudflare Workers assets and Netlify** read it; **GitHub Pages and most other plain static hosts ignore it entirely** and serve their own `Cache-Control` — 10 minutes, in GitHub Pages' case, applied to everything including the content-addressed images the file marks immutable for a year. The build cannot know where a `dist/` is going, so it says what it can:
 
-- Under the `node` or `bun` adapter, which serves no static assets at all, the build warns that the
-  file is documentation rather than configuration — apply the headers at the reverse proxy.
-- With no adapter and a `public/CNAME` — GitHub Pages' custom-domain marker, and nothing else's —
-  the build warns that the file will be ignored.
+- Under the `node` or `bun` adapter, which serves no static assets at all, the build warns that the file is documentation rather than configuration — apply the headers at the reverse proxy.
+- With no adapter and a `public/CNAME` — GitHub Pages' custom-domain marker, and nothing else's — the build warns that the file will be ignored.
 - Otherwise a verbose-only note names the hosts that read it.
 
-The warnings exist because the failure is silent in the worst way: the build writes a caching policy,
-reports success, and the site ships with none.
+The warnings exist because the failure is silent in the worst way: the build writes a caching policy, reports success, and the site ships with none.
 
-**Ordering.** The file is written _after_ the `public/` copy, like the `robots.txt` edit — but it
-**prepends** rather than appends. On both Cloudflare Pages and Netlify a later matching rule wins
-for a duplicate header name, so a hand-authored `public/_headers` has to come last to override, and
-it is concatenated verbatim below a banner. It is not merged structurally: both platforms carry
-removal (`! Header-Name`) and conditional (`Language=`, `Country=`) extensions that a parser would
-silently drop.
+**Ordering.** The file is written _after_ the `public/` copy, like the `robots.txt` edit — but it **prepends** rather than appends. On both Cloudflare Pages and Netlify a later matching rule wins for a duplicate header name, so a hand-authored `public/_headers` has to come last to override, and it is concatenated verbatim below a banner. It is not merged structurally: both platforms carry removal (`! Header-Name`) and conditional (`Language=`, `Country=`) extensions that a parser would silently drop.
 
-**Configuration** lives under `build.headers` — `enabled`, `cache` (`"auto"` or `"off"`),
-`security.{contentTypeOptions, frameOptions, referrerPolicy, permissionsPolicy, hsts, csp}`, and
-`rules` for verbatim stanzas. **HSTS is off by default**: a wrong `max-age` locks an apex domain to
-HTTPS for that long and the mistake is invisible until a certificate lapses. `preload` without
-`includeSubDomains` is a build error, because the preload list will not accept the header without it
-and emitting one anyway produces something that looks submitted and is not.
+**Configuration** lives under `build.headers` — `enabled`, `cache` (`"auto"` or `"off"`), `security.{contentTypeOptions, frameOptions, referrerPolicy, permissionsPolicy, hsts, csp}`, and `rules` for verbatim stanzas. **HSTS is off by default**: a wrong `max-age` locks an apex domain to HTTPS for that long and the mistake is invisible until a certificate lapses. `preload` without `includeSubDomains` is a build error, because the preload list will not accept the header without it and emitting one anyway produces something that looks submitted and is not.
 
 #### 14.3.1 Content-Security-Policy
 
 > **Status: Implemented.** `csp.ts`, emitted through `buildHeaderRules`. Off by default.
 
-A static site cannot use nonces — a nonce must be fresh per response, and these responses are files
-— so hashes are the only route to a strict `script-src`. That works here because the inline scripts
-Jx emits are **constants**: the colour-scheme pre-paint script is one fixed IIFE, and the import map
-is the same object on every page of a build. A handful of hashes covers a whole site, which is what
-makes the policy fit in the `/*` stanza; a per-page policy would exhaust Cloudflare Pages' ~100-rule
-budget on any real site.
+A static site cannot use nonces — a nonce must be fresh per response, and these responses are files — so hashes are the only route to a strict `script-src`. That works here because the inline scripts Jx emits are **constants**: the colour-scheme pre-paint script is one fixed IIFE, and the import map is the same object on every page of a build. A handful of hashes covers a whole site, which is what makes the policy fit in the `/*` stanza; a per-page policy would exhaust Cloudflare Pages' ~100-rule budget on any real site.
 
-Sources are collected by **scanning finished HTML** — the exact bytes about to be written — rather
-than by asking each emission site what it emitted. Seven places can put a `<script>` on a page, and
-a hash that does not match the shipped bytes is worse than no policy at all.
+Sources are collected by **scanning finished HTML** — the exact bytes about to be written — rather than by asking each emission site what it emitted. Seven places can put a `<script>` on a page, and a hash that does not match the shipped bytes is worse than no policy at all.
 
 The emitted policy for a site with no third-party content:
 
@@ -2392,147 +1972,67 @@ Content-Security-Policy: base-uri 'self'; default-src 'self'; font-src 'self'; f
 
 Four decisions in that line:
 
-- **`script-src` is strict.** Compiled output contains no `eval` and no `new Function` (a committed
-  test asserts it), and event handlers are bound as listeners rather than emitted as `onclick=`
-  attributes — so there is nothing for `'unsafe-inline'` or `'unsafe-eval'` to be needed for. Since
-  §12 the runtime is same-origin too, so `'self'` plus the constant hashes is the whole directive.
-- **`style-src` keeps `'unsafe-inline'`, and this is a divergence, not an oversight.** Every page
-  carries a generated `<style>` block whose content is per-page, so hashing them would put one hash
-  per page into a site-wide header; per-element `style=` attributes have no hash form at all. The
-  two cannot be half-done: a hash and `'unsafe-inline'` in the same directive cancel, so a partial
-  set of hashes would turn working pages blank. Hoisting inline attributes into the generated
-  stylesheet is the reachable end state and is not this section's work.
-- **A data block is never hashed.** `<script type="application/ld+json">` is not executed, CSP does
-  not check it, and a hash for it would authorize nothing.
-- **`frame-ancestors` is `'self'`**, matching the `X-Frame-Options: SAMEORIGIN` emitted beside it.
-  Two headers disagreeing about framing is a worse outcome than either answer alone.
+- **`script-src` is strict.** Compiled output contains no `eval` and no `new Function` (a committed test asserts it), and event handlers are bound as listeners rather than emitted as `onclick=` attributes — so there is nothing for `'unsafe-inline'` or `'unsafe-eval'` to be needed for. Since §12 the runtime is same-origin too, so `'self'` plus the constant hashes is the whole directive.
+- **`style-src` keeps `'unsafe-inline'`, and this is a divergence, not an oversight.** Every page carries a generated `<style>` block whose content is per-page, so hashing them would put one hash per page into a site-wide header; per-element `style=` attributes have no hash form at all. The two cannot be half-done: a hash and `'unsafe-inline'` in the same directive cancel, so a partial set of hashes would turn working pages blank. Hoisting inline attributes into the generated stylesheet is the reachable end state and is not this section's work.
+- **A data block is never hashed.** `<script type="application/ld+json">` is not executed, CSP does not check it, and a hash for it would authorize nothing.
+- **`frame-ancestors` is `'self'`**, matching the `X-Frame-Options: SAMEORIGIN` emitted beside it. Two headers disagreeing about framing is a worse outcome than either answer alone.
 
-**Off by default**, unlike every other header in this section. Those describe the response; this one
-governs code the build cannot see — a third-party script that loads a second script, a widget that
-opens a frame. `csp: true` enforces, `"report-only"` observes, and an object form takes `mode`,
-`reportUri` (which emits `report-to`, `report-uri` **and** the `Reporting-Endpoints` header the
-first of those requires) and `directives` for wholesale replacement or removal of any computed
-directive.
+**Off by default**, unlike every other header in this section. Those describe the response; this one governs code the build cannot see — a third-party script that loads a second script, a widget that opens a frame. `csp: true` enforces, `"report-only"` observes, and an object form takes `mode`, `reportUri` (which emits `report-to`, `report-uri` **and** the `Reporting-Endpoints` header the first of those requires) and `directives` for wholesale replacement or removal of any computed directive.
 
-**Per adapter.** Cloudflare Pages, Cloudflare Workers assets and Netlify read the file. The `node`
-and `bun` adapters serve no static assets at all, so for them it is documentation of what a reverse
-proxy must send — the build says so with a warning rather than skipping the file.
+**Per adapter.** Cloudflare Pages, Cloudflare Workers assets and Netlify read the file. The `node` and `bun` adapters serve no static assets at all, so for them it is documentation of what a reverse proxy must send — the build says so with a warning rather than skipping the file.
 
 ### 14.4 `.nojekyll`
 
-Written unconditionally. GitHub Pages runs Jekyll, which excludes every `_`-prefixed path — which is
-`_headers`, `_redirects`, `_worker.js`, `_routes.json` and `_islands/`. One empty file closes the
-whole class of "works locally, half-broken on Pages", which is why it is not an adapter option.
+Written unconditionally. GitHub Pages runs Jekyll, which excludes every `_`-prefixed path — which is `_headers`, `_redirects`, `_worker.js`, `_routes.json` and `_islands/`. One empty file closes the whole class of "works locally, half-broken on Pages", which is why it is not an adapter option.
 
 ### 14.5 Installability and Disclosure Output
 
 > **Status: Implemented.** `well-known.ts`, written after the `public/` copy in step 7d.1.
 
-Two files a site is expected to publish and nothing generated. Both are pure functions of
-`project.json` plus what the build already knows, which is the argument for generating them rather
-than leaving them in `public/`: an author copying either between projects also copies the values
-that were right for the other one.
+Two files a site is expected to publish and nothing generated. Both are pure functions of `project.json` plus what the build already knows, which is the argument for generating them rather than leaving them in `public/`: an author copying either between projects also copies the values that were right for the other one.
 
-**`manifest.webmanifest`** (W3C Web App Manifest) is emitted when the `manifest` section is present
-— absence means no manifest, because a manifest is a claim that a site is meant to be installed and
-most are not. `name` falls back to the project's own and `start_url` to `/`; camelCase config maps
-onto the standard's `snake_case` keys, and a key the project did not set is absent rather than
-null. `<link rel="manifest">` and, when a theme colour is set, `<meta name="theme-color">` join the
-site-level `$head` below the author's own entries.
+**`manifest.webmanifest`** (W3C Web App Manifest) is emitted when the `manifest` section is present — absence means no manifest, because a manifest is a claim that a site is meant to be installed and most are not. `name` falls back to the project's own and `start_url` to `/`; camelCase config maps onto the standard's `snake_case` keys, and a key the project did not set is absent rather than null. `<link rel="manifest">` and, when a theme colour is set, `<meta name="theme-color">` join the site-level `$head` below the author's own entries.
 
-Icons at 192px and 512px are the installability criterion, and their absence is a **warning**, not
-an error: the manifest is still valid and still supplies the name and colour a browser shows, so
-refusing to emit it would be a worse trade than saying so.
+Icons at 192px and 512px are the installability criterion, and their absence is a **warning**, not an error: the manifest is still valid and still supplies the name and colour a browser shows, so refusing to emit it would be a worse trade than saying so.
 
-**`.well-known/security.txt`** (RFC 9116) is emitted when `securityTxt` is present. `.well-known`
-only — §3 makes it canonical, and a second copy at the root is a second thing to forget to update.
-`preferredLanguages` runs through the same BCP 47 canonicalization as `i18n.locales` (§13.2): one
-implementation for the repo.
+**`.well-known/security.txt`** (RFC 9116) is emitted when `securityTxt` is present. `.well-known` only — §3 makes it canonical, and a second copy at the root is a second thing to forget to update. `preferredLanguages` runs through the same BCP 47 canonicalization as `i18n.locales` (§13.2): one implementation for the repo.
 
-**`Expires` is required and a past value is a build error.** §2.5.5 requires it, it is the field
-everyone forgets, and an expired file is worse than a missing one — it advertises a reporting
-channel while telling the reporter not to trust what it says. A missing `Contact` (§2.5.3) fails for
-the same reason.
+**`Expires` is required and a past value is a build error.** §2.5.5 requires it, it is the field everyone forgets, and an expired file is worse than a missing one — it advertises a reporting channel while telling the reporter not to trust what it says. A missing `Contact` (§2.5.3) fails for the same reason.
 
-**Clearsigning is not implemented** and does not need to be. It requires a private key at build
-time, which a build cannot have; a hand-placed `public/.well-known/security.txt` is copied before
-this step and is kept rather than overwritten, so shipping a signed file costs zero code. The same
-shadowing applies to the manifest.
+**Clearsigning is not implemented** and does not need to be. It requires a private key at build time, which a build cannot have; a hand-placed `public/.well-known/security.txt` is copied before this step and is kept rather than overwritten, so shipping a signed file costs zero code. The same shadowing applies to the manifest.
 
 ### 14.6 Service Worker
 
 > **Status: Implemented.** `service-worker.ts`, written in step 7d.2. **Off by default.**
 
-A service worker is unlike every other output in this section: it is **sticky**. It survives
-redeploys, it keeps running against a site that has moved on, and the visitors it breaks are
-precisely the ones who came back. Nothing else the build emits can do that, which is why it is off
-by default and why most of the contract below is about getting rid of one.
+A service worker is unlike every other output in this section: it is **sticky**. It survives redeploys, it keeps running against a site that has moved on, and the visitors it breaks are precisely the ones who came back. Nothing else the build emits can do that, which is why it is off by default and why most of the contract below is about getting rid of one.
 
-**`serviceWorker: false` is not the same as omitting the key**, and this is the load-bearing
-distinction. Absence means "never had one" and emits nothing. `false` means "had one, remove it"
-and emits a **tombstone** at the same URL: a worker whose only job is to unregister itself, delete
-every cache it made, and reload its clients onto the live site. Deleting the file instead would
-leave every previous visitor running the old worker forever — a 404 at that URL is not an
-instruction to stop, and there is no other channel to reach them through.
+**`serviceWorker: false` is not the same as omitting the key**, and this is the load-bearing distinction. Absence means "never had one" and emits nothing. `false` means "had one, remove it" and emits a **tombstone** at the same URL: a worker whose only job is to unregister itself, delete every cache it made, and reload its clients onto the live site. Deleting the file instead would leave every previous visitor running the old worker forever — a 404 at that URL is not an instruction to stop, and there is no other channel to reach them through.
 
-**HTML is always network-first.** The cache is a fallback for a failed request, never a substitute
-for one. A cache-first worker serves a stale page indefinitely and the author's next deploy cannot
-reach the visitor to fix it. The single exception is `/images/_optimized/*`, which is the build's
-only content-addressed output (§14.3) — its filename embeds a digest, so a cached hit can never be
-wrong. `/components/*` and `/assets/*` are deliberately **not** cache-first for the same reason
-they are not `immutable`: they are named after what they contain, not after their content.
+**HTML is always network-first.** The cache is a fallback for a failed request, never a substitute for one. A cache-first worker serves a stale page indefinitely and the author's next deploy cannot reach the visitor to fix it. The single exception is `/images/_optimized/*`, which is the build's only content-addressed output (§14.3) — its filename embeds a digest, so a cached hit can never be wrong. `/components/*` and `/assets/*` are deliberately **not** cache-first for the same reason they are not `immutable`: they are named after what they contain, not after their content.
 
-**A precache URL that this build did not produce is a build error.** `cache.addAll()` is
-all-or-nothing, so one unreachable entry rejects the install and the worker never activates — with
-no error anywhere the author would look. The symptom is "the service worker does nothing", which is
-how it presented the first time this was run against a browser. The emitted worker also fetches
-precache entries individually rather than through `addAll()`, covering what the build cannot see.
+**A precache URL that this build did not produce is a build error.** `cache.addAll()` is all-or-nothing, so one unreachable entry rejects the install and the worker never activates — with no error anywhere the author would look. The symptom is "the service worker does nothing", which is how it presented the first time this was run against a browser. The emitted worker also fetches precache entries individually rather than through `addAll()`, covering what the build cannot see.
 
-An `offlineFallback` is added to `precache` if it is not already there, with a warning: a page that
-was never cached cannot be served when the network is gone, which is the only moment it exists for.
+An `offlineFallback` is added to `precache` if it is not already there, with a warning: a page that was never cached cannot be served when the network is gone, which is the only moment it exists for.
 
-**The cache name rotates on a configuration change, not on every build.** HTML is network-first and
-images are content-addressed, so a content-only deploy needs no rotation, and rotating anyway would
-discard a warm cache on every deploy for nothing.
+**The cache name rotates on a configuration change, not on every build.** HTML is network-first and images are content-addressed, so a content-only deploy needs no rotation, and rotating anyway would discard a warm cache on every deploy for nothing.
 
-The registration script is inline, byte-identical on every page, and therefore one hash in a strict
-`script-src` (§14.3.1). It registers on `load` rather than immediately — a worker competing with
-the page's own resources makes the first visit slower, and that is the visit that matters. It is
-emitted only when a worker exists: registering a tombstone from the page trying to shed it would be
-self-defeating.
+The registration script is inline, byte-identical on every page, and therefore one hash in a strict `script-src` (§14.3.1). It registers on `load` rather than immediately — a worker competing with the page's own resources makes the first visit slower, and that is the visit that matters. It is emitted only when a worker exists: registering a tombstone from the page trying to shed it would be self-defeating.
 
 ### 14.7 Deployment Base Path
 
-> **Status: Implemented.** Derived from `url`, applied to every output a host reads, and answered
-> by the dev server alongside the bare path.
+> **Status: Implemented.** Derived from `url`, applied to every output a host reads, and answered by the dev server alongside the bare path.
 
-A site is not always served from an origin root. Deployed at
-`https://example.pages.dev/m/my-site/`, every absolute-path reference the build emits —
-`/assets/vue-reactivity.js`, `/components/site-counter.js`, `/images/hero.jpg` — resolves against
-`example.pages.dev/` instead, where nothing is. The page renders blank rather than merely wrong,
-because the runtime assets 404 before anything can draw.
+A site is not always served from an origin root. Deployed at `https://example.pages.dev/m/my-site/`, every absolute-path reference the build emits — `/assets/vue-reactivity.js`, `/components/site-counter.js`, `/images/hero.jpg` — resolves against `example.pages.dev/` instead, where nothing is. The page renders blank rather than merely wrong, because the runtime assets 404 before anything can draw.
 
-**The base is `url`'s path, and there is no second key for it.** Every URL a build emits is a URI
-reference and `url` is the base URI it is resolved against ([RFC 3986](https://www.rfc-editor.org/rfc/rfc3986) §5).
-The site above has already said where it lives. A `build.base` beside it would be a second writer on
-one fact — free to disagree with the canonical links and the sitemap that are built from the same
-value — so the base is READ BACK off `url`'s pathname, and a site with no `url`, or one at an origin
-root, has a base of `""` and is unaffected in every particular.
+**The base is `url`'s path, and there is no second key for it.** Every URL a build emits is a URI reference and `url` is the base URI it is resolved against ([RFC 3986](https://www.rfc-editor.org/rfc/rfc3986) §5). The site above has already said where it lives. A `build.base` beside it would be a second writer on one fact — free to disagree with the canonical links and the sitemap that are built from the same value — so the base is READ BACK off `url`'s pathname, and a site with no `url`, or one at an origin root, has a base of `""` and is unaffected in every particular.
 
-What went wrong was narrower than a missing option: the compiler resolved against the base's
-**origin** and discarded its path, which is what §5.2 does to an absolute-path reference and is not
-what a deployment means by one.
+What went wrong was narrower than a missing option: the compiler resolved against the base's **origin** and discarded its path, which is what §5.2 does to an absolute-path reference and is not what a deployment means by one.
 
 Two rules follow, and they are different operations:
 
-1. **An absolute-path reference is re-rooted.** `/assets/x.js` becomes `/m/my-site/assets/x.js`. It
-   is the only form whose meaning is "from the site root", and therefore the only form that moves
-   when the site root does. An absolute URL, a protocol-relative reference, a fragment, a query and
-   every relative path already resolve against something else and are left exactly as written.
-2. **An absolute URL built FROM `url` keeps its path.** `<link rel="canonical">`, `og:url`,
-   `sitemap.xml`'s `<loc>`, the `hreflang` alternates and `robots.txt`'s `Sitemap:` line resolve
-   the route as a relative-path reference, because §5.2 resolution of an absolute-path reference
-   would replace `url`'s whole path and name a page the origin root does not serve.
+1. **An absolute-path reference is re-rooted.** `/assets/x.js` becomes `/m/my-site/assets/x.js`. It is the only form whose meaning is "from the site root", and therefore the only form that moves when the site root does. An absolute URL, a protocol-relative reference, a fragment, a query and every relative path already resolve against something else and are left exactly as written.
+2. **An absolute URL built FROM `url` keeps its path.** `<link rel="canonical">`, `og:url`, `sitemap.xml`'s `<loc>`, the `hreflang` alternates and `robots.txt`'s `Sitemap:` line resolve the route as a relative-path reference, because §5.2 resolution of an absolute-path reference would replace `url`'s whole path and name a page the origin root does not serve.
 
 Every output a host reads carries the base, not only the page:
 
@@ -2545,19 +2045,9 @@ Every output a host reads carries the base, not only the page:
 | `manifest.webmanifest` (§14.5) | `start_url`, `scope` and icon `src` are fetched or navigated to                                                                                                                             |
 | The generated worker (§14.1)   | It IS the origin: the request it sees carries the prefix, so its routes and its extension mounts are registered under the base                                                              |
 
-**The page rewrite happens on finished HTML, deliberately.** The alternative is to thread a prefix
-through every emitter that can put a URL on a page — the import map, three page-template tiers that
-each write their own map, component scripts, island modules, sidecar and npm bundles, image
-`srcset`, `$head`, and whatever the author wrote by hand. That list is complete until the next
-emitter is added, and a build has already shipped an import map naming files a different emitter
-never wrote. One pass over the bytes that ship cannot drift from them. Re-rooting is idempotent, so
-an emitter that already prefixed is unaffected.
+**The page rewrite happens on finished HTML, deliberately.** The alternative is to thread a prefix through every emitter that can put a URL on a page — the import map, three page-template tiers that each write their own map, component scripts, island modules, sidecar and npm bundles, image `srcset`, `$head`, and whatever the author wrote by hand. That list is complete until the next emitter is added, and a build has already shipped an import map naming files a different emitter never wrote. One pass over the bytes that ship cannot drift from them. Re-rooting is idempotent, so an emitter that already prefixed is unaffected.
 
-**`jx dev` answers both spellings.** It strips a leading base at the edge rather than moving the dev
-root, so `localhost:3000/` is unchanged for every project that never sets a `url` path, and the
-based URL a build emits resolves to the same file. A preview that only answered the bare path would
-exercise URLs the deployed site never uses, which is the class of bug that is only found in
-production (`server.md` §3).
+**`jx dev` answers both spellings.** It strips a leading base at the edge rather than moving the dev root, so `localhost:3000/` is unchanged for every project that never sets a `url` path, and the based URL a build emits resolves to the same file. A preview that only answered the bare path would exercise URLs the deployed site never uses, which is the class of bug that is only found in production (`server.md` §3).
 
 ---
 

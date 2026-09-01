@@ -2,9 +2,9 @@
 
 ## Declarative Document Object Model — JSON Edition
 
-**Version:** 0.6.0-draft
-**Status:** Partial
-**Updated:** 2026-09-01
+**Version:** 0.6.0-draft\
+**Status:** Partial\
+**Updated:** 2026-09-01\
 **License:** MIT
 
 ---
@@ -696,46 +696,24 @@ Non-standard attributes are set via the `attributes` object:
 }
 ```
 
-**A boolean value is written the way the attribute is read.** HTML spells a boolean two
-incompatible ways, so an attribute whose value is `true` or `false` — declared directly, or resolved
-from a `${...}` template or `$ref` — is emitted according to the family its NAME puts it in:
+**A boolean value is written the way the attribute is read.** HTML spells a boolean two incompatible ways, so an attribute whose value is `true` or `false` — declared directly, or resolved from a `${...}` template or `$ref` — is emitted according to the family its NAME puts it in:
 
 | Family                                                                                                     | `true`    | `false`          |
 | ---------------------------------------------------------------------------------------------------------- | --------- | ---------------- |
 | **Presence** — `open`, `disabled`, `checked`, `hidden`, `required`, and every other HTML boolean attribute | bare name | attribute absent |
 | **Enumerated** — every `aria-*`, plus `contenteditable`, `draggable`, `spellcheck`                         | `="true"` | `="false"`       |
 
-Neither form is a stylistic choice. A presence attribute counts _any_ value as true, so
-`<details open="false">` is an open `<details>`; an enumerated attribute reads an empty value as
-unset, so a bare `aria-hidden` is not hidden and an absent `contenteditable` means "inherit" rather
-than `false`. Writing either as the other inverts it in silence.
+Neither form is a stylistic choice. A presence attribute counts _any_ value as true, so `<details open="false">` is an open `<details>`; an enumerated attribute reads an empty value as unset, so a bare `aria-hidden` is not hidden and an absent `contenteditable` means "inherit" rather than `false`. Writing either as the other inverts it in silence.
 
-A **string** is never reinterpreted in either family: `"aria-current": "false"` is emitted verbatim,
-because an enumerated attribute carries its value in its text.
+A **string** is never reinterpreted in either family: `"aria-current": "false"` is emitted verbatim, because an enumerated attribute carries its value in its text.
 
-Every renderer applies this identically — the static compiler writing HTML source and the runtime
-writing live elements — so an element does not change meaning when a prerendered page hydrates.
+Every renderer applies this identically — the static compiler writing HTML source and the runtime writing live elements — so an element does not change meaning when a prerendered page hydrates.
 
-**`popover` is enumerated, and is deliberately emitted through the presence branch.** Its keywords
-are `auto`, `manual` and `hint`; its MISSING-value default is `auto`, so a bare `popover` and
-`popover=""` are both auto popovers — which is what the presence branch produces for `true`. Its
-INVALID-value default is `manual`, so emitting `popover="true"` would silently give up light dismiss
-and Escape. The house spelling is therefore the keyword itself, `"popover": "auto"`, and a boolean
-`popover` is a defect a document report names rather than an emission a renderer corrects. It is the
-one attribute for which the paragraph above needs a caveat: a presence attribute counts any value as
-true, but `popover="false"` is a _manual_ popover rather than a true-ish one.
+**`popover` is enumerated, and is deliberately emitted through the presence branch.** Its keywords are `auto`, `manual` and `hint`; its MISSING-value default is `auto`, so a bare `popover` and `popover=""` are both auto popovers — which is what the presence branch produces for `true`. Its INVALID-value default is `manual`, so emitting `popover="true"` would silently give up light dismiss and Escape. The house spelling is therefore the keyword itself, `"popover": "auto"`, and a boolean `popover` is a defect a document report names rather than an emission a renderer corrects. It is the one attribute for which the paragraph above needs a caveat: a presence attribute counts any value as true, but `popover="false"` is a _manual_ popover rather than a true-ish one.
 
-> **Status: Implemented.** `booleanAttrValue()` in `@jxsuite/runtime` is the single decision, and all
-> FOUR writers defer to it: the compiler's `buildAttrs()`, its custom-element and client targets, and
-> the runtime's `applyAttributes()`. The runtime removes the attribute rather than writing `"false"`
-> when a binding flips, and the two generated-module targets do the same through an inlined copy of
-> the rule whose enumerated-name list is serialized from `enumeratedAttrNames()` — those modules load
-> without `@jxsuite/runtime`, and a test asserts the emitted literal still equals that export.
+> **Status: Implemented.** `booleanAttrValue()` in `@jxsuite/runtime` is the single decision, and all FOUR writers defer to it: the compiler's `buildAttrs()`, its custom-element and client targets, and the runtime's `applyAttributes()`. The runtime removes the attribute rather than writing `"false"` when a binding flips, and the two generated-module targets do the same through an inlined copy of the rule whose enumerated-name list is serialized from `enumeratedAttrNames()` — those modules load without `@jxsuite/runtime`, and a test asserts the emitted literal still equals that export.
 >
-> The element and client targets did NOT defer to it until they were made to: they stringified
-> booleans, so a component's `open: true` compiled to `open="true"` and a bound `open` that flipped
-> false wrote `open="false"` — an OPEN element the author had closed. Only the static emitter was
-> ever correct, which is why this note used to name two writers.
+> The element and client targets did NOT defer to it until they were made to: they stringified booleans, so a component's `open: true` compiled to `open="true"` and a bound `open` that flipped false wrote `open="false"` — an OPEN element the author had closed. Only the static emitter was ever correct, which is why this note used to name two writers.
 
 ### 8.4 Child Arrays
 
@@ -774,22 +752,13 @@ When all children are bare strings with no element siblings, prefer the simpler 
 
 #### Computed Children (Build Time)
 
-The entire `children` value may be a `${…}` template string that resolves **at
-site-build time** to an array of child definitions. This is the mechanism for
-injecting parsed content (e.g. a content entry's `$children` from
-`@jxsuite/parser`) into a wrapper element:
+The entire `children` value may be a `${…}` template string that resolves **at site-build time** to an array of child definitions. This is the mechanism for injecting parsed content (e.g. a content entry's `$children` from `@jxsuite/parser`) into a wrapper element:
 
 ```json
 { "tagName": "bl-prose", "children": "${state.entry.$children}" }
 ```
 
-The compiler's template pass replaces `children` with the resolved array and
-recurses into it. Scope of the feature: the template must resolve to an array
-during the site build (e.g. from `$paths`-bound state or a compiler-timing
-prototype). A computed-children string is **not** re-evaluated at runtime —
-runtime-reactive content swapping is not supported through this form — and a
-plain non-template string is not a valid `children` value at all (text
-children must be array items, per above).
+The compiler's template pass replaces `children` with the resolved array and recurses into it. Scope of the feature: the template must resolve to an array during the site build (e.g. from `$paths`-bound state or a compiler-timing prototype). A computed-children string is **not** re-evaluated at runtime — runtime-reactive content swapping is not supported through this form — and a plain non-template string is not a valid `children` value at all (text children must be array items, per above).
 
 ### 8.5 Slot Support
 
@@ -881,10 +850,7 @@ Base and nested declarations alike become rules in one stylesheet, keyed on a ha
 
 Nesting is **flattened by the emitter**, never handed to the browser as CSS Nesting: `&` is resolved before anything is written, and no `&` reaches the output. This is deliberate rather than incidental. A key like `.child` COMPOUNDS onto its scope here (`#box.child`), where CSS Nesting resolves the same key as a descendant, so a style object handed to a nesting parser would silently mean something else.
 
-Nesting is **recursive**: selector groups and at-rule groups (`@`-prefixed
-keys — named breakpoints per §9.4, or standard at-rules like
-`@starting-style`) may nest to arbitrary depth, e.g. breakpoint → selector →
-pseudo-class:
+Nesting is **recursive**: selector groups and at-rule groups (`@`-prefixed keys — named breakpoints per §9.4, or standard at-rules like `@starting-style`) may nest to arbitrary depth, e.g. breakpoint → selector → pseudo-class:
 
 ```json
 {
@@ -897,18 +863,9 @@ pseudo-class:
 }
 ```
 
-Both the compiler and the runtime resolve nesting recursively; the component
-and project style schemas model the same recursive contract. Selector groups
-and at-rule groups compose in **either order and to any depth** — `@media →
-selector → pseudo` and `selector → @media` are the same tree read two ways, and
-one emitter answers for both (§9.6).
+Both the compiler and the runtime resolve nesting recursively; the component and project style schemas model the same recursive contract. Selector groups and at-rule groups compose in **either order and to any depth** — `@media → selector → pseudo` and `selector → @media` are the same tree read two ways, and one emitter answers for both (§9.6).
 
-**Some at-rules take a DECLARATION body rather than a selector body**, and both
-emitters recognise them by name: `@position-try`, `@property`, `@font-face` and
-`@counter-style`. Their block is emitted verbatim with no selector inside it and
-is not scoped to the element whose `style` object declares it, because the name
-such a rule declares is document-global — the same way an author writes one in a
-plain stylesheet, near the rule that uses it:
+**Some at-rules take a DECLARATION body rather than a selector body**, and both emitters recognise them by name: `@position-try`, `@property`, `@font-face` and `@counter-style`. Their block is emitted verbatim with no selector inside it and is not scoped to the element whose `style` object declares it, because the name such a rule declares is document-global — the same way an author writes one in a plain stylesheet, near the rule that uses it:
 
 ```json
 {
@@ -920,13 +877,9 @@ plain stylesheet, near the rule that uses it:
 }
 ```
 
-The name is part of the key, so the test is a prefix match. `@keyframes` is
-deliberately absent: its body is neither declarations nor selectors but
-percentage stops, which is a third shape.
+The name is part of the key, so the test is a prefix match. `@keyframes` is deliberately absent: its body is neither declarations nor selectors but percentage stops, which is a third shape.
 
-> **Status: Implemented.** Wrapping one of these in a selector produced a block
-> the parser discards without a word, which is why an anchor-positioned panel
-> could declare no custom fallback at all.
+> **Status: Implemented.** Wrapping one of these in a selector produced a block the parser discards without a word, which is why an anchor-positioned panel could declare no custom fallback at all.
 
 ### 9.3 Static Style Extraction
 
@@ -947,10 +900,7 @@ Named breakpoints are declared at root level using `$media`, following the CSS `
 }
 ```
 
-Within any `style` object, `@--name` keys reference named breakpoints. `@(condition)` keys are
-literal media queries, where the parentheses belong to the query itself — a feature query keeps
-them (`@(min-width: 1280px)`), while a bare media type does not, so `@(print)` emits
-`@media print`:
+Within any `style` object, `@--name` keys reference named breakpoints. `@(condition)` keys are literal media queries, where the parentheses belong to the query itself — a feature query keeps them (`@(min-width: 1280px)`), while a bare media type does not, so `@(print)` emits `@media print`:
 
 ```json
 {
@@ -965,97 +915,50 @@ them (`@(min-width: 1280px)`), while a bare media type does not, so `@(print)` e
 
 `$media` declarations propagate through the component scope.
 
-A `$media` entry whose value is a _pure_ `prefers-color-scheme` query — exactly
-`(prefers-color-scheme: light)` or `(prefers-color-scheme: dark)`, no other conditions — is a
-**scheme query**. Scheme queries participate in the forced-scheme contract defined in §9.5.
+A `$media` entry whose value is a _pure_ `prefers-color-scheme` query — exactly `(prefers-color-scheme: light)` or `(prefers-color-scheme: dark)`, no other conditions — is a **scheme query**. Scheme queries participate in the forced-scheme contract defined in §9.5.
 
 > **Status: Implemented.** Runtime `applyStyle` handles nested selectors, media breakpoints, and scoped style generation.
 
 ### 9.5 Color-Scheme Variants and Forced Schemes
 
-Declaring a scheme query in `$media` opts a document (or site) into the color-scheme contract.
-Two normative constants define the visitor-facing override mechanism:
+Declaring a scheme query in `$media` opts a document (or site) into the color-scheme contract. Two normative constants define the visitor-facing override mechanism:
 
-- **`data-color-scheme`** — attribute on the root element (`<html>`). Value `"light"` or
-  `"dark"` forces that scheme; an absent attribute means _auto_ (follow the OS
-  `prefers-color-scheme`).
-- **`jx-color-scheme`** — `localStorage` key a site switcher persists the visitor's forced
-  scheme under. Values `"light"` or `"dark"`; absent means auto.
+- **`data-color-scheme`** — attribute on the root element (`<html>`). Value `"light"` or `"dark"` forces that scheme; an absent attribute means _auto_ (follow the OS `prefers-color-scheme`).
+- **`jx-color-scheme`** — `localStorage` key a site switcher persists the visitor's forced scheme under. Values `"light"` or `"dark"`; absent means auto.
 
-**Dual emission.** Every style block keyed by a scheme query (`@--dark { … }` or a literal
-`@(prefers-color-scheme: …) { … }`) is emitted twice:
+**Dual emission.** Every style block keyed by a scheme query (`@--dark { … }` or a literal `@(prefers-color-scheme: …) { … }`) is emitted twice:
 
-1. a media-guarded copy that applies only while no scheme is forced — root-level rules are
-   guarded as `:root:where(:not([data-color-scheme]))`, scoped rules as
-   `:where(:root:not([data-color-scheme])) <selector>`;
-2. an unconditional forced copy under the attribute — `:root:where([data-color-scheme="dark"])`
-   for root-level rules, `:where(:root[data-color-scheme="dark"]) <selector>` for scoped rules.
+1. a media-guarded copy that applies only while no scheme is forced — root-level rules are guarded as `:root:where(:not([data-color-scheme]))`, scoped rules as `:where(:root:not([data-color-scheme])) <selector>`;
+2. an unconditional forced copy under the attribute — `:root:where([data-color-scheme="dark"])` for root-level rules, `:where(:root[data-color-scheme="dark"]) <selector>` for scoped rules.
 
-All guards are wrapped in `:where()` so specificity matches the unguarded selector and source
-order decides the cascade: base rules are always emitted **before** conditional blocks.
-At the project level, custom properties inside a scheme block land on `:root` and direct
-properties on `body`, mirroring the base emission.
+All guards are wrapped in `:where()` so specificity matches the unguarded selector and source order decides the cascade: base rules are always emitted **before** conditional blocks. At the project level, custom properties inside a scheme block land on `:root` and direct properties on `body`, mirroring the base emission.
 
-**Compound-query limitation.** A query that combines `prefers-color-scheme` with any other
-condition (e.g. `(prefers-color-scheme: dark) and (min-width: 768px)`) is _not_ a scheme query:
-it keeps plain `@media` emission and does not respond to the forced attribute.
+**Compound-query limitation.** A query that combines `prefers-color-scheme` with any other condition (e.g. `(prefers-color-scheme: dark) and (min-width: 768px)`) is _not_ a scheme query: it keeps plain `@media` emission and does not respond to the forced attribute.
 
-**`color-scheme` declaration.** When a scheme query is declared, the compiler emits
-`:root { color-scheme: light dark }` plus per-attribute overrides
-(`:root:where([data-color-scheme="light"]) { color-scheme: light }` and the dark equivalent) so
-native widgets, scrollbars, and form controls follow the forced scheme. Authors who set
-`colorScheme` in the project `style` suppress this emission.
+**`color-scheme` declaration.** When a scheme query is declared, the compiler emits `:root { color-scheme: light dark }` plus per-attribute overrides (`:root:where([data-color-scheme="light"]) { color-scheme: light }` and the dark equivalent) so native widgets, scrollbars, and form controls follow the forced scheme. Authors who set `colorScheme` in the project `style` suppress this emission.
 
-**Pre-paint script.** Site and standalone compilation targets inject a small synchronous inline
-`<script>` into `<head>` — ahead of all style blocks — that reads `jx-color-scheme` from
-`localStorage` and sets `data-color-scheme` on the root element, eliminating any flash of the
-wrong scheme on load. Declaring a scheme query is the sole opt-in; no other configuration
-exists.
+**Pre-paint script.** Site and standalone compilation targets inject a small synchronous inline `<script>` into `<head>` — ahead of all style blocks — that reads `jx-color-scheme` from `localStorage` and sets `data-color-scheme` on the root element, eliminating any flash of the wrong scheme on load. Declaring a scheme query is the sole opt-in; no other configuration exists.
 
-> **Status: Implemented.** `pureSchemeOf`/`schemeSelectors` (runtime, re-exported by the
-> compiler) define the shared selector contract; `applyStyle`, `compileStyles`, and the site
-> pipeline all dual-emit through them.
+> **Status: Implemented.** `pureSchemeOf`/`schemeSelectors` (runtime, re-exported by the compiler) define the shared selector contract; `applyStyle`, `compileStyles`, and the site pipeline all dual-emit through them.
 
 ### 9.6 The Runtime Stylesheet Engine
 
-The runtime delivers an element's styles as **CSS rules in a constructable stylesheet adopted by the
-document**, reached through `document.adoptedStyleSheets`. Nothing an author writes in a `style`
-object is written as an inline declaration.
+The runtime delivers an element's styles as **CSS rules in a constructable stylesheet adopted by the document**, reached through `document.adoptedStyleSheets`. Nothing an author writes in a `style` object is written as an inline declaration.
 
-**The handle is `data-jx`, and its value is a content hash.** A rule is scoped by
-`[data-jx="jx-<hash>"]`, specificity (0,1,0), stamped on the element by the runtime. It is not a
-generated class, because a class handle would be destroyed by a static `attributes: { "class": … }`
-applied after the style; and it is not random, because the hash is what lets two elements that
-style alike SHARE one rule set and what makes the handle stable across a server render and the
-client render that follows it. Everything that can vary per call site is an input to that hash: the
-authored object, the resolved `$media` map, and any host-specific value or selector transposition.
+**The handle is `data-jx`, and its value is a content hash.** A rule is scoped by `[data-jx="jx-<hash>"]`, specificity (0,1,0), stamped on the element by the runtime. It is not a generated class, because a class handle would be destroyed by a static `attributes: { "class": … }` applied after the style; and it is not random, because the hash is what lets two elements that style alike SHARE one rule set and what makes the handle stable across a server render and the client render that follows it. Everything that can vary per call site is an input to that hash: the authored object, the resolved `$media` map, and any host-specific value or selector transposition.
 
-**Reactive declarations are indirected through a custom property.** A value carrying a `${…}`
-template or a `{ "$ref": … }` is emitted as `property: var(--jx-r<n>-<m>)`, and the element sets
-that variable inline as its source changes. The declaration therefore stays in the rule, where a
-`:hover` or `@media` block can override it, while only the variable moves. A reactive element never
-shares a rule set with another: a `var()` resolves from the nearest ancestor that set it, so a
-shared descendant rule would read the wrong element's value.
+**Reactive declarations are indirected through a custom property.** A value carrying a `${…}` template or a `{ "$ref": … }` is emitted as `property: var(--jx-r<n>-<m>)`, and the element sets that variable inline as its source changes. The declaration therefore stays in the rule, where a `:hover` or `@media` block can override it, while only the variable moves. A reactive element never shares a rule set with another: a `var()` resolves from the nearest ancestor that set it, so a shared descendant rule would read the wrong element's value.
 
-**Declaration-body at-rules are hoisted.** The four at-rules of §9.2 whose body is declarations
-rather than rules declare a document-global NAME, so they are written once for the document and
-released when the last element that declares one lets go, rather than emitted per element.
+**Declaration-body at-rules are hoisted.** The four at-rules of §9.2 whose body is declarations rather than rules declare a document-global NAME, so they are written once for the document and released when the last element that declares one lets go, rather than emitted per element.
 
 Two cascade premises hold this together, and neither is Jx's to change:
 
-1. **Adopted sheets cascade after the document's own `<style>` and `<link>`.** An adopted rule
-   therefore wins an equal-specificity tie against a page stylesheet.
-2. **Jx emits no cascade layer of its own.** An unlayered rule beats a layered one at any
-   specificity, and third-party CSS arrives through `$head` unlayered; layering Jx's rules would
-   hand every page's `$head` a win over the document's own styles. An authored `"@layer name"` key
-   is passed through verbatim, as any other at-rule is.
+1. **Adopted sheets cascade after the document's own `<style>` and `<link>`.** An adopted rule therefore wins an equal-specificity tie against a page stylesheet.
+2. **Jx emits no cascade layer of its own.** An unlayered rule beats a layered one at any specificity, and third-party CSS arrives through `$head` unlayered; layering Jx's rules would hand every page's `$head` a win over the document's own styles. An authored `"@layer name"` key is passed through verbatim, as any other at-rule is.
 
-A host that cannot construct a stylesheet falls back to a `<style>` element carrying the same
-rules, in the same order.
+A host that cannot construct a stylesheet falls back to a `<style>` element carrying the same rules, in the same order.
 
-> **Status: Implemented.** `buildStyleRules` (`@jxsuite/runtime/css`) is the single definition of
-> what a style object means as CSS, shared by `applyStyle`, the static compiler and the site-style
-> builder, so a preview and the shipped page resolve the same nesting.
+> **Status: Implemented.** `buildStyleRules` (`@jxsuite/runtime/css`) is the single definition of what a style object means as CSS, shared by `applyStyle`, the static compiler and the site-style builder, so a preview and the shipped page resolve the same nesting.
 
 ---
 
@@ -1063,10 +966,7 @@ rules, in the same order.
 
 ### 10.1 Array Namespace Syntax
 
-A dynamic list is an array **pseudo-element** — an object with `$prototype: "Array"` that sits as a
-**member of a `children` array**, nestled among sibling elements or as the sole child. It renders
-**wrapper-less**: its mapped items become direct children of the array's parent (no intervening
-container).
+A dynamic list is an array **pseudo-element** — an object with `$prototype: "Array"` that sits as a **member of a `children` array**, nestled among sibling elements or as the sole child. It renders **wrapper-less**: its mapped items become direct children of the array's parent (no intervening container).
 
 ```json
 {
@@ -1085,10 +985,7 @@ container).
 }
 ```
 
-> **Backward compatibility.** The legacy form where `children` is _itself_ the Array object
-> (`"children": { "$prototype": "Array", … }`) is still accepted: the runtime and compiler render its
-> items directly into the parent element, and the studio normalizes it to a single array member on
-> load.
+> **Backward compatibility.** The legacy form where `children` is _itself_ the Array object (`"children": { "$prototype": "Array", … }`) is still accepted: the runtime and compiler render its items directly into the parent element, and the studio normalizes it to a single array member on load.
 
 ### 10.2 Iteration Context
 
@@ -1099,10 +996,7 @@ container).
 
 Template strings inside the map read the same context as `${$map.item…}` and `${$map.index}` (§6.6).
 
-**From a handler.** An event handler bound anywhere inside a map — on the map body or on any of its
-descendants — reads its iteration off state as `state.$map`, carrying `item` and `index`. The
-iteration is published before the handler body runs, so a handler shared by every row can tell which
-row invoked it. A nested map shadows the outer context for handlers within it.
+**From a handler.** An event handler bound anywhere inside a map — on the map body or on any of its descendants — reads its iteration off state as `state.$map`, carrying `item` and `index`. The iteration is published before the handler body runs, so a handler shared by every row can tell which row invoked it. A nested map shadows the outer context for handlers within it.
 
 ### 10.3 Filtering and Sorting
 
@@ -1116,8 +1010,7 @@ row invoked it. A nested map shadows the outer context for handlers within it.
 }
 ```
 
-> **Status: Implemented.** The runtime renders array members inline (wrapper-less) via
-> `renderMappedArrayInto()`, handling items, filter, sort, `$map/item`, and `$map/index`.
+> **Status: Implemented.** The runtime renders array members inline (wrapper-less) via `renderMappedArrayInto()`, handling items, filter, sort, `$map/item`, and `$map/index`.
 
 ---
 
@@ -1161,26 +1054,18 @@ Web APIs are accessed via `$prototype` in a `state` entry:
 
 > **Status: Implemented.**
 
-Three attributes are **derived rather than taken as declared**, because a browser that disagrees
-with a cookie's attributes drops it silently — the write appears to succeed and the value is simply
-never there again ([RFC 6265bis](https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-rfc6265bis)
-§4.1.3, §5.4.7):
+Three attributes are **derived rather than taken as declared**, because a browser that disagrees with a cookie's attributes drops it silently — the write appears to succeed and the value is simply never there again ([RFC 6265bis](https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-rfc6265bis) §4.1.3, §5.4.7):
 
-- A **`__Host-`** name forces `Secure`, forces `Path=/`, and drops any declared `Domain`. Honoring a
-  declared path or domain would produce a cookie no browser stores.
+- A **`__Host-`** name forces `Secure`, forces `Path=/`, and drops any declared `Domain`. Honoring a declared path or domain would produce a cookie no browser stores.
 - A **`__Secure-`** name forces `Secure`, and leaves path and domain alone.
 - **`SameSite=None`** forces `Secure`.
 
 Two attributes are absent on purpose, and neither is a missing feature:
 
-- **`HttpOnly`** cannot be set from script and would make the value unreadable to the binding that
-  wrote it. Its absence is the correct behavior for a script-written cookie.
-- **`Expires`** is not supported. `Max-Age` covers the same ground, §5.5 makes `Max-Age` win
-  wherever both appear, and `Expires` takes an HTTP-date whose mis-spelling fails silently in the
-  direction of a cookie that never expires.
+- **`HttpOnly`** cannot be set from script and would make the value unreadable to the binding that wrote it. Its absence is the correct behavior for a script-written cookie.
+- **`Expires`** is not supported. `Max-Age` covers the same ground, §5.5 makes `Max-Age` win wherever both appear, and `Expires` takes an HTTP-date whose mis-spelling fails silently in the direction of a cookie that never expires.
 
-The cookie **name is data, never pattern syntax**: the reader splits the cookie header rather than
-building a regular expression from an author-supplied name.
+The cookie **name is data, never pattern syntax**: the reader splits the cookie header rather than building a regular expression from an author-supplied name.
 
 ### 11.3 Timing Values
 
@@ -1479,15 +1364,7 @@ Props are passed via `$props` on the instance node. This is the only mechanism f
 }
 ```
 
-**An instance supplies a prop, or it does not.** The runtime takes a value from the instance only
-where the instance genuinely carries one — an own JS property, or an attribute of that name. Probing
-the element for the key alone is not enough, because a state key that collides with a **reflected**
-DOM property (`title`, `role`, `id`, `lang`, `dir`, `slot`, `hidden`) always answers: the accessor
-lives on the prototype and reports `""` when nothing is set, which would otherwise beat the
-component's declared default and render blank. Testing for an own property alone is equally wrong in
-the other direction — assigning a reflected name goes through that same accessor and creates no own
-property, so a real `$props.title` would be discarded. The attribute the accessor writes is what
-distinguishes the two.
+**An instance supplies a prop, or it does not.** The runtime takes a value from the instance only where the instance genuinely carries one — an own JS property, or an attribute of that name. Probing the element for the key alone is not enough, because a state key that collides with a **reflected** DOM property (`title`, `role`, `id`, `lang`, `dir`, `slot`, `hidden`) always answers: the accessor lives on the prototype and reports `""` when nothing is set, which would otherwise beat the component's declared default and render blank. Testing for an own property alone is equally wrong in the other direction — assigning a reflected name goes through that same accessor and creates no own property, so a real `$props.title` would be discarded. The attribute the accessor writes is what distinguishes the two.
 
 ### 13.3 Signal Forwarding
 
@@ -1629,27 +1506,17 @@ Type coercion: `string` → no conversion, `number` → `Number()`, `boolean` �
 
 ### 16.6 Light DOM Rendering
 
-Custom elements render to the light DOM by default. No shadow root is attached there, and none of
-the shadow-scoped styling primitives apply: no `attachShadow`, no `shadowrootmode`, no `::part`.
+Custom elements render to the light DOM by default. No shadow root is attached there, and none of the shadow-scoped styling primitives apply: no `attachShadow`, no `shadowrootmode`, no `::part`.
 
-Scoping is therefore selector-based, in two parts: a component's own rules are prefixed with its
-**tag name** (`sty-card { … }`, `sty-card .inner { … }`), and a nested element carrying its own
-`style` gets a **generated class**, `.<tagName>-<n>`. `data-jx-static` and `data-jx-prerendered`
-appear on emitted elements but mark hydration state and are never used as selectors.
+Scoping is therefore selector-based, in two parts: a component's own rules are prefixed with its **tag name** (`sty-card { … }`, `sty-card .inner { … }`), and a nested element carrying its own `style` gets a **generated class**, `.<tagName>-<n>`. `data-jx-static` and `data-jx-prerendered` appear on emitted elements but mark hydration state and are never used as selectors.
 
-`adoptedStyleSheets` IS used, on the DOCUMENT rather than on a shadow root: it is where the runtime
-delivers an element's rules (§9.6). That is a delivery mechanism, not a scoping one — an adopted
-sheet is document-wide, so the selector handle above is still what confines a rule to its element.
+`adoptedStyleSheets` IS used, on the DOCUMENT rather than on a shadow root: it is where the runtime delivers an element's rules (§9.6). That is a delivery mechanism, not a scoping one — an adopted sheet is document-wide, so the selector handle above is still what confines a rule to its element.
 
-What that buys and what it costs is the same fact stated twice: a page's own CSS can reach into a
-component and restyle it, and so can a stylesheet the author never wrote.
+What that buys and what it costs is the same fact stated twice: a page's own CSS can reach into a component and restyle it, and so can a stylesheet the author never wrote.
 
-**A component may opt into a shadow root.** `$shadow: "open" | "closed" | false` on the component,
-`defaults.shadow` for the project, `false` if neither says otherwise. A component's own value wins
-in both directions, so `$shadow: false` opts one component out of a project that opted in.
+**A component may opt into a shadow root.** `$shadow: "open" | "closed" | false` on the component, `defaults.shadow` for the project, `false` if neither says otherwise. A component's own value wins in both directions, so `$shadow: false` opts one component out of a project that opted in.
 
-Light DOM remains the default and is not a placeholder for this. The two modes differ in ways an
-author has to mean:
+Light DOM remains the default and is not a placeholder for this. The two modes differ in ways an author has to mean:
 
 |                     | Light DOM                                                                  | Shadow DOM                                          |
 | ------------------- | -------------------------------------------------------------------------- | --------------------------------------------------- |
@@ -1659,38 +1526,19 @@ author has to mean:
 | Stylesheet          | `<link>` in the document head                                              | `<link>` inside the shadow root                     |
 | Page CSS reaches in | yes                                                                        | no                                                  |
 
-Slot distribution is the difference that cannot be papered over, and the reason shadow cannot
-become the default: the emulation _moves_ children into the rendered tree, while a real `<slot>`
-leaves them in the light tree and projects them.
+Slot distribution is the difference that cannot be papered over, and the reason shadow cannot become the default: the emulation _moves_ children into the rendered tree, while a real `<slot>` leaves them in the light tree and projects them.
 
-**Server rendering is a declarative shadow root.** A prerendered shadow component emits
-`<template shadowrootmode="open|closed">` containing its markup and its stylesheet link, with the
-slotted light children as **siblings outside** the template — where the slot projects them from.
-The parser materializes that root before any script runs, so the component paints correctly with
-JavaScript disabled or still loading.
+**Server rendering is a declarative shadow root.** A prerendered shadow component emits `<template shadowrootmode="open|closed">` containing its markup and its stylesheet link, with the slotted light children as **siblings outside** the template — where the slot projects them from. The parser materializes that root before any script runs, so the component paints correctly with JavaScript disabled or still loading.
 
-**The element adopts that root rather than replacing it.** Calling `attachShadow` over an existing
-declarative root throws, and even where it did not, replacing it would discard the markup the
-feature exists to ship. An `open` root is found on the element; a `closed` one is not — by
-definition — and `ElementInternals` is the standard's only way back to it, which is why the two
-modes emit different lookups rather than one call with a mode string.
+**The element adopts that root rather than replacing it.** Calling `attachShadow` over an existing declarative root throws, and even where it did not, replacing it would discard the markup the feature exists to ship. An `open` root is found on the element; a `closed` one is not — by definition — and `ElementInternals` is the standard's only way back to it, which is why the two modes emit different lookups rather than one call with a mode string.
 
-What the client render then does is **replace**, not hydrate: lit renders its own tree, so the
-declarative markup is cleared first, exactly as the light path clears `innerHTML`. The stylesheet
-link is the one child kept, because it styles that root and the document's head cannot reach in.
-Jx does not use lit-ssr's `hydrate`, so a declarative shadow root is a first paint rather than a
-hydration target — the same contract the light path has always had.
+What the client render then does is **replace**, not hydrate: lit renders its own tree, so the declarative markup is cleared first, exactly as the light path clears `innerHTML`. The stylesheet link is the one child kept, because it styles that root and the document's head cannot reach in. Jx does not use lit-ssr's `hydrate`, so a declarative shadow root is a first paint rather than a hydration target — the same contract the light path has always had.
 
-**A style object means the same thing in both modes.** `:host` and `:host(.sel)` are translated
-rather than passed through: inside a root they stand alone, and outside they become the tag name
-and `<tag>.sel`, which is what "the host, matching this" means when there is no root. Moving a
-component between modes therefore does not silently break its styles.
+**A style object means the same thing in both modes.** `:host` and `:host(.sel)` are translated rather than passed through: inside a root they stand alone, and outside they become the tag name and `<tag>.sel`, which is what "the host, matching this" means when there is no root. Moving a component between modes therefore does not silently break its styles.
 
-**Content-Security-Policy is unaffected.** The component stylesheet stays an external `<link>`,
-merely relocated, so no hash changes (site-architecture.md §14.3.1).
+**Content-Security-Policy is unaffected.** The component stylesheet stays an external `<link>`, merely relocated, so no hash changes (site-architecture.md §14.3.1).
 
-> **Status: Implemented.** Light DOM is the default; the `$shadow` opt-in emits and adopts a
-> declarative shadow root, verified in a browser for both modes.
+> **Status: Implemented.** Light DOM is the default; the `$shadow` opt-in emits and adopts a declarative shadow root, verified in a browser for both modes.
 
 ### 16.7 Development vs. Production
 
@@ -2135,10 +1983,7 @@ A named `state` expression may be bound to multiple elements via `$ref` (`"oncli
 
 A **pure** expression (§19.1) used as a `state` entry is a computed value — it is read via `$ref` or `${}` like any Shape 3 computed (`"textContent": { "$ref": "#/state/total" }`). A **mutating** expression used as a `state` entry is a handler, bound to events. The mode follows from the operator; it is not declared.
 
-3. **As an element's `tagName`** — a tag chosen when the element is created, narrowed to the
-   `TagExpression` shape: `?:` or `switch`, whose every result is a literal `TagName`. This is the
-   one position where an `$expression` is **not live** — the tag is resolved once, at creation, and
-   never re-read.
+3. **As an element's `tagName`** — a tag chosen when the element is created, narrowed to the `TagExpression` shape: `?:` or `switch`, whose every result is a literal `TagName`. This is the one position where an `$expression` is **not live** — the tag is resolved once, at creation, and never re-read.
 
    ```json
    {
@@ -2155,18 +2000,9 @@ A **pure** expression (§19.1) used as a `state` entry is a computed value — i
    }
    ```
 
-   **Why the results are tag names and not operands.** The candidate set has to be readable without
-   evaluating anything: the compiler emits one template per candidate (lit cannot bind a tag name),
-   `jx validate` refuses an illegal name at authoring time, and the void-element, preformatted and
-   slot analyses that read a tag structurally keep a finite set to reason about. A `${…}` template
-   here would surrender all of it — and did: nothing in the pipeline evaluated one, so each consumer
-   failed differently and silently.
+   **Why the results are tag names and not operands.** The candidate set has to be readable without evaluating anything: the compiler emits one template per candidate (lit cannot bind a tag name), `jx validate` refuses an illegal name at authoring time, and the void-element, preformatted and slot analyses that read a tag structurally keep a finite set to reason about. A `${…}` template here would surrender all of it — and did: nothing in the pipeline evaluated one, so each consumer failed differently and silently.
 
-   **Why once and not live.** A tag that changed after mount means replacing the element, and the
-   subtree's listeners, focus, typed input values and component instances go with it. `jx validate`
-   warns when a tag discriminant is also an assignment target, so the case where the rule bites is
-   caught before it ships. The document ROOT's `tagName` and a `$head` entry's stay literal — they
-   are a custom element's name and a head tag.
+   **Why once and not live.** A tag that changed after mount means replacing the element, and the subtree's listeners, focus, typed input values and component instances go with it. `jx validate` warns when a tag discriminant is also an assignment target, so the case where the rule bites is caught before it ships. The document ROOT's `tagName` and a `$head` entry's stay literal — they are a custom element's name and a head tag.
 
 ### 19.7 Shape Detection (amends §5.7)
 
@@ -2300,8 +2136,7 @@ Every statement kind reuses a web-platform name — §19.4's law extended to sta
 
 ## 21. Evaluation Surface
 
-> **Status: Partial.** The surface is stated accurately, which is what this section is for; a
-> Trusted Types policy guards the shell's own injection sink; enforcement is declined (§21.5).
+> **Status: Partial.** The surface is stated accurately, which is what this section is for; a Trusted Types policy guards the shell's own injection sink; enforcement is declined (§21.5).
 
 Jx documents contain executable code — `${}` templates and `body`/`$src` functions. Where and how that code runs differs by mode, and the security posture differs with it. This section states the surface honestly so hosts can make an informed decision.
 
@@ -2331,55 +2166,24 @@ A Jx document is **executable input**. Loading and rendering an untrusted docume
 
 > **Status: Implemented** as a decision. Enforcement is **declined**, not pending — see below.
 
-There are **two** profiles here, not one profile with an outstanding TODO, and saying so is the
-point of this section: "remove `eval` from the runtime" has been living as an implied task, and it
-is not one. The interpreter **is** those `new Function` sites — an interpreter that does not compile
-expressions at runtime is a compiler.
+There are **two** profiles here, not one profile with an outstanding TODO, and saying so is the point of this section: "remove `eval` from the runtime" has been living as an implied task, and it is not one. The interpreter **is** those `new Function` sites — an interpreter that does not compile expressions at runtime is a compiler.
 
 | Profile                     | `'unsafe-eval'` | Why                                                                        |
 | --------------------------- | --------------- | -------------------------------------------------------------------------- |
 | **Compiled output**         | never           | §21.1, with a committed test asserting the emitted JS contains neither     |
 | **The interpreting canvas** | permanently     | §21.3 — it evaluates `${}` templates and `body` functions as they are read |
 
-**What Trusted Types actually gates, verified rather than assumed.** The tempting reading is that
-`require-trusted-types-for 'script'` covers DOM injection sinks and leaves `eval` to `script-src`.
-It does not: under Trusted Types, `eval()` and `new Function()` are gated as well, and throw when no
-default policy exists. The escape hatch is a **default policy whose `createScript` passes its input
-through**, which re-permits evaluation and makes the script half of Trusted Types a rubber stamp.
+**What Trusted Types actually gates, verified rather than assumed.** The tempting reading is that `require-trusted-types-for 'script'` covers DOM injection sinks and leaves `eval` to `script-src`. It does not: under Trusted Types, `eval()` and `new Function()` are gated as well, and throw when no default policy exists. The escape hatch is a **default policy whose `createScript` passes its input through**, which re-permits evaluation and makes the script half of Trusted Types a rubber stamp.
 
-That settles the staging question by removing it. The shell is not a deployment target: it is the
-development environment, and it is powered by the interpreter it exists to drive. Enforcing Trusted
-Types on it would mean a default policy whose `createScript` passes its input through — which
-re-permits evaluation for the whole shell and buys a type-level ceremony in place of a control.
+That settles the staging question by removing it. The shell is not a deployment target: it is the development environment, and it is powered by the interpreter it exists to drive. Enforcing Trusted Types on it would mean a default policy whose `createScript` passes its input through — which re-permits evaluation for the whole shell and buys a type-level ceremony in place of a control.
 
-**What Jx adopts, and what it declines.** The injection-sink half is worth having on its own terms
-and is taken; the script half cannot apply to either profile, and is declined rather than left as an
-implied task.
+**What Jx adopts, and what it declines.** The injection-sink half is worth having on its own terms and is taken; the script half cannot apply to either profile, and is declined rather than left as an implied task.
 
-- **No `innerHTML` write remains in code Jx ships.** The four in `@jxsuite/runtime` and the one the
-  compiler emitted into every light-DOM element module became `replaceChildren()` — identical
-  semantics for clearing an element, and not an injection sink. That is a real reduction in a
-  shipped site's surface, independent of any policy.
-- **The shell's markdown goes through a policy that asserts.** `createHTML` throws naming what it
-  found (`packages/studio/src/services/trusted-types.ts`); `createScript` and `createScriptURL`
-  refuse outright. A `createHTML` returning its input unchanged would satisfy the API and defend
-  nothing.
-- **Enforcement is not planned, on either profile.** The canvas evaluates permanently (§21.3). The
-  shell evaluates too — Ajv's codegen in `jx-validate.ts`, Monaco's worker URL, and the interpreter
-  itself running in the shell document for Library preview, render-check and component preview — and
-  its remaining DOM sinks belong to its dependencies: `<sp-theme>` writes
-  `templateElement.innerHTML` before any author has clicked anything, and Tabulator and Monaco carry
-  their own. None is reachable from `jx-studio`, and the only lever over them is a `trusted-types`
-  allow-list, which admits the pass-through this section rejects.
+- **No `innerHTML` write remains in code Jx ships.** The four in `@jxsuite/runtime` and the one the compiler emitted into every light-DOM element module became `replaceChildren()` — identical semantics for clearing an element, and not an injection sink. That is a real reduction in a shipped site's surface, independent of any policy.
+- **The shell's markdown goes through a policy that asserts.** `createHTML` throws naming what it found (`packages/studio/src/services/trusted-types.ts`); `createScript` and `createScriptURL` refuse outright. A `createHTML` returning its input unchanged would satisfy the API and defend nothing.
+- **Enforcement is not planned, on either profile.** The canvas evaluates permanently (§21.3). The shell evaluates too — Ajv's codegen in `jx-validate.ts`, Monaco's worker URL, and the interpreter itself running in the shell document for Library preview, render-check and component preview — and its remaining DOM sinks belong to its dependencies: `<sp-theme>` writes `templateElement.innerHTML` before any author has clicked anything, and Tabulator and Monaco carry their own. None is reachable from `jx-studio`, and the only lever over them is a `trusted-types` allow-list, which admits the pass-through this section rejects.
 
-**The observation stage ran, and has been removed.** Both servers briefly sent the shell
-`Content-Security-Policy-Report-Only: require-trusted-types-for 'script'` and filed each
-`SecurityPolicyViolationEvent` as a Problem. It answered its question — every violation belongs to a
-dependency or to the interpreter, and no Jx-owned sink remained — so it was deleted along with the
-header that fed it. Keeping it would have put a permanent warning in §16's Problems panel about a
-decision already taken, and a panel that reports what its reader cannot act on teaches its reader to
-stop looking. Four properties of the standard were established during that run and are recorded here
-because they would otherwise have to be rediscovered:
+**The observation stage ran, and has been removed.** Both servers briefly sent the shell `Content-Security-Policy-Report-Only: require-trusted-types-for 'script'` and filed each `SecurityPolicyViolationEvent` as a Problem. It answered its question — every violation belongs to a dependency or to the interpreter, and no Jx-owned sink remained — so it was deleted along with the header that fed it. Keeping it would have put a permanent warning in §16's Problems panel about a decision already taken, and a panel that reports what its reader cannot act on teaches its reader to stop looking. Four properties of the standard were established during that run and are recorded here because they would otherwise have to be rediscovered:
 
 | Established                                                                                | Consequence                                                                                                                              |
 | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |

@@ -44,8 +44,7 @@ Anything that holds text: headings, paragraphs, list items, table cells, caption
 Two cases where the cursor lands somewhere you might not expect, and both are deliberate:
 
 - **A block quote** holds paragraphs, so clicking one puts the cursor in the paragraph inside it, which is the thing you actually want to type in.
-- **A link** is part of a paragraph, not a block of its own. Clicking one puts the cursor in the
-  paragraph, so you can type through and around the link and it stays intact.
+- **A link** is part of a paragraph, not a block of its own. Clicking one puts the cursor in the paragraph, so you can type through and around the link and it stays intact.
 
 Code blocks are not editable this way; their whitespace is significant, so they are left alone.
 

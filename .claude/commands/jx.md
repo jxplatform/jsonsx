@@ -186,8 +186,7 @@ Reference a function from state:
 
 ### Passing data to child components
 
-Register the component in `$elements` (path relative to the current file), then use it by tag
-name with `props.*` attributes — there is no `$ref`-in-`children` transclusion:
+Register the component in `$elements` (path relative to the current file), then use it by tag name with `props.*` attributes — there is no `$ref`-in-`children` transclusion:
 
 ```json
 {
