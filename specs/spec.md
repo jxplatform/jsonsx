@@ -2,9 +2,9 @@
 
 ## Declarative Document Object Model — JSON Edition
 
-**Version:** 0.5.9-draft
+**Version:** 0.6.0-draft
 **Status:** Partial
-**Updated:** 2026-08-31
+**Updated:** 2026-09-01
 **License:** MIT
 
 ---
@@ -842,7 +842,7 @@ Any element may carry `$title` and `$description` as developer-facing metadata a
 
 ## 9. Styling
 
-### 9.1 Inline Styles as Objects
+### 9.1 Style Objects
 
 The `style` property accepts an object with camelCase CSS property names:
 
@@ -857,6 +857,10 @@ The `style` property accepts an object with camelCase CSS property names:
   }
 }
 ```
+
+Every declaration in that object becomes a **CSS rule**, not an inline style attribute — see §9.6 for the runtime and §9.3 for the compiler. That is what makes the nested blocks of §9.2 work: an inline declaration beats any non-`!important` rule, so a base property written inline could never be overridden by the `:hover` or `@media` block beside it. A custom property (`--name`) is a declaration like any other and keeps its exact spelling, because custom property names are case-sensitive.
+
+An author's own `attributes: { "style": "…" }` is untouched by any of this; it remains a literal attribute, at inline precedence, and overrides the object.
 
 ### 9.2 Nested CSS Selectors
 
@@ -873,7 +877,9 @@ CSS nesting is supported via special keys. Keys beginning with `:`, `.`, `&`, or
 }
 ```
 
-Inline properties are applied directly to the element. Nested rules are emitted as a scoped `<style>` block keyed on a **generated class** — `.<tagName>-<n>`, assigned to the element in the compiled HTML. (`data-jx-static` and `data-jx-prerendered` exist on emitted elements but are hydration markers, never CSS selectors.)
+Base and nested declarations alike become rules in one stylesheet, keyed on a handle the emitter chooses: the compiler prefers the element's own `#id`, then a **generated class** `.<tagName>-<n>` assigned in the compiled HTML; the runtime uses `data-jx` (§9.6). Base rules are emitted before nested ones, so an equal-specificity override wins by source order. (`data-jx-static` and `data-jx-prerendered` exist on emitted elements but are hydration markers, never CSS selectors.)
+
+Nesting is **flattened by the emitter**, never handed to the browser as CSS Nesting: `&` is resolved before anything is written, and no `&` reaches the output. This is deliberate rather than incidental. A key like `.child` COMPOUNDS onto its scope here (`#box.child`), where CSS Nesting resolves the same key as a descendant, so a style object handed to a nesting parser would silently mean something else.
 
 Nesting is **recursive**: selector groups and at-rule groups (`@`-prefixed
 keys — named breakpoints per §9.4, or standard at-rules like
@@ -892,10 +898,10 @@ pseudo-class:
 ```
 
 Both the compiler and the runtime resolve nesting recursively; the component
-and project style schemas model the same recursive contract. (Known compiler
-limitation: inside an at-rule group, only one selector level is currently
-emitted — at-rule → selector → pseudo is accepted by the schema and runtime
-but not yet fully emitted by the static compiler.)
+and project style schemas model the same recursive contract. Selector groups
+and at-rule groups compose in **either order and to any depth** — `@media →
+selector → pseudo` and `selector → @media` are the same tree read two ways, and
+one emitter answers for both (§9.6).
 
 **Some at-rules take a DECLARATION body rather than a selector body**, and both
 emitters recognise them by name: `@position-try`, `@property`, `@font-face` and
@@ -1009,6 +1015,47 @@ exists.
 > **Status: Implemented.** `pureSchemeOf`/`schemeSelectors` (runtime, re-exported by the
 > compiler) define the shared selector contract; `applyStyle`, `compileStyles`, and the site
 > pipeline all dual-emit through them.
+
+### 9.6 The Runtime Stylesheet Engine
+
+The runtime delivers an element's styles as **CSS rules in a constructable stylesheet adopted by the
+document**, reached through `document.adoptedStyleSheets`. Nothing an author writes in a `style`
+object is written as an inline declaration.
+
+**The handle is `data-jx`, and its value is a content hash.** A rule is scoped by
+`[data-jx="jx-<hash>"]`, specificity (0,1,0), stamped on the element by the runtime. It is not a
+generated class, because a class handle would be destroyed by a static `attributes: { "class": … }`
+applied after the style; and it is not random, because the hash is what lets two elements that
+style alike SHARE one rule set and what makes the handle stable across a server render and the
+client render that follows it. Everything that can vary per call site is an input to that hash: the
+authored object, the resolved `$media` map, and any host-specific value or selector transposition.
+
+**Reactive declarations are indirected through a custom property.** A value carrying a `${…}`
+template or a `{ "$ref": … }` is emitted as `property: var(--jx-r<n>-<m>)`, and the element sets
+that variable inline as its source changes. The declaration therefore stays in the rule, where a
+`:hover` or `@media` block can override it, while only the variable moves. A reactive element never
+shares a rule set with another: a `var()` resolves from the nearest ancestor that set it, so a
+shared descendant rule would read the wrong element's value.
+
+**Declaration-body at-rules are hoisted.** The four at-rules of §9.2 whose body is declarations
+rather than rules declare a document-global NAME, so they are written once for the document and
+released when the last element that declares one lets go, rather than emitted per element.
+
+Two cascade premises hold this together, and neither is Jx's to change:
+
+1. **Adopted sheets cascade after the document's own `<style>` and `<link>`.** An adopted rule
+   therefore wins an equal-specificity tie against a page stylesheet.
+2. **Jx emits no cascade layer of its own.** An unlayered rule beats a layered one at any
+   specificity, and third-party CSS arrives through `$head` unlayered; layering Jx's rules would
+   hand every page's `$head` a win over the document's own styles. An authored `"@layer name"` key
+   is passed through verbatim, as any other at-rule is.
+
+A host that cannot construct a stylesheet falls back to a `<style>` element carrying the same
+rules, in the same order.
+
+> **Status: Implemented.** `buildStyleRules` (`@jxsuite/runtime/css`) is the single definition of
+> what a style object means as CSS, shared by `applyStyle`, the static compiler and the site-style
+> builder, so a preview and the shipped page resolve the same nesting.
 
 ---
 
@@ -1582,14 +1629,17 @@ Type coercion: `string` → no conversion, `number` → `Number()`, `boolean` �
 
 ### 16.6 Light DOM Rendering
 
-Custom elements render to the light DOM. No shadow root is attached anywhere in the compiler or the
-runtime, and none is offered: there is no `attachShadow`, no `shadowrootmode`, no `::part` and no
-`adoptedStyleSheets`.
+Custom elements render to the light DOM by default. No shadow root is attached there, and none of
+the shadow-scoped styling primitives apply: no `attachShadow`, no `shadowrootmode`, no `::part`.
 
 Scoping is therefore selector-based, in two parts: a component's own rules are prefixed with its
 **tag name** (`sty-card { … }`, `sty-card .inner { … }`), and a nested element carrying its own
 `style` gets a **generated class**, `.<tagName>-<n>`. `data-jx-static` and `data-jx-prerendered`
 appear on emitted elements but mark hydration state and are never used as selectors.
+
+`adoptedStyleSheets` IS used, on the DOCUMENT rather than on a shadow root: it is where the runtime
+delivers an element's rules (§9.6). That is a delivery mechanism, not a scoping one — an adopted
+sheet is document-wide, so the selector handle above is still what confines a rule to its element.
 
 What that buys and what it costs is the same fact stated twice: a page's own CSS can reach into a
 component and restyle it, and so can a stylesheet the author never wrote.
@@ -1705,19 +1755,20 @@ Custom elements may carry annotations compatible with the Custom Elements Manife
 
 External standards this specification binds itself to. Vocabulary and cell grammar: [`standards.md`](./standards.md). Two things once listed here are **not** standards and are therefore prose rather than rows: reactivity is `@vue/reactivity`, a library; and the `$media` breakpoint syntax borrows the shape of CSS `@custom-media`, a Media Queries Level 5 feature no browser ships, which Jx resolves itself at build and run time. The Custom Elements Manifest (§16.8) is a community format with no standards body.
 
-| Standard                                                                                  | Class         | Binds    | Evidence                                                                                                                                     | Note                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| ----------------------------------------------------------------------------------------- | ------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| [ECMA-404](https://ecma-international.org/publications-and-standards/standards/ecma-404/) | **Adopted**   | §3       | packages/schema/src/parse.ts                                                                                                                 | A Jx document is JSON. Nothing in the format extends the syntax.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| [JSON Schema 2020-12](https://json-schema.org/draft/2020-12/schema)                       | **Divergent** | §3.2, §5 | packages/schema/src/schema.ts, packages/schema/tests/schema.test.ts                                                                          | `$defs` holds genuine 2020-12 type definitions and a document validates as an _instance_ against a conformant meta-schema. Three deviations: Jx declares no `$vocabulary`, so it is not a dialect; `$id` is a display name and establishes no base URI for relative `$ref`; and `$schema` is an editor "schema for this instance" pointer, not a dialect declaration.                                                                                                                                                                                                                                  |
-| [ECMA-262](https://ecma-international.org/publications-and-standards/standards/ecma-262/) | **Subset**    | §19, §20 | packages/runtime/src/expression.ts, packages/runtime/tests/expression.test.ts                                                                | Operator punctuators and their arity are ECMAScript's, and aggregate operations follow `Array.prototype` semantics — but only an allow-listed subset is evaluable, and `if`/`then`/`else` statements are imperative control flow over a statement list rather than anything from JSON Schema.                                                                                                                                                                                                                                                                                                          |
-| [WHATWG DOM](https://dom.spec.whatwg.org/)                                                | **Subset**    | §16, §20 | packages/compiler/src/targets/compile-element.ts                                                                                             | Custom elements are defined and `dispatchEvent` emits a real `CustomEvent`. Shadow trees are not used at all (§16.6).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| [WHATWG HTML](https://html.spec.whatwg.org/)                                              | **Subset**    | §16.6    | packages/compiler/src/shadow.ts, packages/compiler/src/targets/compile-element.ts, packages/compiler/tests/shadow-dom.test.ts                | Custom elements are defined and upgraded as the standard describes and render into the **light DOM by default**. A component may opt into a shadow root with `$shadow` (a project into all of them with `defaults.shadow`), which emits a declarative `<template shadowrootmode>` the element then adopts — `open` through `element.shadowRoot`, `closed` through `ElementInternals`. Not offered: `ElementInternals` for form association, and `::part` addressed from outside a component.                                                                                                           |
-| [CSS Scoping](https://www.w3.org/TR/css-scoping-1/)                                       | **Subset**    | §16.6    | packages/compiler/src/shared.ts, packages/compiler/tests/shadow-dom.test.ts                                                                  | `:host`, `:host()` and `::slotted()` are emitted for a shadow component, and `:host`/`:host()` are translated to the tag name in light DOM so one style object serves both modes. `:host-context()` is not offered — it never reached a second engine.                                                                                                                                                                                                                                                                                                                                                 |
-| [CSSOM](https://www.w3.org/TR/cssom-1/)                                                   | **Adopted**   | §9.1     | packages/runtime/src/runtime.ts                                                                                                              | `style` keys are the CSSOM camelCase IDL attribute names, so a property name needs no translation table.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| [CSS Color 4](https://www.w3.org/TR/css-color-4/)                                         | **Adopted**   | §9.5     | packages/compiler/src/shared.ts, packages/compiler/tests/shared.test.ts                                                                      | `color-scheme: light dark` is emitted with per-attribute overrides, so native controls follow a forced scheme rather than only the author's own rules.                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| [RFC 6901](https://www.rfc-editor.org/rfc/rfc6901)                                        | **Divergent** | §7       | packages/runtime/src/pointer.ts                                                                                                              | Pointer syntax is implemented as written, `~0`/`~1` escapes included, with `/` as the only separator. Four enumerated deviations: a `$ref` binds a live value off the reactive scope rather than resolving a node of a JSON document; a token matching nothing yields `undefined` instead of failing evaluation (§4); the `-` array token (§4) is not special and reads a member named `-`; and the `#`-fragment schemes (`window#/`, `parent#/`, `event#/`) are Jx extensions, not the URI fragment representation of §6 — they are not percent-decoded.                                              |
-| [CSP Level 3](https://www.w3.org/TR/CSP3/)                                                | **Divergent** | §21      | packages/compiler/tests/no-eval.test.ts                                                                                                      | Compiled output contains no `new Function` and no `eval`, proven by a committed test, so it runs under a policy without `'unsafe-eval'`. The **interpreting** runtime compiles templates and function bodies at load time and therefore requires `'unsafe-eval'` permanently — §21.3 states this as a property, not a defect.                                                                                                                                                                                                                                                                          |
-| [Trusted Types](https://www.w3.org/TR/trusted-types/)                                     | **Subset**    | §21.5    | packages/studio/src/services/trusted-types.ts, packages/studio/tests/trusted-types.test.ts, packages/compiler/src/targets/compile-element.ts | The injection-sink half only. No `innerHTML` write remains in code Jx ships — the runtime's four and the one the compiler emitted became `replaceChildren()` — and the shell's markdown goes through a policy that asserts and throws naming what it found, with `createScript`/`createScriptURL` refusing. **Enforcement is declined, not deferred**: `require-trusted-types-for 'script'` gates `eval` and `new Function`, which the interpreter is made of (§21.3), and the shell's remaining sinks belong to its dependencies. A report-only run established this and was removed with its header. |
+| Standard                                                                                  | Class         | Binds      | Evidence                                                                                                                                     | Note                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ----------------------------------------------------------------------------------------- | ------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [ECMA-404](https://ecma-international.org/publications-and-standards/standards/ecma-404/) | **Adopted**   | §3         | packages/schema/src/parse.ts                                                                                                                 | A Jx document is JSON. Nothing in the format extends the syntax.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| [JSON Schema 2020-12](https://json-schema.org/draft/2020-12/schema)                       | **Divergent** | §3.2, §5   | packages/schema/src/schema.ts, packages/schema/tests/schema.test.ts                                                                          | `$defs` holds genuine 2020-12 type definitions and a document validates as an _instance_ against a conformant meta-schema. Three deviations: Jx declares no `$vocabulary`, so it is not a dialect; `$id` is a display name and establishes no base URI for relative `$ref`; and `$schema` is an editor "schema for this instance" pointer, not a dialect declaration.                                                                                                                                                                                                                                  |
+| [ECMA-262](https://ecma-international.org/publications-and-standards/standards/ecma-262/) | **Subset**    | §19, §20   | packages/runtime/src/expression.ts, packages/runtime/tests/expression.test.ts                                                                | Operator punctuators and their arity are ECMAScript's, and aggregate operations follow `Array.prototype` semantics — but only an allow-listed subset is evaluable, and `if`/`then`/`else` statements are imperative control flow over a statement list rather than anything from JSON Schema.                                                                                                                                                                                                                                                                                                          |
+| [WHATWG DOM](https://dom.spec.whatwg.org/)                                                | **Subset**    | §16, §20   | packages/compiler/src/targets/compile-element.ts                                                                                             | Custom elements are defined and `dispatchEvent` emits a real `CustomEvent`. Shadow trees are not used at all (§16.6).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| [WHATWG HTML](https://html.spec.whatwg.org/)                                              | **Subset**    | §16.6      | packages/compiler/src/shadow.ts, packages/compiler/src/targets/compile-element.ts, packages/compiler/tests/shadow-dom.test.ts                | Custom elements are defined and upgraded as the standard describes and render into the **light DOM by default**. A component may opt into a shadow root with `$shadow` (a project into all of them with `defaults.shadow`), which emits a declarative `<template shadowrootmode>` the element then adopts — `open` through `element.shadowRoot`, `closed` through `ElementInternals`. Not offered: `ElementInternals` for form association, and `::part` addressed from outside a component.                                                                                                           |
+| [CSS Scoping](https://www.w3.org/TR/css-scoping-1/)                                       | **Subset**    | §16.6      | packages/compiler/src/shared.ts, packages/compiler/tests/shadow-dom.test.ts                                                                  | `:host`, `:host()` and `::slotted()` are emitted for a shadow component, and `:host`/`:host()` are translated to the tag name in light DOM so one style object serves both modes. `:host-context()` is not offered — it never reached a second engine.                                                                                                                                                                                                                                                                                                                                                 |
+| [CSSOM](https://www.w3.org/TR/cssom-1/)                                                   | **Adopted**   | §9.1, §9.6 | packages/runtime/src/runtime.ts, packages/runtime/tests/stylesheet-engine.test.ts                                                            | `style` keys are the CSSOM camelCase IDL attribute names, so a property name needs no translation table. The runtime also builds a constructable `CSSStyleSheet` and delivers an element's rules through `document.adoptedStyleSheets`, using `insertRule`/`deleteRule`/`replaceSync` as specified; a host that cannot construct one falls back to a `<style>` element carrying the same rules.                                                                                                                                                                                                        |
+| [CSS Nesting](https://www.w3.org/TR/css-nesting-1/)                                       | **Borrowed**  | §9.2       | packages/runtime/src/css.ts, packages/runtime/tests/css.test.ts                                                                              | The shape of a nested style block is taken; conformance is not claimed and `&` is never handed to a parser. Jx flattens nesting itself, and it has to: a `.child` key COMPOUNDS onto its scope here where CSS Nesting resolves it as a descendant, so the same source would mean two different things.                                                                                                                                                                                                                                                                                                 |
+| [CSS Color 4](https://www.w3.org/TR/css-color-4/)                                         | **Adopted**   | §9.5       | packages/compiler/src/shared.ts, packages/compiler/tests/shared.test.ts                                                                      | `color-scheme: light dark` is emitted with per-attribute overrides, so native controls follow a forced scheme rather than only the author's own rules.                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| [RFC 6901](https://www.rfc-editor.org/rfc/rfc6901)                                        | **Divergent** | §7         | packages/runtime/src/pointer.ts                                                                                                              | Pointer syntax is implemented as written, `~0`/`~1` escapes included, with `/` as the only separator. Four enumerated deviations: a `$ref` binds a live value off the reactive scope rather than resolving a node of a JSON document; a token matching nothing yields `undefined` instead of failing evaluation (§4); the `-` array token (§4) is not special and reads a member named `-`; and the `#`-fragment schemes (`window#/`, `parent#/`, `event#/`) are Jx extensions, not the URI fragment representation of §6 — they are not percent-decoded.                                              |
+| [CSP Level 3](https://www.w3.org/TR/CSP3/)                                                | **Divergent** | §21        | packages/compiler/tests/no-eval.test.ts                                                                                                      | Compiled output contains no `new Function` and no `eval`, proven by a committed test, so it runs under a policy without `'unsafe-eval'`. The **interpreting** runtime compiles templates and function bodies at load time and therefore requires `'unsafe-eval'` permanently — §21.3 states this as a property, not a defect.                                                                                                                                                                                                                                                                          |
+| [Trusted Types](https://www.w3.org/TR/trusted-types/)                                     | **Subset**    | §21.5      | packages/studio/src/services/trusted-types.ts, packages/studio/tests/trusted-types.test.ts, packages/compiler/src/targets/compile-element.ts | The injection-sink half only. No `innerHTML` write remains in code Jx ships — the runtime's four and the one the compiler emitted became `replaceChildren()` — and the shell's markdown goes through a policy that asserts and throws naming what it found, with `createScript`/`createScriptURL` refusing. **Enforcement is declined, not deferred**: `require-trusted-types-for 'script'` gates `eval` and `new Function`, which the interpreter is made of (§21.3), and the shell's remaining sinks belong to its dependencies. A report-only run established this and was removed with its header. |
 
 ---
 
@@ -2558,6 +2609,7 @@ This rewrites the mutating handlers of Appendix A's idiom using `$expression`, l
 
 ## Changelog
 
+- **0.6.0-draft** (2026-09-01) — Styling: every declaration in a style object becomes a CSS rule; the runtime delivers them through document.adoptedStyleSheets (new 9.6). Nesting composes in either order to any depth, so 9.2's compiler limitation is gone.
 - **0.5.9-draft** (2026-08-31) — popover is enumerated and emitted through the presence branch; declaration-body at-rules (@position-try, @property) emit verbatim; all four boolean-attribute writers now defer to booleanAttrValue.
 - **0.5.8-draft** (2026-08-26) — §5.3: $lazy on a $src Function defers the module to first call.
 - **0.5.7-draft** (2026-08-26) — §8.3: a boolean attribute value is emitted by family — presence for HTML boolean attributes, the written word for aria-* and the enumerated three.
@@ -2621,4 +2673,4 @@ This rewrites the mutating handlers of Appendix A's idiom using `$expression`, l
 
 ---
 
-_Jx Specification v0.5.9-draft — subject to revision_
+_Jx Specification v0.6.0-draft — subject to revision_

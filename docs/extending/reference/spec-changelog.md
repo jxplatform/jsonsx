@@ -41,6 +41,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `compiler.md`
 
+- **0.4.3-draft** (2026-09-01) — CSS extraction delegates its nesting to buildStyleRules, the one definition the runtime and the site builder also use; 4.5's example shows the emitted rule form.
 - **0.4.2-draft** (2026-08-31) — CSS extraction emits the popover states and the declaration-body at-rules; attrHelperSource inlines the boolean-attribute rule for the generated-module targets.
 - **0.4.1-draft** (2026-08-27) — §12: the client-runtime asset set is derived from the emitted HTML, so every import map a build ships names files it wrote.
 - **0.4.0-draft** (2026-08-26) — Browser bundles are minified (§12); component CSS is inlined rather than linked (§8.2); image sizes derives from the container and variants stop at the configured ceiling (§7.2, §7.2.1).
@@ -373,6 +374,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `spec.md`
 
+- **0.6.0-draft** (2026-09-01) — Styling: every declaration in a style object becomes a CSS rule; the runtime delivers them through document.adoptedStyleSheets (new 9.6). Nesting composes in either order to any depth, so 9.2's compiler limitation is gone.
 - **0.5.9-draft** (2026-08-31) — popover is enumerated and emitted through the presence branch; declaration-body at-rules (@position-try, @property) emit verbatim; all four boolean-attribute writers now defer to booleanAttrValue.
 - **0.5.8-draft** (2026-08-26) — §5.3: $lazy on a $src Function defers the module to first call.
 - **0.5.7-draft** (2026-08-26) — §8.3: a boolean attribute value is emitted by family — presence for HTML boolean attributes, the written word for aria-* and the enumerated three.

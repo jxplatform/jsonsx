@@ -2,9 +2,9 @@
 
 ## Static HTML Compiler, Custom Element Emitter, and Island Detector
 
-**Version:** 0.4.2-draft
+**Version:** 0.4.3-draft
 **Status:** Partial
-**Updated:** 2026-08-31
+**Updated:** 2026-09-01
 **License:** MIT
 
 ---
@@ -259,6 +259,9 @@ user-card:hover {
   background-color: #f0f0f0;
 }
 ```
+
+Both declarations are RULES, and the base one is emitted first, so the state block overrides it at
+equal specificity by source order (`spec.md` §9.1).
 
 ### 4.6 `$elements` Dependencies
 
@@ -698,6 +701,11 @@ Nested selectors and at-rule groups are emitted per `spec.md` §9.2, including t
 (`@position-try`, `@property`, `@font-face`, `@counter-style`), whose block carries no selector and
 is not scoped to the element whose `style` object declares it.
 
+The nesting is resolved by `buildStyleRules` (`@jxsuite/runtime/css`), the same function the runtime
+(`spec.md` §9.6) and the site-style builder call, so a document previewed in Studio and the page
+this emits resolve the same tree. The compiler keeps what is its own: the `#id` / `.jx-N` handle
+preference, the `:host` translation of §16.6, and the `</style` escaping below.
+
 Component stylesheets are extracted the same way. A page inlines the CSS of every light-DOM
 component it uses, appended after the page block so the cascade is unchanged, and emits no
 `<link rel="stylesheet">` for them — one render-blocking request per component was a page's entire
@@ -921,6 +929,7 @@ neither file.
 
 ## Changelog
 
+- **0.4.3-draft** (2026-09-01) — CSS extraction delegates its nesting to buildStyleRules, the one definition the runtime and the site builder also use; 4.5's example shows the emitted rule form.
 - **0.4.2-draft** (2026-08-31) — CSS extraction emits the popover states and the declaration-body at-rules; attrHelperSource inlines the boolean-attribute rule for the generated-module targets.
 - **0.4.1-draft** (2026-08-27) — §12: the client-runtime asset set is derived from the emitted HTML, so every import map a build ships names files it wrote.
 - **0.4.0-draft** (2026-08-26) — Browser bundles are minified (§12); component CSS is inlined rather than linked (§8.2); image sizes derives from the container and variants stop at the configured ceiling (§7.2, §7.2.1).
@@ -962,4 +971,4 @@ neither file.
 
 ---
 
-_`@jxsuite/compiler` Specification v0.4.2-draft_
+_`@jxsuite/compiler` Specification v0.4.3-draft_

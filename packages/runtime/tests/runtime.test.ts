@@ -20,11 +20,13 @@ import {
   COLOR_SCHEME_ATTR,
   COLOR_SCHEME_STORAGE_KEY,
   booleanAttrValue,
-  elementStyleTags,
   enumeratedAttrNames,
   isDeclarationAtRule,
+  releaseElementStyles,
+  resetDocumentStyles,
 } from "../src/runtime";
 import { evaluateExpression, isMutating } from "../src/expression";
+import { adoptedCSS, elementCSS } from "./style-text.ts";
 import type { JxDocument, JxElement } from "@jxsuite/schema/types";
 
 /** Read a scope member as a callable — tests poke the dynamic scope directly. */
@@ -597,59 +599,108 @@ describe("setSkipServerFunctions", () => {
 describe("applyStyle", () => {
   let el: HTMLElement;
   beforeEach(() => {
+    resetDocumentStyles();
     el = document.createElement("div");
-    for (const s of document.head.querySelectorAll("style")) {
-      s.remove();
-    }
+    document.body.append(el);
   });
 
-  test("sets inline style properties", () => {
+  test("a base declaration is a RULE, not an inline style", () => {
+    /* The whole point. An inline declaration beats any non-`!important` rule, so as long as the
+       base went inline no authored `:hover` or `@media` could ever override it. */
     applyStyle(el, { color: "red", fontSize: "14px" });
-    expect(el.style.color).toBe("red");
-    expect(el.style.fontSize).toBe("14px");
+    expect(el.style.cssText).toBe("");
+    expect(elementCSS(el)).toBe(`[data-jx="${el.dataset.jx}"] { color: red; font-size: 14px }`);
+  });
+
+  test("a nested override of a base property wins, because both are rules", () => {
+    /* The regression test that would have caught the original defect, and the reason it is written
+       against `getComputedStyle` rather than against the sheet text: the emitted CSS was always
+       right. Built after the rules because the test DOM caches computed style permanently. */
+    applyStyle(el, { ":hover": { backgroundColor: "#15164a" }, backgroundColor: "#6e0303" });
+    const css = elementCSS(el).split("\n");
+    expect(css).toEqual([
+      `[data-jx="${el.dataset.jx}"] { background-color: #6e0303 }`,
+      `[data-jx="${el.dataset.jx}"]:hover { background-color: #15164a }`,
+    ]);
+    const probe = document.createElement("div");
+    probe.dataset.jx = el.dataset.jx as string;
+    document.body.append(probe);
+    expect(getComputedStyle(probe).backgroundColor).toBe("#6e0303");
+  });
+
+  test("two elements that style alike share one interned rule set", () => {
+    // `Math.random()` handles could not dedup and were not stable across a server render.
+    const twin = document.createElement("span");
+    document.body.append(twin);
+    applyStyle(el, { ":hover": { color: "blue" }, color: "red" });
+    applyStyle(twin, { ":hover": { color: "blue" }, color: "red" });
+    expect(twin.dataset.jx).toBe(el.dataset.jx as string);
+    expect(adoptedCSS().split("\n").length).toBe(2);
+  });
+
+  test("releasing one of two sharers leaves the rules for the other", () => {
+    const twin = document.createElement("span");
+    document.body.append(twin);
+    applyStyle(el, { color: "red" });
+    applyStyle(twin, { color: "red" });
+    releaseElementStyles(el);
+    expect({ el: el.dataset.jx, css: adoptedCSS() }).toEqual({
+      css: `[data-jx="${twin.dataset.jx}"] { color: red }`,
+      el: undefined,
+    });
+    releaseElementStyles(twin);
+    expect(adoptedCSS()).toBe("");
   });
 
   test("empty style object — no side effects", () => {
     applyStyle(el, {});
     expect(el.dataset.jx).toBeUndefined();
-    expect(document.head.querySelectorAll("style").length).toBe(0);
+    expect(adoptedCSS()).toBe("");
   });
 
-  test("emits scoped <style> for :pseudo selector", () => {
+  test("Jx emits no cascade layer of its own", () => {
+    /* Load-bearing rather than stylistic: third-party CSS arrives through `$head` UNLAYERED, and
+       an unlayered rule beats a layered one at any specificity. Layering Jx's rules would hand
+       every page's `$head` a win over the document's own styles. */
+    applyStyle(el, { ":hover": { color: "blue" }, "@(min-width: 1px)": { gap: "1px" }, gap: "0" });
+    expect(adoptedCSS()).not.toContain("@layer");
+  });
+
+  test("emits a scoped rule for a :pseudo selector", () => {
     applyStyle(el, { ":hover": { color: "blue" } });
     expect(el.dataset.jx).toBeDefined();
     const uid = el.dataset.jx;
-    const style = document.head.querySelector("style") as HTMLStyleElement;
-    expect(style).not.toBeNull();
+    const style = { textContent: elementCSS(el) };
+    expect(style.textContent).not.toBe("");
     expect(style.textContent).toContain(`[data-jx="${uid}"]:hover`);
     expect(style.textContent).toContain("color: blue");
   });
 
-  test("emits scoped <style> for .class selector", () => {
+  test("emits a scoped rule for a .class selector", () => {
     applyStyle(el, { ".child": { marginTop: "4px" } });
     const uid = el.dataset.jx;
-    const style = document.head.querySelector("style") as HTMLStyleElement;
+    const style = { textContent: elementCSS(el) };
     expect(style.textContent).toContain(`[data-jx="${uid}"].child`);
   });
 
-  test("emits scoped <style> for &.compound selector", () => {
+  test("emits a scoped rule for an &.compound selector", () => {
     applyStyle(el, { "&.active": { fontWeight: "bold" } });
     const uid = el.dataset.jx;
-    const style = document.head.querySelector("style") as HTMLStyleElement;
+    const style = { textContent: elementCSS(el) };
     expect(style.textContent).toContain(`[data-jx="${uid}"].active`);
   });
 
-  test("emits scoped <style> for [attr] selector", () => {
+  test("emits a scoped rule for an [attr] selector", () => {
     applyStyle(el, { "[disabled]": { opacity: "0.5" } });
     const uid = el.dataset.jx;
-    const style = document.head.querySelector("style") as HTMLStyleElement;
+    const style = { textContent: elementCSS(el) };
     expect(style.textContent).toContain(`[data-jx="${uid}"][disabled]`);
   });
 
   test("resolves named @--breakpoint from mediaQueries", () => {
     applyStyle(el, { "@--md": { fontSize: "18px" } }, { "--md": "(min-width: 768px)" });
     const uid = el.dataset.jx;
-    const style = document.head.querySelector("style") as HTMLStyleElement;
+    const style = { textContent: elementCSS(el) };
     expect(style.textContent).toContain("@media (min-width: 768px)");
     expect(style.textContent).toContain(`[data-jx="${uid}"]`);
     expect(style.textContent).toContain("font-size: 18px");
@@ -657,13 +708,13 @@ describe("applyStyle", () => {
 
   test("uses literal condition for @(min-width:...) keys", () => {
     applyStyle(el, { "@(min-width: 1024px)": { padding: "2rem" } });
-    const style = document.head.querySelector("style") as HTMLStyleElement;
+    const style = { textContent: elementCSS(el) };
     expect(style.textContent).toContain("@media (min-width: 1024px)");
   });
 
   test("falls back to raw name when @--name not found in mediaQueries", () => {
     applyStyle(el, { "@--xl": { gap: "2rem" } }, {});
-    const style = document.head.querySelector("style") as HTMLStyleElement;
+    const style = { textContent: elementCSS(el) };
     expect(style.textContent).toContain("@media --xl");
   });
 
@@ -673,18 +724,18 @@ describe("applyStyle", () => {
    */
   test("@(print) emits the bare media type", () => {
     applyStyle(el, { "@(print)": { display: "none" } }, {});
-    const style = document.head.querySelector("style") as HTMLStyleElement;
+    const style = { textContent: elementCSS(el) };
     expect(style.textContent).toContain("@media print");
     expect(style.textContent).not.toContain("@media (print)");
   });
 
   test("@(feature: value) keeps its parentheses", () => {
     applyStyle(el, { "@(min-width: 40rem)": { gap: "2rem" } }, {});
-    const style = document.head.querySelector("style") as HTMLStyleElement;
+    const style = { textContent: elementCSS(el) };
     expect(style.textContent).toContain("@media (min-width: 40rem)");
   });
 
-  test("combined inline + nested + media", () => {
+  test("combined base + nested + media", () => {
     applyStyle(
       el,
       {
@@ -694,8 +745,7 @@ describe("applyStyle", () => {
       },
       { "--sm": "(min-width: 640px)" },
     );
-    // Color is in stylesheet (not inline) because it's overridden by a media query
-    const style = document.head.querySelector("style") as HTMLStyleElement;
+    const style = { textContent: elementCSS(el) };
     expect(style.textContent).toContain("color: green");
     expect(style.textContent).toContain("]:focus");
     expect(style.textContent).toContain("@media (min-width: 640px)");
@@ -707,8 +757,7 @@ describe("applyStyle", () => {
       { "@--md": { ":hover": { color: "blue" }, fontSize: "2rem" } },
       { "--md": "(min-width: 768px)" },
     );
-    const style = document.head.querySelector("style") as HTMLStyleElement;
-    const css = style.textContent;
+    const css = elementCSS(el);
     // Media block flat props
     expect(css).toContain("@media (min-width: 768px)");
     expect(css).toContain("font-size: 2rem");
@@ -724,22 +773,21 @@ describe("applyStyle", () => {
       { "@--sm": { "&.active": { fontWeight: "bold" } } },
       { "--sm": "(min-width: 640px)" },
     );
-    const style = document.head.querySelector("style") as HTMLStyleElement;
-    const css = style.textContent;
+    const css = elementCSS(el);
     expect(css).toMatch(
       /@media \(min-width: 640px\) \{ \[data-jx="[^"]+"\]\.active \{ font-weight: bold \} \}/,
     );
   });
-  test("sets CSS custom properties via setProperty", () => {
-    applyStyle(el, { "--my-color": "red", "--spacing": "8px" });
-    expect(el.style.getPropertyValue("--my-color")).toBe("red");
-    expect(el.style.getPropertyValue("--spacing")).toBe("8px");
+  test("custom properties are rules too, and keep their exact spelling", () => {
+    /* In a rule rather than inline so `:hover { --my-color: … }` can override the base, and
+       verbatim because a custom property is case-sensitive: kebab-casing `--myColor` renames it. */
+    applyStyle(el, { "--my-color": "red", "--myColor": "8px" });
+    expect(elementCSS(el)).toBe(`[data-jx="${el.dataset.jx}"] { --my-color: red; --myColor: 8px }`);
   });
 
   test("custom properties and regular properties coexist", () => {
     applyStyle(el, { "--accent": "green", color: "blue" });
-    expect(el.style.color).toBe("blue");
-    expect(el.style.getPropertyValue("--accent")).toBe("green");
+    expect(elementCSS(el)).toBe(`[data-jx="${el.dataset.jx}"] { --accent: green; color: blue }`);
   });
 });
 
@@ -783,16 +831,15 @@ describe("color-scheme helpers", () => {
 describe("applyStyle color-scheme dual emission", () => {
   let el: HTMLElement;
   beforeEach(() => {
+    resetDocumentStyles();
     el = document.createElement("div");
-    for (const s of document.head.querySelectorAll("style")) {
-      s.remove();
-    }
+    document.body.append(el);
   });
 
   test("@--dark scheme block emits guarded media copy plus forced copy", () => {
     applyStyle(el, { "@--dark": { color: "white" } }, { "--dark": "(prefers-color-scheme: dark)" });
     const uid = el.dataset.jx;
-    const css = (document.head.querySelector("style") as HTMLStyleElement).textContent!;
+    const css = elementCSS(el);
     expect(css).toContain(
       `@media (prefers-color-scheme: dark) { :where(:root:not([data-color-scheme])) [data-jx="${uid}"] { color: white } }`,
     );
@@ -803,7 +850,7 @@ describe("applyStyle color-scheme dual emission", () => {
 
   test("literal @(prefers-color-scheme: light) dual-emits too", () => {
     applyStyle(el, { "@(prefers-color-scheme: light)": { color: "black" } });
-    const css = (document.head.querySelector("style") as HTMLStyleElement).textContent!;
+    const css = elementCSS(el);
     expect(css).toContain(
       "@media (prefers-color-scheme: light) { :where(:root:not([data-color-scheme]))",
     );
@@ -817,7 +864,7 @@ describe("applyStyle color-scheme dual emission", () => {
       { "--dark": "(prefers-color-scheme: dark)" },
     );
     const uid = el.dataset.jx;
-    const css = (document.head.querySelector("style") as HTMLStyleElement).textContent!;
+    const css = elementCSS(el);
     expect(css).toContain(
       `@media (prefers-color-scheme: dark) { :where(:root:not([data-color-scheme])) [data-jx="${uid}"].active { border-color: red } }`,
     );
@@ -828,12 +875,12 @@ describe("applyStyle color-scheme dual emission", () => {
 
   test("compound scheme query keeps plain single emission", () => {
     applyStyle(el, { "@(prefers-color-scheme: dark) and (min-width: 600px)": { color: "white" } });
-    const css = (document.head.querySelector("style") as HTMLStyleElement).textContent!;
+    const css = elementCSS(el);
     expect(css).toContain("@media (prefers-color-scheme: dark) and (min-width: 600px)");
     expect(css).not.toContain("data-color-scheme");
   });
 
-  test("base prop overridden by a scheme block moves to the stylesheet", () => {
+  test("the base property is a rule, so the forced-scheme copy can override it", () => {
     applyStyle(
       el,
       { "@--dark": { color: "white" }, color: "black" },
@@ -842,9 +889,9 @@ describe("applyStyle color-scheme dual emission", () => {
       },
     );
     const uid = el.dataset.jx;
-    expect(el.style.color).toBe("");
-    const css = (document.head.querySelector("style") as HTMLStyleElement).textContent!;
-    expect(css).toContain(`[data-jx="${uid}"] { color: black }`);
+    expect(el.style.cssText).toBe("");
+    const css = elementCSS(el);
+    expect(css.split("\n")[0]).toBe(`[data-jx="${uid}"] { color: black }`);
   });
 });
 
@@ -1517,7 +1564,7 @@ describe("renderNode", () => {
 
   test("style object applied", () => {
     const el = renderNode({ style: { color: "green" }, tagName: "div" }, reactive({}));
-    expect(el.style.color).toBe("green");
+    expect(elementCSS(el)).toBe(`[data-jx="${el.dataset.jx}"] { color: green }`);
   });
 });
 
@@ -1859,10 +1906,9 @@ describe("buildScope — $media inheritance", () => {
 describe("applyStyle — non-media at-rules", () => {
   let el: HTMLElement;
   beforeEach(() => {
+    resetDocumentStyles();
     el = document.createElement("div");
-    for (const s of document.head.querySelectorAll("style")) {
-      s.remove();
-    }
+    document.body.append(el);
   });
 
   test("@starting-style emits without @media wrapper", () => {
@@ -1871,7 +1917,7 @@ describe("applyStyle — non-media at-rules", () => {
         ":popover-open": { transform: "translateX(100%)" },
       },
     });
-    const style = document.head.querySelector("style") as HTMLStyleElement;
+    const style = { textContent: elementCSS(el) };
     expect(style.textContent).toContain("@starting-style");
     expect(style.textContent).not.toContain("@media starting-style");
     expect(style.textContent).toContain(":popover-open");
@@ -1882,7 +1928,7 @@ describe("applyStyle — non-media at-rules", () => {
     applyStyle(el, {
       "@supports (display: grid)": { display: "grid" },
     });
-    const style = document.head.querySelector("style") as HTMLStyleElement;
+    const style = { textContent: elementCSS(el) };
     expect(style.textContent).toContain("@supports (display: grid)");
     expect(style.textContent).not.toContain("@media");
   });
@@ -1891,13 +1937,13 @@ describe("applyStyle — non-media at-rules", () => {
     applyStyle(el, {
       "@(max-width: 600px)": { fontSize: "14px" },
     });
-    const style = document.head.querySelector("style") as HTMLStyleElement;
+    const style = { textContent: elementCSS(el) };
     expect(style.textContent).toContain("@media (max-width: 600px)");
   });
 
   test("@--breakpoint still resolves from mediaQueries", () => {
     applyStyle(el, { "@--lg": { fontSize: "20px" } }, { "--lg": "(min-width: 1024px)" });
-    const style = document.head.querySelector("style") as HTMLStyleElement;
+    const style = { textContent: elementCSS(el) };
     expect(style.textContent).toContain("@media (min-width: 1024px)");
   });
 });
@@ -2442,19 +2488,20 @@ describe("applyStyle — declaration-body at-rules", () => {
       "@position-try --flip-up": { insetBlockStart: "auto" },
       positionAnchor: "--btn",
     });
-    const tag = elementStyleTags.get(el);
-    expect(tag?.textContent).toContain("@position-try --flip-up {");
-    expect(tag?.textContent).toContain("inset-block-start: auto");
+    /* Hoisted, not scoped: the name it declares is document-global, so it is written once for the
+       whole document rather than once per element that mentions it. */
+    const css = adoptedCSS();
+    expect(css).toContain("@position-try --flip-up { inset-block-start: auto }");
     // The defect: a `[data-jx=…]` selector inside kills the whole block, silently.
-    expect(tag?.textContent).not.toContain("@position-try --flip-up { [data-jx");
+    expect(css).not.toContain("@position-try --flip-up { [data-jx");
+    expect(elementCSS(el)).toBe(`[data-jx="${el.dataset.jx}"] { position-anchor: --btn }`);
   });
 
   test("@media still scopes its rules to the element", () => {
     const el = document.createElement("div");
     document.body.append(el);
     applyStyle(el, { "@(min-width: 40rem)": { color: "red" } });
-    const tag = elementStyleTags.get(el);
-    expect(tag?.textContent).toContain("@media (min-width: 40rem) { [data-jx=");
+    expect(elementCSS(el)).toContain("@media (min-width: 40rem) { [data-jx=");
   });
 
   test("isDeclarationAtRule knows the four, and rejects the rule-bodied ones", () => {

@@ -30,23 +30,32 @@ describe("CSS custom properties on inline styles", () => {
 
 // ─── Runtime applyStyle with custom properties ──────────────────────────────
 
+/* An authored declaration is a RULE now, not an inline style — that is the whole point of the
+   engine, since an inline one could never be overridden by the `:hover` block beside it. So the
+   question these tests ask moved from `el.style` to what the element computes. */
 describe("applyStyle with CSS custom properties", () => {
-  test("sets custom properties retrievable via getPropertyValue", () => {
+  test("sets custom properties the element can resolve", () => {
     const el = document.createElement("div");
-    applyStyle(el, { "--my-color": "red", "--spacing": "8px" });
-    expect(el.style.getPropertyValue("--my-color")).toBe("red");
-    expect(el.style.getPropertyValue("--spacing")).toBe("8px");
+    document.body.append(el);
+    applyStyle(el, { "--my-color": "red", color: "var(--my-color)" });
+    expect(getComputedStyle(el).color).toBe("red");
+    el.remove();
   });
 
   test("custom properties and regular properties coexist", () => {
     const el = document.createElement("div");
+    document.body.append(el);
     applyStyle(el, { "--accent": "green", color: "blue", fontSize: "14px" });
-    expect(el.style.color).toBe("blue");
-    expect(el.style.fontSize).toBe("14px");
-    expect(el.style.getPropertyValue("--accent")).toBe("green");
+    const computed = getComputedStyle(el);
+    expect({ color: computed.color, size: computed.fontSize }).toEqual({
+      color: "blue",
+      size: "14px",
+    });
+    el.remove();
   });
 
-  test("font stack variable set on parent is accessible", () => {
+  test("font stack variable set on parent is inherited by the child", () => {
+    // A custom property in a rule still inherits, which is what the child's `var()` reads.
     const parent = document.createElement("div");
     const child = document.createElement("h1");
     parent.append(child);
@@ -57,13 +66,7 @@ describe("applyStyle with CSS custom properties", () => {
     });
     applyStyle(child, { fontFamily: "var(--font-geometric-humanist)" });
 
-    // The variable is set on the parent
-    expect(parent.style.getPropertyValue("--font-geometric-humanist")).toBe(
-      "Avenir, Montserrat, Corbel, sans-serif",
-    );
-    // The child references it via var()
-    expect(child.style.fontFamily).toBe("var(--font-geometric-humanist)");
-
+    expect(getComputedStyle(child).fontFamily).toBe("Avenir, Montserrat, Corbel, sans-serif");
     parent.remove();
   });
 });

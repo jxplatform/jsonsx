@@ -1,6 +1,6 @@
 ---
 title: "Styling"
-description: "Inline styles, nested CSS selectors, and named media breakpoints in Jx."
+description: "Style objects, nested CSS selectors, and named media breakpoints in Jx."
 spec:
   - spec.md#9
 code:
@@ -15,7 +15,7 @@ code:
 
 Styles are JSON objects. Property names are the CSS ones in camelCase, the same spelling the CSSOM uses, so `background-color` is written `backgroundColor`.
 
-## Inline styles
+## Style objects
 
 The `style` property accepts a JSON object:
 
@@ -49,19 +49,46 @@ Keys beginning with `:`, `.`, `&`, or `[` are treated as nested selectors:
 }
 ```
 
-Inline properties apply directly to the element. Nested rules are emitted as a scoped `<style>` block keyed on a **generated class**, `.<tagName>-<n>`, which the build also puts on the element:
+Every declaration becomes a CSS rule, the base ones and the nested ones alike. The build scopes them with a **generated class**, `.<tagName>-<n>`, which it also puts on the element:
 
 ```html
 <div class="sty-card-0">…</div>
 ```
 
 ```css
+.sty-card-0 {
+  background-color: blue;
+}
 .sty-card-0:hover {
-  padding: 8px;
+  background-color: darkblue;
+  cursor: pointer;
 }
 ```
 
+Base rules come first, so a state block overrides its own base property. That ordering is the whole reason nothing is written as an `style="…"` attribute: an inline declaration beats any ordinary rule, so a `backgroundColor` written on the element could never be overridden by the `:hover` block sitting next to it in the same object.
+
+When Studio renders the page live, the same rules are delivered through the document's adopted stylesheets and scoped with `data-jx` instead of a class. Different handle, same cascade, so what you see in the canvas is what the published page does.
+
 (You'll also see `data-jx-static` and `data-jx-prerendered` in compiled output. Those mark hydration state and are never used as CSS selectors.)
+
+Your own `style` **attribute**, written under `attributes`, is untouched by any of this. It stays a literal attribute at inline precedence, so it wins over the object.
+
+### Nesting goes as deep as you write it
+
+Selector blocks and `@` blocks nest inside each other, in either order and to any depth:
+
+```json
+{
+  "style": {
+    "& .nav-link": { "color": "gray", ":hover": { "color": "white" } },
+    "@--sm": {
+      "& li:nth-of-type(2n)": { ":hover": { "opacity": "0.8" } }
+    }
+  }
+}
+```
+
+One flattener resolves that tree for the compiler, the live preview and Studio's canvas, so all three agree about what it means. Note that `&` never reaches the browser: Jx resolves it itself, because `.child` **compounds** onto the element here (`.sty-card-0.child`) where native CSS nesting would read the same key as a descendant.
 
 ### At-rules that hold declarations
 

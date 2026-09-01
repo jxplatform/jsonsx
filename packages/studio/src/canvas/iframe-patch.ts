@@ -377,7 +377,13 @@ function editModeStyle(style: JxStyle | undefined): JxStyle | undefined {
   }
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(style)) {
-    out[k] = typeof v === "string" && v.includes("${") ? "" : v;
+    /* OMITTED, not blanked. It used to be written as `""`, which was a silent no-op while a
+       declaration went to `el.style` and is a malformed declaration now that it goes into a rule.
+       Dropping the key is what blanking always meant: the property falls back to the cascade. */
+    if (typeof v === "string" && v.includes("${")) {
+      continue;
+    }
+    out[k] = v;
   }
   return out as JxStyle;
 }

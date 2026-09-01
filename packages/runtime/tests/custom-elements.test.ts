@@ -8,9 +8,11 @@ import {
   buildScope,
   RESERVED_KEYS,
   applyStyle,
+  resetDocumentStyles,
   setRootMedia,
   setStampPropBindings,
 } from "../src/runtime";
+import { elementCSS } from "./style-text.ts";
 
 try {
   GlobalRegistrator.register();
@@ -349,26 +351,22 @@ describe("Custom Elements", () => {
 // ─── Phase 5: component @media via the buildScope-direct (iframe) path ────────────
 
 describe("component @media (setRootMedia seeds the iframe path)", () => {
-  test("equal-specificity cascade: base prop → stylesheet rule (not inline) + a real @media rule", () => {
-    for (const s of document.head.querySelectorAll("style")) {
-      s.remove();
-    }
+  test("equal-specificity cascade: base prop is a rule (not inline) + a real @media rule", () => {
+    resetDocumentStyles();
     const el = document.createElement("div");
-    // A base prop that is ALSO overridden under @--md routes to a stylesheet baseDecls rule (NOT
-    // Inline), so the @media rule can win at equal specificity — the whole Phase-5 premise.
+    document.body.append(el);
+    // Both declarations are rules, so the @media one wins at equal specificity by source order.
     applyStyle(el, { "@--md": { color: "blue" }, color: "red" }, { "--md": "(min-width: 768px)" });
-    expect(el.style.color).toBe(""); // No inline color.
+    expect(el.style.cssText).toBe(""); // Nothing authored is left inline.
     const jxUid = el.dataset.jx;
-    const css = (document.head.querySelector(`style[data-jx-owner="${jxUid}"]`) as HTMLStyleElement)
-      .textContent;
-    expect(css).toContain(`[data-jx="${jxUid}"] { color: red }`);
-    expect(css).toContain(`@media (min-width: 768px) { [data-jx="${jxUid}"] { color: blue } }`);
+    expect(elementCSS(el).split("\n")).toEqual([
+      `[data-jx="${jxUid}"] { color: red }`,
+      `@media (min-width: 768px) { [data-jx="${jxUid}"] { color: blue } }`,
+    ]);
   });
 
   test("a component with its own @--md and no own $media resolves the real query after setRootMedia", async () => {
-    for (const s of document.head.querySelectorAll("style")) {
-      s.remove();
-    }
+    resetDocumentStyles();
     const tag = uniqueTag();
     // The component carries an @--md block but NO own $media — it must inherit the root map.
     await defineElement({
@@ -386,9 +384,7 @@ describe("component @media (setRootMedia seeds the iframe path)", () => {
       setTimeout(r, 100);
     });
 
-    const jxUid = el.dataset.jx;
-    const css = (document.head.querySelector(`style[data-jx-owner="${jxUid}"]`) as HTMLStyleElement)
-      .textContent;
+    const css = elementCSS(el);
     // The named breakpoint resolved to its real query — NOT the invalid `@media --md`.
     expect(css).toContain("@media (min-width: 768px)");
     expect(css).not.toContain("@media --md");
@@ -583,5 +579,47 @@ describe("a reflected property name does not clobber the declared default", () =
   test("a props.* attribute still wins", async () => {
     const r = await render({ attributes: { "props.title": "FROM PROPS-ATTR" } });
     expect(r.title).toBe("FROM PROPS-ATTR");
+  });
+});
+
+// ─── The display default, now that a component's own `display` is a rule ──────
+
+describe("the custom-element display default", () => {
+  /**
+   * A custom element is `display: inline` by default and a Jx container behaves like a `<div>`, so
+   * the runtime supplies `display: block`. It used to check `this.style.display` — a correct test
+   * only while the author's own `display` went inline. With every declaration in a rule, an inline
+   * default beats the author at any specificity, so the test moved to the definition.
+   */
+  async function mount(style: Record<string, unknown>): Promise<HTMLElement> {
+    const tag = uniqueTag();
+    await defineElement({ state: {}, style, tagName: tag } as never);
+    const el = document.createElement(tag);
+    document.body.append(el);
+    await new Promise((r) => {
+      setTimeout(r, 0);
+    });
+    return el;
+  }
+
+  test("a component with no display of its own gets the block default", async () => {
+    const el = await mount({ color: "red" });
+    expect(el.style.display).toBe("block");
+  });
+
+  test("a base display is left to the author", async () => {
+    const el = await mount({ display: "flex" });
+    expect({ inline: el.style.display, rule: elementCSS(el) }).toEqual({
+      inline: "",
+      rule: `[data-jx="${el.dataset.jx}"] { display: flex }`,
+    });
+  });
+
+  test("a display declared only under a state or a query still suppresses the default", async () => {
+    // An inline `display: block` would beat both of these, so the scan has to be a deep one.
+    const el = await mount({ "@(min-width: 40rem)": { display: "grid" } });
+    expect(el.style.display).toBe("");
+    const hovered = await mount({ ":hover": { display: "none" } });
+    expect(hovered.style.display).toBe("");
   });
 });

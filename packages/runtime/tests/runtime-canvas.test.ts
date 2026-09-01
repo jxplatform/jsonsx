@@ -10,12 +10,12 @@ import {
   setCanvasDelinkAnchors,
   setCanvasDelinkPopovers,
   setCanvasViewportTranspose,
-  elementStyleTags,
   resolveNestedSelector,
   toCSSText,
   transposeCanvasPopoverSelector,
   transposeCanvasUnits,
 } from "../src/runtime";
+import { elementCSS } from "./style-text.ts";
 
 try {
   GlobalRegistrator.register();
@@ -133,27 +133,26 @@ describe("toCSSText viewport transpose", () => {
 // ─── applyStyle inline transpose ─────────────────────────────────────────────────
 
 describe("applyStyle viewport transpose", () => {
-  test("flag off keeps the raw viewport unit on the inline style", () => {
+  test("flag off keeps the raw viewport unit in the emitted rule", () => {
     const el = document.createElement("div");
     applyStyle(el, { height: "100vh" });
-    expect(el.style.height).toContain("vh");
-    expect(el.style.height).not.toContain("cqh");
+    expect(elementCSS(el)).toContain("height: 100vh");
   });
 
   test("flag on transposes a custom property value to a container-query unit", () => {
     setCanvasViewportTranspose(true);
     const el = document.createElement("div");
-    // Custom properties are stored verbatim, so the transpose is observable.
     applyStyle(el, { "--banner-height": "80vh" });
-    expect(el.style.getPropertyValue("--banner-height")).toBe("80cqh");
+    expect(elementCSS(el)).toContain("--banner-height: 80cqh");
   });
 
-  test("flag on: the transposed standard-property value no longer carries 'vh'", () => {
+  test("flag on: the standard-property value is transposed in the rule", () => {
+    /* A rule keeps the `cq*` unit the inline path could not: happy-dom dropped it on assignment to
+       `el.style.height`, so the assertion had to be that "vh" was gone rather than what replaced it. */
     setCanvasViewportTranspose(true);
     const el = document.createElement("div");
-    // Happy-dom drops the cq* unit on a standard property, but "vh" is gone.
     applyStyle(el, { height: "100vh" });
-    expect(el.style.height).not.toContain("vh");
+    expect(elementCSS(el)).toContain("height: 100cqh");
   });
 
   test("flag off vs on diverge for the same standard-property input", () => {
@@ -162,7 +161,7 @@ describe("applyStyle viewport transpose", () => {
     setCanvasViewportTranspose(true);
     const on = document.createElement("div");
     applyStyle(on, { height: "100vh" });
-    expect(off.style.height).not.toBe(on.style.height);
+    expect(elementCSS(off)).not.toBe(elementCSS(on));
   });
 });
 
@@ -320,13 +319,13 @@ describe("setCanvasAssetResolver", () => {
     expect(el.getAttribute("srcset")).toBe("/raw/a.png 1x, /raw/b.png 2x");
   });
 
-  test("url() inside a style value, in the inline and the emitted-stylesheet paths", () => {
+  test("url() inside a style value, in the rule and the toCSSText paths", () => {
     setCanvasAssetResolver(prefixResolver);
     const el = renderNode(
       { style: { backgroundImage: "url('/bg.png')" }, tagName: "div" } as never,
       reactive({}),
     );
-    expect(el.style.backgroundImage.replaceAll('"', "'")).toBe("url('/raw/bg.png')");
+    expect(elementCSS(el)).toContain("background-image: url('/raw/bg.png')");
     expect(toCSSText({ maskImage: "url(/m.svg)" })).toBe("mask-image: url(/raw/m.svg)");
   });
 
@@ -381,9 +380,8 @@ describe("setCanvasAssetResolver", () => {
         expect(el.getAttribute(key)).toBe(expected as string);
       }
     }
-    expect(
-      renderNode(cases[3] as never, reactive({})).style.backgroundImage.replaceAll('"', "'"),
-    ).toBe("url('/bg.png')");
+    const styled = renderNode(cases[3] as never, reactive({}));
+    expect(elementCSS(styled)).toContain("background-image: url('/bg.png')");
     expect(toCSSText({ maskImage: "url(/m.svg)" })).toBe("mask-image: url(/m.svg)");
   });
 
@@ -466,7 +464,7 @@ describe("setCanvasDelinkPopovers", () => {
     expect(el.getAttribute("popover")).toBe("auto");
     const styled = stamped();
     applyStyle(styled, { ":popover-open": { display: "flex" } });
-    expect(elementStyleTags.get(styled)?.textContent).toContain(":popover-open");
+    expect(elementCSS(styled)).toContain(":popover-open");
   });
 
   test("flag on renames popover on a node the studio can address", () => {
@@ -510,7 +508,7 @@ describe("setCanvasDelinkPopovers", () => {
     setCanvasDelinkPopovers(true);
     const el = stamped();
     applyStyle(el, { ":popover-open": { display: "flex" }, transform: "translateX(100%)" });
-    const css = elementStyleTags.get(el)?.textContent ?? "";
+    const css = elementCSS(el);
     expect(css).toContain("[data-jx-popover-open] { display: flex }");
     expect(css).not.toContain(":popover-open");
   });
@@ -522,7 +520,7 @@ describe("setCanvasDelinkPopovers", () => {
       "&:popover-open": { opacity: "1" },
       "@(min-width: 40rem)": { ":popover-open": { gap: "1rem" } },
     });
-    const css = elementStyleTags.get(el)?.textContent ?? "";
+    const css = elementCSS(el);
     expect(css).toContain("[data-jx-popover-open] { opacity: 1 }");
     expect(css).toContain("@media (min-width: 40rem)");
     expect(css).not.toContain(":popover-open");
@@ -536,7 +534,7 @@ describe("setCanvasDelinkPopovers", () => {
       ":popover-open::backdrop": { opacity: "1" },
       ":popover-open": { display: "flex" },
     });
-    const css = elementStyleTags.get(el)?.textContent ?? "";
+    const css = elementCSS(el);
     expect(css).not.toContain("backdrop");
     expect(css).toContain("[data-jx-popover-open] { display: flex }");
   });
@@ -546,7 +544,7 @@ describe("setCanvasDelinkPopovers", () => {
     const el = document.createElement("nav");
     document.body.append(el);
     applyStyle(el, { ":popover-open": { display: "flex" } });
-    expect(elementStyleTags.get(el)?.textContent).toContain(":popover-open");
+    expect(elementCSS(el)).toContain(":popover-open");
   });
 });
 

@@ -46,7 +46,7 @@ import type { JxPath } from "../state";
 // ObserveScope MUST come from the runtime: the $defs refs are created by the runtime's copy of
 // @vue/reactivity, and dep tracking is per module instance — an effect from the studio's own copy
 // Would never re-run when a dev-proxy data source settles.
-import { observeScope, reapplyStyle, setResolveToken } from "@jxsuite/runtime";
+import { observeScope, reapplyStyle, resetDocumentStyles, setResolveToken } from "@jxsuite/runtime";
 import type { IframeChannel } from "./iframe-channel";
 import type {
   CanvasMode,
@@ -913,6 +913,12 @@ export function startCanvasIframe(opts: {
         stopDataScopeWatch?.();
         stopDataScopeWatch = null;
         handle?.dispose();
+        /* And its stylesheets. Scope teardown releases each element's rules on its own, so this is
+           belt to that braces — but a full re-render replaces every element in the frame, and the
+           canvas is the one place where "the sheet only ever grows" would be a live leak rather
+           than a theoretical one. It used to be exactly that, one orphaned `<style>` per styled
+           element per render. */
+        resetDocumentStyles(container.ownerDocument);
         handle = await renderResolvedDocument({
           assets: msg.assets ?? null,
           container,

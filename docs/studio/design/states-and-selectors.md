@@ -66,7 +66,7 @@ Rules for elements _inside_ the selection are the inspector's **Relative Styling
 Switch the segment to the state and clear its values with their chips: property by property, or a whole section from the accent dot on its header. When a state has no values left, it drops out of the menu's marked entries.
 
 :::doc-note
-Each state is saved as a nested rule inside the element's `style` object. These are real CSS pseudo-classes that behave natively on the published page. The format is described in **[Styling](/docs/framework/concepts/styling)**.
+Each state is saved as a nested rule inside the element's `style` object. These are real CSS pseudo-classes, and they behave the same way in the canvas as they do on the published page: both deliver the base declaration and the state block as ordinary rules, so the state wins by source order. The format is described in **[Styling](/docs/framework/concepts/styling)**.
 :::
 
 ## Next

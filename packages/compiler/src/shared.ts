@@ -11,14 +11,13 @@ import {
   COLOR_SCHEME_STORAGE_KEY,
   RESERVED_KEYS,
   booleanAttrValue,
+  buildStyleRules,
   enumeratedAttrNames,
   isDeclarationAtRule,
+  isNestedSelectorKey,
   camelToKebab,
   isSingleExpression,
   pureSchemeOf,
-  resolveAtQuery,
-  schemeSelectors,
-  toCSSText,
 } from "@jxsuite/runtime";
 import { evaluateExpression, isMutating } from "@jxsuite/runtime/expression";
 import { runStatements } from "@jxsuite/runtime/statements";
@@ -1042,90 +1041,30 @@ export function colorSchemePrePaintScript(): string {
 }
 
 /**
- * Resolve an `@`-prefixed style key into an emit function that pushes conditional rules. Pure
- * color-scheme queries dual-emit per the forced-scheme contract (spec §9.5): a media-guarded copy
- * that applies while no scheme is forced plus an unconditional copy under the forced root
- * attribute.
+ * Push the rules one style object becomes, scoped to `selector`.
  *
- * @param {string} atKey
- * @param {Record<string, string>} mediaQueries
- * @param {string[]} rules
- * @returns {(selector: string, props: string) => void}
- * @docs framework/concepts/color-schemes
- */
-function conditionalRuleEmitter(
-  atKey: string,
-  mediaQueries: Record<string, string>,
-  rules: string[],
-): (selector: string, props: string) => void {
-  /* A declaration-body at-rule has no selector to wrap: `@position-try --flip { … }` IS the body,
-     and the default path below would emit `@position-try --flip { #panel { … } }`, which the
-     parser discards silently. The name it declares is document-global, so the block is written
-     once and the selector is dropped rather than scoped. */
-  if (isDeclarationAtRule(atKey)) {
-    let emitted = false;
-    return (_selector: string, props: string) => {
-      if (props && !emitted) {
-        emitted = true;
-        rules.push(`${atKey} { ${props} }`);
-      }
-    };
-  }
-  const query = resolveAtQuery(atKey, mediaQueries);
-  const atRule = query === null ? atKey : `@media ${query}`;
-  const scheme = query === null ? null : pureSchemeOf(query);
-  return (selector: string, props: string) => {
-    if (!props) {
-      return;
-    }
-    if (scheme) {
-      const { auto, forced } = schemeSelectors(selector, scheme);
-      rules.push(`${atRule} { ${auto} { ${props} } }`, `${forced} { ${props} }`);
-    } else {
-      rules.push(`${atRule} { ${selector} { ${props} } }`);
-    }
-  };
-}
-
-/**
- * Push the rules for one `@`-prefixed style block scoped to `selector`: flat props plus one level
- * of nested selectors, routed through conditionalRuleEmitter (scheme-aware).
+ * The single door from the compiler to `buildStyleRules`, which is now the ONE definition of what a
+ * Jx style object means as CSS — shared with the DOM runtime and the site-style builder. Three
+ * emitters used to answer that question separately, and each dropped a different combination: this
+ * one emitted `selector → @media` but only ever ONE selector level inside an at-rule group, so
+ * `@media → .card → :hover` was silently lost, while the runtime dropped the opposite order.
+ *
+ * Template-string and `$ref` values are omitted rather than resolved: a compiled page's CSS is
+ * static by construction, and the runtime writes those declarations at render time.
  *
  * @param {string[]} rules
- * @param {string} atKey
+ * @param {JxStyle} style
+ * @param {string | null} selector - The scope, or null for a bare declaration-body at-rule
  * @param {Record<string, string>} mediaQueries
- * @param {string} selector
- * @param {Record<string, unknown>} obj
  */
-function pushConditionalRule(
+function pushStyleRules(
   rules: string[],
-  atKey: string,
+  style: JxStyle,
+  selector: string | null,
   mediaQueries: Record<string, string>,
-  selector: string,
-  obj: Record<string, unknown>,
 ) {
-  if (obj === null || typeof obj !== "object" || Array.isArray(obj)) {
-    return;
-  }
-  const emit = conditionalRuleEmitter(atKey, mediaQueries, rules);
-  emit(selector, toCSSText(obj));
-  if (isDeclarationAtRule(atKey)) {
-    // Its children are declarations, so there is no nested selector level to walk.
-    return;
-  }
-  for (const [sel, sub] of Object.entries(obj)) {
-    if (sub === null || typeof sub !== "object" || Array.isArray(sub)) {
-      continue;
-    }
-    if (sel.startsWith("@")) {
-      continue;
-    }
-    const resolved = sel.startsWith("&")
-      ? sel.replace("&", selector)
-      : sel.startsWith(":") || sel.startsWith(".") || sel.startsWith("[")
-        ? `${selector}${sel}`
-        : `${selector} ${sel}`;
-    emit(resolved, toCSSText(sub));
+  for (const rule of buildStyleRules(style, { mediaQueries, scope: selector })) {
+    rules.push(rule.text);
   }
 }
 
@@ -1189,42 +1128,24 @@ export function compileStyles(
   // Everything else on body.  Project-level style is implicitly :root, so a
   // Flat object like { "--bg": "#000", "margin": "0" } is the expected format.
   if (projectStyle && typeof projectStyle === "object") {
-    const emitProjectRules = (selector: string, obj: Record<string, unknown>) => {
-      const props = toCSSText(obj);
-      if (props) {
-        rules.push(`${selector} { ${props} }`);
-      }
-      for (const [key, val] of Object.entries(obj)) {
-        if (val === null || typeof val !== "object" || Array.isArray(val)) {
-          continue;
-        }
-        if (key.startsWith("@")) {
-          pushConditionalRule(rules, key, mediaQueries, selector, val as Record<string, unknown>);
-          continue;
-        }
-        const resolved = key.startsWith("&")
-          ? key.replace("&", selector)
-          : key.startsWith(":") || key.startsWith(".") || key.startsWith("[")
-            ? `${selector}${key}`
-            : `${selector} ${key}`;
-        emitProjectRules(resolved, val as Record<string, unknown>);
-      }
-    };
-
-    // Collect CSS custom properties into :root {}
-    const rootProps: Record<string, unknown> = {};
-    // Collect direct CSS properties into body {}
-    const bodyProps: Record<string, unknown> = {};
+    /* The project's own style is implicitly `:root`, but only half of it: a custom property has to
+       land on `:root` so a forced-scheme selector can override it, while an ordinary property is
+       page chrome and belongs on `body`. That split is the one thing the shared builder cannot do
+       for us, so it is done here and each half is handed over whole. */
+    const rootProps: JxStyle = {};
+    const bodyProps: JxStyle = {};
+    const selectorBlocks: [string, JxStyle][] = [];
+    const conditionalBlocks: [string, JxStyle][] = [];
     for (const [key, val] of Object.entries(projectStyle)) {
-      if (
-        key.startsWith(":") ||
-        key.startsWith(".") ||
-        key.startsWith("[") ||
-        key.startsWith("@")
-      ) {
+      if (val !== null && typeof val === "object" && !Array.isArray(val)) {
+        if (key.startsWith("@")) {
+          conditionalBlocks.push([key, val]);
+        } else if (!key.startsWith("--")) {
+          selectorBlocks.push([key, val]);
+        }
         continue;
       }
-      if (val !== null && typeof val === "object" && !Array.isArray(val)) {
+      if (isNestedSelectorKey(key) || key.startsWith("@")) {
         continue;
       }
       if (key.startsWith("--")) {
@@ -1233,57 +1154,45 @@ export function compileStyles(
         bodyProps[key] = val;
       }
     }
+
     // Base rules precede conditional blocks so equal-specificity overrides win by source order.
-    const rootCSS = toCSSText(rootProps);
-    if (rootCSS) {
-      rules.push(`:root { ${rootCSS} }`);
-    }
-    const bodyCSS = toCSSText(bodyProps);
-    if (bodyCSS) {
-      rules.push(`body { ${bodyCSS} }`);
+    pushStyleRules(rules, rootProps, ":root", mediaQueries);
+    pushStyleRules(rules, bodyProps, "body", mediaQueries);
+
+    for (const [key, val] of selectorBlocks) {
+      // A top-level selector key IS the selector — `.card` styles `.card`, not `:root .card`.
+      pushStyleRules(rules, val, key, mediaQueries);
     }
 
-    for (const [key, val] of Object.entries(projectStyle)) {
-      if (key.startsWith(":") || key.startsWith(".") || key.startsWith("[")) {
-        emitProjectRules(key, val as Record<string, unknown>);
-      } else if (
-        val !== null &&
-        typeof val === "object" &&
-        !Array.isArray(val) &&
-        !key.startsWith("@") &&
-        !key.startsWith("--")
-      ) {
-        emitProjectRules(key, val as Record<string, unknown>);
-      } else if (
-        key.startsWith("@") &&
-        val !== null &&
-        typeof val === "object" &&
-        !Array.isArray(val)
-      ) {
-        // Conditional block at project top level: custom properties override :root, direct
-        // Properties override body, selector-keyed sub-objects their own selector.
-        const emit = conditionalRuleEmitter(key, mediaQueries, rules);
-        const condRoot: Record<string, unknown> = {};
-        const condBody: Record<string, unknown> = {};
-        const condSubs: [string, Record<string, unknown>][] = [];
-        for (const [k, v] of Object.entries(val as Record<string, unknown>)) {
-          if (v !== null && typeof v === "object" && !Array.isArray(v)) {
-            if (!k.startsWith("@")) {
-              condSubs.push([k, v as Record<string, unknown>]);
-            }
-            continue;
+    for (const [key, val] of conditionalBlocks) {
+      /* A declaration-body at-rule has no selector to split across, and its name is global —
+         `@font-face` at project level is one block, not one per target. */
+      if (isDeclarationAtRule(key)) {
+        pushStyleRules(rules, { [key]: val }, null, mediaQueries);
+        continue;
+      }
+      // Conditional block at project top level: custom properties override :root, direct
+      // Properties override body, selector-keyed sub-objects their own selector.
+      const condRoot: JxStyle = {};
+      const condBody: JxStyle = {};
+      const condSubs: [string, JxStyle][] = [];
+      for (const [k, v] of Object.entries(val)) {
+        if (v !== null && typeof v === "object" && !Array.isArray(v)) {
+          if (!k.startsWith("@")) {
+            condSubs.push([k, v]);
           }
-          if (k.startsWith("--")) {
-            condRoot[k] = v;
-          } else {
-            condBody[k] = v;
-          }
+          continue;
         }
-        emit(":root", toCSSText(condRoot));
-        emit("body", toCSSText(condBody));
-        for (const [sel, sub] of condSubs) {
-          emit(sel, toCSSText(sub));
+        if (k.startsWith("--")) {
+          condRoot[k] = v;
+        } else {
+          condBody[k] = v;
         }
+      }
+      pushStyleRules(rules, { [key]: condRoot }, ":root", mediaQueries);
+      pushStyleRules(rules, { [key]: condBody }, "body", mediaQueries);
+      for (const [sel, sub] of condSubs) {
+        pushStyleRules(rules, { [key]: sub }, sel, mediaQueries);
       }
     }
   }
@@ -1319,41 +1228,6 @@ export function compileStyles(
  */
 export function escapeStyleText(css: string): string {
   return css.replaceAll(/<\/(?=style)/gi, String.raw`<\/`);
-}
-
-/**
- * Recursively emit CSS rules for a nested element selector.
- *
- * @param {string} selector
- * @param {Record<string, unknown>} obj
- * @param {string[]} rules
- * @param {Record<string, string>} mediaQueries
- */
-function emitNestedElement(
-  selector: string,
-  obj: Record<string, unknown>,
-  rules: string[],
-  mediaQueries: Record<string, string>,
-) {
-  const props = toCSSText(obj);
-  if (props) {
-    rules.push(`${selector} { ${props} }`);
-  }
-  for (const [key, val] of Object.entries(obj)) {
-    if (val === null || typeof val !== "object" || Array.isArray(val)) {
-      continue;
-    }
-    if (key.startsWith("@")) {
-      pushConditionalRule(rules, key, mediaQueries, selector, val as Record<string, unknown>);
-      continue;
-    }
-    const resolved = key.startsWith("&")
-      ? key.replace("&", selector)
-      : key.startsWith(":") || key.startsWith(".") || key.startsWith("[")
-        ? `${selector}${key}`
-        : `${selector} ${key}`;
-    emitNestedElement(resolved, val as Record<string, unknown>, rules, mediaQueries);
-  }
 }
 
 /**
@@ -1393,49 +1267,7 @@ export function collectStyles(
       : tagSelector;
 
   if (def.style) {
-    const baseDecls = [];
-    for (const [prop, value] of Object.entries(def.style)) {
-      if (
-        prop.startsWith(":") ||
-        prop.startsWith(".") ||
-        prop.startsWith("&") ||
-        prop.startsWith("[") ||
-        prop.startsWith("@")
-      ) {
-        continue;
-      }
-      if (value === null || typeof value === "object") {
-        continue;
-      }
-      if (typeof value === "string" && isTemplateString(value)) {
-        continue;
-      }
-      baseDecls.push(`  ${camelToKebab(prop)}: ${value};`);
-    }
-    if (baseDecls.length > 0) {
-      rules.push(`${selector} {\n${baseDecls.join("\n")}\n}`);
-    }
-
-    for (const [prop, val] of Object.entries(def.style)) {
-      if (val === null || typeof val !== "object" || Array.isArray(val)) {
-        continue;
-      }
-      if (prop.startsWith("@")) {
-        pushConditionalRule(rules, prop, mediaQueries, selector, val as Record<string, unknown>);
-      } else {
-        const resolved = prop.startsWith("&")
-          ? prop.replace("&", selector)
-          : prop.startsWith(":") || prop.startsWith(".") || prop.startsWith("[")
-            ? `${selector}${prop}`
-            : `${selector} ${prop}`;
-        emitNestedElement(
-          resolved,
-          /** @type {Record<string, unknown>} */ val,
-          rules,
-          mediaQueries,
-        );
-      }
-    }
+    pushStyleRules(rules, def.style, selector, mediaQueries);
   }
 
   if (Array.isArray(def.children)) {
@@ -1902,41 +1734,27 @@ export function buildComponentCSS(
   const scope = styleScopePrefix(tagName, shadow);
 
   if (styleDef && typeof styleDef === "object") {
-    const decls: string[] = [];
+    /* The top level is walked here rather than handed straight to the builder, because ONE of its
+       keys does not mean what `resolveNestedSelector` would make of it: `:host` and `:host(.foo)`
+       are TRANSLATED per {@link resolveSelector} so a style object means the same thing in both
+       modes. Everything below the top level is ordinary nesting, so each block goes to the builder
+       whole — which is also what gives a component's nested selectors the recursion they never had
+       (this used to emit exactly one level and drop anything under it). */
+    const own: JxStyle = {};
+    const blocks: [string, JxStyle][] = [];
     for (const [prop, value] of Object.entries(styleDef)) {
-      if (
-        prop.startsWith(":") ||
-        prop.startsWith(".") ||
-        prop.startsWith("&") ||
-        prop.startsWith("[") ||
-        prop.startsWith("@")
-      ) {
-        continue;
+      if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+        blocks.push([prop, value]);
+      } else if (!prop.startsWith("@") && !isNestedSelectorKey(prop)) {
+        own[prop] = value;
       }
-      if (value === null || typeof value === "object") {
-        continue;
-      }
-      if (typeof value === "string" && isTemplateString(value)) {
-        continue;
-      }
-      decls.push(`  ${camelToKebab(prop)}: ${value};`);
     }
-    if (decls.length > 0) {
-      rules.push(`${scope} {\n${decls.join("\n")}\n}`);
-    }
-
-    for (const [prop, val] of Object.entries(styleDef)) {
+    pushStyleRules(rules, own, scope, mediaQueries);
+    for (const [prop, val] of blocks) {
       if (prop.startsWith("@")) {
-        pushConditionalRule(rules, prop, mediaQueries, scope, val as Record<string, unknown>);
-      } else if (
-        prop.startsWith(":") ||
-        prop.startsWith(".") ||
-        prop.startsWith("&") ||
-        prop.startsWith("[")
-      ) {
-        rules.push(
-          `${resolveSelector(prop, scope)} { ${toCSSText(val as Record<string, unknown>)} }`,
-        );
+        pushStyleRules(rules, { [prop]: val }, scope, mediaQueries);
+      } else if (isNestedSelectorKey(prop)) {
+        pushStyleRules(rules, val, resolveSelector(prop, scope), mediaQueries);
       }
     }
   }

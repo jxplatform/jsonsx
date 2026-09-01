@@ -82,7 +82,7 @@ describe("compileStyles — projectStyle deep nesting", () => {
   });
 });
 
-describe("compileStyles — element-level nested selectors (emitNestedElement)", () => {
+describe("compileStyles — element-level nested selectors", () => {
   test("nested selector with media, sub-selectors and recursion", () => {
     const doc = {
       children: [],
@@ -110,6 +110,52 @@ describe("compileStyles — element-level nested selectors (emitNestedElement)",
     expect(result).toContain("#box.child.deep");
     expect(result).toContain("#box.child > span");
     expect(result).toContain("#box.child.grand");
+  });
+});
+
+describe("compileStyles — the nesting the compiler used to drop", () => {
+  test("@media then selector then pseudo now emits all three levels", () => {
+    /* The compiler emitted ONE selector level inside an at-rule group and dropped anything under
+       it, so `@media → .child → :hover` was silently lost. It is the mirror of the runtime's own
+       defect (which dropped `selector → @media`), which is why preview and shipped page disagreed
+       in both directions. */
+    const result = compileStyles({
+      children: [],
+      id: "box",
+      style: { "@(min-width: 700px)": { ".child": { ":hover": { color: "blue" } } } },
+      tagName: "div",
+    } as never);
+    expect(result).toContain("@media (min-width: 700px) { #box.child:hover { color: blue } }");
+  });
+
+  test("at-rules compose to any depth, in either order", () => {
+    const result = compileStyles({
+      children: [],
+      id: "box",
+      style: {
+        ":hover": { "@supports (display: grid)": { "@(min-width: 1px)": { display: "grid" } } },
+      },
+      tagName: "div",
+    } as never);
+    expect(result).toContain(
+      "@supports (display: grid) { @media (min-width: 1px) { #box:hover { display: grid } } }",
+    );
+  });
+
+  test("a component's nested selector recurses too", () => {
+    // `buildComponentCSS` emitted exactly one level and dropped whatever was below it.
+    const css = buildComponentCSS("my-el", { "& .inner": { ":hover": { color: "blue" } } });
+    expect(css).toContain("my-el .inner:hover { color: blue }");
+  });
+
+  test(":host is still translated, in both modes", () => {
+    // The one top-level key that does NOT resolve like ordinary nesting.
+    expect(buildComponentCSS("my-el", { ":host(.wide)": { gap: "1rem" } })).toContain(
+      "my-el.wide { gap: 1rem }",
+    );
+    expect(
+      buildComponentCSS("my-el", { ":host(.wide)": { gap: "1rem" } }, null, {}, "open"),
+    ).toContain(":host(.wide) { gap: 1rem }");
   });
 });
 
@@ -213,7 +259,7 @@ describe("buildComponentCSS — media blocks", () => {
       "@--mobile": "not-an-object",
       color: "red",
     } as any);
-    expect(css).toContain("color: red;");
+    expect(css).toContain("my-el { color: red }");
     expect(css).not.toContain("@media");
     expect(css).not.toContain("not-an-object");
   });

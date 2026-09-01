@@ -6,7 +6,7 @@
  */
 import "./with-dom.js";
 import { beforeAll, describe, expect, test } from "bun:test";
-import { buildScope } from "@jxsuite/runtime";
+import { applyStyle, buildScope, documentStyleText, resetDocumentStyles } from "@jxsuite/runtime";
 import { applyIframePatch } from "../src/canvas/iframe-patch";
 import { serializeJxPath } from "../src/canvas/path-mapping";
 import { getNodeAtPath } from "../src/state";
@@ -38,6 +38,7 @@ beforeAll(async () => {
  * and top-level `textContent`/`style` are mirrored — enough to exercise the in-place patcher.
  */
 function mount(doc: JxMutableNode): { container: HTMLElement; shadow: JxMutableNode } {
+  resetDocumentStyles();
   const shadow = structuredClone(doc);
   const container = document.createElement("div");
   const root = document.createElement(doc.tagName as string);
@@ -49,9 +50,8 @@ function mount(doc: JxMutableNode): { container: HTMLElement; shadow: JxMutableN
       el.textContent = kid.textContent;
     }
     if (kid.style && typeof kid.style === "object") {
-      for (const [k, v] of Object.entries(kid.style)) {
-        el.style.setProperty(k, String(v));
-      }
+      // The full render emits rules, not inline declarations — so the harness must too.
+      applyStyle(el, kid.style);
     }
     root.append(el);
   }
@@ -61,6 +61,17 @@ function mount(doc: JxMutableNode): { container: HTMLElement; shadow: JxMutableN
 
 function elAt(container: HTMLElement, path: (string | number)[]): HTMLElement {
   return container.querySelector(`[data-jx-path='${serializeJxPath(path)}']`) as HTMLElement;
+}
+
+/** The rules the stylesheet engine holds for one element — the replacement for `el.style`. */
+function cssFor(el: HTMLElement): string {
+  const handle = `[data-jx="${el.dataset.jx}"]`;
+  return el.dataset.jx === undefined
+    ? ""
+    : documentStyleText()
+        .split("\n")
+        .filter((line) => line.includes(handle))
+        .join("\n");
 }
 
 const BASE: JxMutableNode = {
@@ -83,9 +94,8 @@ describe("applyIframePatch — set-style", () => {
     applyIframePatch(shadow, [op], container);
 
     const el = elAt(container, ["children", 0]);
-    expect(el.style.color).toBe("blue");
-    expect(el.style.fontWeight).toBe("700");
-    // The previous inline color was cleared, not merged.
+    // The previous rule set was released, not merged.
+    expect(cssFor(el)).toBe(`[data-jx="${el.dataset.jx}"] { color: blue; font-weight: 700 }`);
     expect((shadow.children as JxMutableNode[])[0]!.style).toEqual({
       color: "blue",
       fontWeight: "700",
@@ -103,28 +113,28 @@ describe("applyIframePatch — set-style", () => {
     applyIframePatch(shadow, [op], container);
 
     const el = elAt(container, ["children", 0]);
-    expect(el.style.color).toBe(""); // Template value blanked.
-    expect(el.style.fontSize).toBe("12px");
+    // Template value blanked by the edit-mode transform, so no declaration is emitted for it.
+    expect(cssFor(el)).toBe(`[data-jx="${el.dataset.jx}"] { font-size: 12px }`);
   });
 
-  test("clearing the style empties the element's inline style", () => {
+  test("clearing the style releases the element's rules", () => {
     const { container, shadow } = mount(BASE);
     applyIframePatch(
       shadow,
       [{ key: "style", op: "set-key", path: ["children", 0], value: {} }],
       container,
     );
-    expect(elAt(container, ["children", 0]).style.color).toBe("");
+    expect(documentStyleText()).toBe("");
   });
 
-  test("a non-object style value clears the element's inline style", () => {
+  test("a non-object style value releases the element's rules", () => {
     const { container, shadow } = mount(BASE);
     applyIframePatch(
       shadow,
       [{ key: "style", op: "set-key", path: ["children", 0], value: null }],
       container,
     );
-    expect(elAt(container, ["children", 0]).style.color).toBe("");
+    expect(documentStyleText()).toBe("");
   });
 
   test("threads the doc's $media so an @--md block keeps a valid @media query (not `@media md`)", async () => {
@@ -147,12 +157,7 @@ describe("applyIframePatch — set-style", () => {
     };
     applyIframePatch(shadow, [op], container, mediaCtx);
 
-    const el = elAt(container, ["children", 0]);
-    const styleTag = document.head.querySelector(
-      `style[data-jx-owner="${el.dataset.jx}"]`,
-    ) as HTMLStyleElement;
-    expect(styleTag).toBeTruthy();
-    const css = styleTag.textContent ?? "";
+    const css = cssFor(elAt(container, ["children", 0]));
     // The named breakpoint resolved to its real query — NOT the invalid `@media --md` (the form
     // Emitted when the map is empty / not threaded).
     expect(css).toContain("@media (min-width: 768px)");

@@ -74,19 +74,18 @@ const { initLayers } = await import("../src/ui/layers");
 // ─── Stylebook doc transforms ────────────────────────────────────────────────
 
 describe("transposeStylebookStyle gaps", () => {
-  test("media blocks nested inside a hoisted tag-media rule are stripped", () => {
+  test("a media block nested inside a tag rule keeps whatever nests inside IT", () => {
+    // The hoist used to flatten this to one level and strip the inner query. Both survive now.
     const out = transposeStylebookStyle({
       p: {
-        "@--sm": {
-          color: "red",
-          "@--nested": { color: "blue" }, // Already-hoisted media can't nest deeper.
-        },
+        "@--sm": { "@--nested": { color: "blue" }, color: "red" },
         margin: "0",
       },
     } as never) as Record<string, any>;
-    expect(out["& .element-card-preview p"]).toEqual({ margin: "0" });
-    expect(out["@--sm"]["& .element-card-preview p"]).toEqual({ color: "red" });
-    expect(JSON.stringify(out)).not.toContain("@--nested");
+    expect(out["& .element-card-preview p"]).toEqual({
+      "@--sm": { "@--nested": { color: "blue" }, color: "red" },
+      margin: "0",
+    });
   });
 
   test("top-level non-tag selectors pass through untransformed", () => {

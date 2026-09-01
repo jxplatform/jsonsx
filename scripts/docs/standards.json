@@ -51,6 +51,12 @@
       "url": "https://www.w3.org/TR/css-contain-3/"
     },
     {
+      "id": "CSS Nesting",
+      "org": "W3C",
+      "title": "CSS Nesting Module",
+      "url": "https://www.w3.org/TR/css-nesting-1/"
+    },
+    {
       "id": "CSS Scoping",
       "org": "W3C",
       "title": "CSS Scoping Module Level 1",
