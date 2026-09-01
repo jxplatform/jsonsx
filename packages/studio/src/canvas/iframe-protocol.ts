@@ -71,7 +71,16 @@ export interface SyncedChord {
 /** One node the comparison says changed, addressed in THIS artboard's document. */
 export interface WireDiffMark {
   path: (string | number)[];
-  kind: "added" | "removed" | "modified";
+  /**
+   * How to draw it.
+   *
+   * A modification is ONE change with two faces, and the artboard it is drawn on decides which:
+   * `modified-before` on the committed side, `modified-after` on the working copy. The parent
+   * splits them when it hands each artboard its own marks, because the frame does not know which
+   * side it is. Marked identically on both, a modification read as "added" on the left — the green
+   * of the added colour over the text that is being replaced.
+   */
+  kind: "added" | "removed" | "modified-before" | "modified-after";
 }
 
 /** An artboard's whole mark set. Each side receives only its own; `[]` clears. */

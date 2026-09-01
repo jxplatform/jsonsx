@@ -90,7 +90,12 @@ const modified = (i: number) => ({
 });
 
 const draw = (paneId: string) => renderInto(diffToolbarTpl(paneId));
-const radios = (el: HTMLElement) => [...el.querySelectorAll("[role='radio']")] as HTMLElement[];
+/* By ELEMENT, not by `[role='radio']`. The template sets that role, and `sp-action-button`
+   overwrites it with `role="button"` plus `aria-pressed` once Spectrum upgrades the element — which
+   happy-dom never does, so a role selector passes here and finds nothing in a browser. The
+   assertions below read `aria-checked`, which the template owns and which survives. */
+const radios = (el: HTMLElement) =>
+  [...el.querySelectorAll(".diff-view sp-action-button")] as HTMLElement[];
 
 beforeEach(() => {
   resetDiffViews();
@@ -110,6 +115,13 @@ describe("what the toolbar says", () => {
     setDiffChangeMap("primary", mapOf([modified(0), modified(1), modified(2)]));
     const el = await draw("primary");
     expect(el.textContent).toContain("3 changes");
+  });
+
+  test("counts one change in the singular", async () => {
+    setDiffChangeMap("primary", mapOf([modified(0)]));
+    const el = await draw("primary");
+    expect(el.textContent).toContain("1 change");
+    expect(el.textContent).not.toContain("1 changes");
   });
 
   test("switches to a position once stepping", async () => {
@@ -153,6 +165,7 @@ describe("what the toolbar says", () => {
     const el = await draw("primary");
     expect(el.querySelector(".diff-view-static")?.textContent).toBe("Code");
     expect(radios(el)).toHaveLength(0);
+    expect(el.textContent).toContain("Changed lines are marked");
   });
 
   test("the Code button switches the view and rebuilds the stage", async () => {

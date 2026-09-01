@@ -132,3 +132,39 @@ describe("openDiffTab", () => {
     expect(opened).toHaveLength(1);
   });
 });
+
+describe("what has a visual half", () => {
+  test("a page or component does", () => {
+    expect(canRenderComparison("pages/index.json")).toBe(true);
+    expect(canRenderComparison("components/card.json")).toBe(true);
+  });
+
+  test("a .json that CONFIGURES the project does not", () => {
+    /* Found in a browser: `package.json` took the visual half on the strength of its extension,
+       drew whatever the runtime makes of an object with no `tagName`, and reported a dependency
+       bump as "document settings changed" — every one of its keys being the root's. */
+    expect(canRenderComparison("package.json")).toBe(false);
+    expect(canRenderComparison("tsconfig.json")).toBe(false);
+    expect(canRenderComparison("sites/x/package.json")).toBe(false);
+  });
+
+  test("a generated schema document does not either", () => {
+    expect(canRenderComparison("project.schema.json")).toBe(false);
+    expect(canRenderComparison("document.schema.json")).toBe(false);
+  });
+});
+
+describe("files outside the project", () => {
+  test("are refused by name rather than as a failed read", () => {
+    /* `git status` runs in the project root, so a project nested in a larger repository lists real
+       changes above itself. The server refuses a `..` in a git path outright — a traversal guard
+       worth keeping — so the click has to explain rather than fail. */
+    expect(comparisonRefusal("../bun.lock", "M")).toContain("outside this project");
+    expect(comparisonRefusal("../packages/studio/src/x.ts", "M")).toContain("outside this project");
+  });
+
+  test("a path merely containing dots is fine", () => {
+    expect(comparisonRefusal("pages/my..page.json", "M")).toBeNull();
+    expect(comparisonRefusal("a/b/c.json", "M")).toBeNull();
+  });
+});

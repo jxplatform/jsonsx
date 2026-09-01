@@ -38,7 +38,7 @@ import { shell } from "../src/shell";
 import { setFormats } from "../src/format/format-host";
 import { setEditZoom } from "../src/canvas/canvas-utils";
 import { resetEditWidths, setEditWidth } from "../src/canvas/edit-width";
-import { resetDiffViews, setDiffView } from "../src/canvas/diff-view";
+import { diffChangeMapOf, diffViewOf, resetDiffViews, setDiffView } from "../src/canvas/diff-view";
 import { MARKDOWN_FORMAT } from "./format-fixture";
 import { createCommandRegistry } from "../src/commands/registry";
 import { makeContext } from "../src/commands/context";
@@ -134,6 +134,11 @@ interface FakeDiffEditor {
   setModel: (model: { original: FakeModel; modified: FakeModel } | null) => void;
 }
 const createdDiffEditors: FakeDiffEditor[] = [];
+/** What each `mountIframeCanvas` was told beyond the four arguments the DOM double needs. */
+const mountCalls: {
+  diffMarks: { kind: string; path: unknown[] }[] | null;
+  modeOverride: string | null;
+}[] = [];
 
 /**
  * Wait until the source editor's floating mount has actually landed.
@@ -294,7 +299,16 @@ void mock.module("../src/canvas/iframe-host.js", () => ({
     doc: JxMutableNode,
     canvas: HTMLElement,
     widthPx?: number | null,
-  ) => iframeImpl(gen, doc, canvas, widthPx),
+    _tabId?: string | null,
+    _viewTab?: unknown,
+    modeOverride?: string | null,
+    diffMarks?: { kind: string; path: unknown[] }[] | null,
+  ) => {
+    // The later arguments are recorded rather than forwarded: `iframeImpl` is the DOM double and
+    // Takes four, but the per-artboard facts a git-diff render carries are only observable here.
+    mountCalls.push({ diffMarks: diffMarks ?? null, modeOverride: modeOverride ?? null });
+    return iframeImpl(gen, doc, canvas, widthPx);
+  },
   // `insert.openSlashMenu`'s poster; a PARTIAL mock of a module the graph reaches is a load
   // Error, not a missing stub at call time.
   postOpenSlash: () => {},
@@ -534,6 +548,7 @@ beforeEach(() => {
   createdModels.length = 0;
   createdEditors.length = 0;
   createdDiffEditors.length = 0;
+  mountCalls.length = 0;
   canvasPanels.length = 0;
   surface.prevCanvasMode = null;
   surfaceForPane("primary").panzoomWrap = null;
@@ -2875,5 +2890,83 @@ describe("a derived pane's stage", () => {
     expect(wrap.textContent).toContain("Looking for something to show here…");
     expect(renderWelcome).not.toHaveBeenCalledWith(wrap);
     wrap.remove();
+  });
+});
+
+describe("git-diff · a comparison with no visual half", () => {
+  /* All three of these were found in a browser, not by a test, and two of them could only be found
+     there: happy-dom performs no layout, so a container that mounts at zero width looks identical
+     to one that does not. */
+
+  test("a non-document .json forces the Code view without storing a choice", async () => {
+    openSyncedTab();
+    setMode("git-diff");
+    ctx.gitDiffState = {
+      currentContent: '{"name":"x","version":"2"}',
+      filePath: "package.json",
+      originalContent: '{"name":"x","version":"1"}',
+    };
+    renderCanvas();
+    await flush();
+    // Code, though nobody chose it…
+    expect(createdDiffEditors).toHaveLength(1);
+    expect(canvasPanels.length).toBe(0);
+    // …and the choice is not written, so the next document still opens Visual.
+    expect(diffViewOf("primary")).toBe("visual");
+  });
+
+  test("its change map is cleared, so the toolbar offers no dead Visual button", async () => {
+    openSyncedTab();
+    setMode("git-diff");
+    ctx.gitDiffState = {
+      currentContent: "{}",
+      filePath: "package.json",
+      originalContent: "{}",
+    };
+    renderCanvas();
+    await flush();
+    expect(diffChangeMapOf("primary")).toBeNull();
+  });
+
+  test("the mount guard agrees with the branch that built its container", async () => {
+    /* The guard used to ask only "did the author choose Code", while the branch asked "is there a
+       visual half OR did they choose Code". For a file with no visual half the branch built the
+       container and the guard then refused to mount into it: an empty stage and no error. */
+    openSyncedTab();
+    setMode("git-diff");
+    ctx.gitDiffState = {
+      currentContent: "b",
+      filePath: "notes.txt",
+      originalContent: "a",
+    };
+    renderCanvas();
+    await flush();
+    expect(createdDiffEditors).toHaveLength(1);
+    expect(createdDiffEditors[0]!.getModel()?.original.getValue()).toBe("a");
+  });
+
+  test("a modification wears a different face on each artboard", async () => {
+    // Marked identically on both, it read as "added" on the left: the green of the added colour
+    // Over the very text being replaced.
+    openSyncedTab();
+    setMode("git-diff");
+    ctx.gitDiffState = {
+      currentContent: JSON.stringify({
+        children: [{ tagName: "p", textContent: "after" }],
+        tagName: "div",
+      }),
+      filePath: "/project/index.json",
+      originalContent: JSON.stringify({
+        children: [{ tagName: "p", textContent: "before" }],
+        tagName: "div",
+      }),
+    };
+    renderCanvas();
+    await flush();
+    const kinds = mountCalls
+      .slice(-2)
+      .map((c) => (c.diffMarks ?? []).map((m: { kind: string }) => m.kind));
+    expect(kinds[0]).toEqual(["modified-before"]);
+    expect(kinds[1]).toEqual(["modified-after"]);
   });
 });

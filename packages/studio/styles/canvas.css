@@ -747,13 +747,24 @@
 /* The Code half of a comparison: one Monaco diff editor filling the stage, no artboards and no
    pan/zoom. It follows the CHROME theme rather than the canvas ramp, because a code editor is
    chrome; the artboards beside it in Visual are the author's document and always render light. */
+/* `width`, `flex` and `min-width` are all three load-bearing, and their absence is a bug that only
+   a browser could show: the stage is a flex container, so a child with no width and no grow
+   collapses to its CONTENT width — and Monaco's internals are absolutely positioned, so they
+   contribute none. The editor mounted at 0px wide and painted its gutter and nothing else, which
+   reads as "the diff has no text" rather than as a layout fault. `.source-wrap` above carries the
+   same three for the same reason; happy-dom performs no layout, so no unit test can tell these
+   apart. */
 .diff-code-wrap {
   display: flex;
   flex-direction: column;
+  width: 100%;
   height: 100%;
+  flex: 1;
+  min-width: 0;
   padding-top: 40px;
 }
 .diff-code-editor {
   flex: 1;
+  min-width: 0;
   min-height: 0;
 }

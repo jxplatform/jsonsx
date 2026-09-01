@@ -1866,7 +1866,13 @@ export async function handleStudioApi(
         if (fp.includes("..")) {
           return problem("invalidRequest", "Invalid path");
         }
-        const content = await runGit(["show", `${ref}:${fp}`]);
+        /* `./` IS LOAD-BEARING. `git show <rev>:<path>` resolves <path> from the REPOSITORY ROOT,
+           whatever the cwd is; only a `./` prefix makes it relative to the cwd. Every other verb
+           here — status, diff, checkout — is cwd-relative, and so is the `readFile` the studio
+           pairs this with, so without it a project nested inside its repo compared two DIFFERENT
+           FILES: the working copy of `examples/package.json` against the committed root
+           `package.json`, with no error anywhere and a plausible-looking diff. */
+        const content = await runGit(["show", `${ref}:./${fp}`]);
         return Response.json({ content });
       }
 

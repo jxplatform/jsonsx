@@ -71,7 +71,7 @@ describe("applyDiffMarks", () => {
 
   test("replaces the whole set, so a render with no marks clears the last one's", () => {
     const root = stamped([["children", 0]]);
-    applyDiffMarks(root, [{ kind: "modified", path: ["children", 0] }]);
+    applyDiffMarks(root, [{ kind: "modified-after", path: ["children", 0] }]);
     applyDiffMarks(root, null);
     expect(at(root, ["children", 0])?.dataset.jxDiff).toBeUndefined();
   });
@@ -84,7 +84,7 @@ describe("applyDiffMarks", () => {
     const section = document.createElement("section");
     section.dataset.jxPath = serializeJxPath(["children", 0]);
     root.append(section);
-    applyDiffMarks(root, [{ kind: "modified", path: ["children", 0, "children", 3] }]);
+    applyDiffMarks(root, [{ kind: "modified-after", path: ["children", 0, "children", 3] }]);
     expect(section.dataset.jxDiffWithin).toBe("");
     expect(section.dataset.jxDiff).toBeUndefined();
   });
@@ -101,7 +101,7 @@ describe("applyDiffMarks", () => {
     const section = document.createElement("section");
     section.dataset.jxPath = serializeJxPath(["children", 0]);
     root.append(section);
-    applyDiffMarks(root, [{ kind: "modified", path: ["children", 0, "children", 3] }]);
+    applyDiffMarks(root, [{ kind: "modified-after", path: ["children", 0, "children", 3] }]);
     applyDiffMarks(root, []);
     expect(section.dataset.jxDiffWithin).toBeUndefined();
   });

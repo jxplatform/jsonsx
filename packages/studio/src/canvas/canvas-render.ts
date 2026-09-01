@@ -35,8 +35,9 @@ import {
 } from "../commands/command-args";
 import { collabSourceContext } from "../collab/collab-session";
 import { buildChangeMap } from "./diff-marks";
-import type { ChangeMap } from "./diff-marks";
+import type { ChangeMap, ChangeMark } from "./diff-marks";
 import { clearDiffView, diffViewOf, setDiffChangeMap } from "./diff-view";
+import { canRenderComparison } from "../panels/git-diff-open";
 import { renderDiffToolbar, setDiffRepaint, setDiffToolbarHost } from "./diff-toolbar";
 import { attachCursorStyles } from "../collab/monaco-cursors";
 import type { AwarenessLike } from "../collab/monaco-cursors";
@@ -417,6 +418,39 @@ function disposeDiffEditor(surface: CanvasSurface): void {
  * false when the slot is already filled, so a comparison switching to a different file would keep
  * the old editor and its claimed URIs. That one is disposed synchronously, before the await.
  */
+/**
+ * Whether this pane draws the comparison as TEXT.
+ *
+ * One definition, because two callers must never disagree about it: the render branch chooses which
+ * half to build, and the mount's post-await guard re-asks whether that half is still wanted. They
+ * were two spellings — the branch said "not renderable OR the author chose Code", the guard said
+ * only "the author chose Code" — so for a file with no visual half the branch built the Code
+ * container and the guard then refused to mount into it. An empty stage, no error, and a toolbar
+ * correctly describing an editor that was never there.
+ */
+/**
+ * One artboard's marks, with a modification given the face that side wears.
+ *
+ * {@link ChangeMap} names a modification once, semantically; the two artboards draw it as the before
+ * and the after. The split happens here because this is the only place that knows which document
+ * each mark set is about to be painted on.
+ */
+function sideMarks(
+  marks: readonly ChangeMark[] | undefined,
+  modified: "modified-before" | "modified-after",
+): WireDiffMarks | null {
+  return (
+    marks?.map((mark) => ({
+      kind: mark.kind === "modified" ? modified : mark.kind,
+      path: mark.path,
+    })) ?? null
+  );
+}
+
+function diffShowsCode(paneId: string, filePath: string): boolean {
+  return !canRenderComparison(filePath) || diffViewOf(paneId) === "code";
+}
+
 async function mountDiffEditor(
   surface: CanvasSurface,
   container: Element,
@@ -432,7 +466,7 @@ async function mountDiffEditor(
     !mountStillWanted(
       container,
       surface.monacoDiffEditor,
-      () => canvasModeOfPane(paneId) === "git-diff" && diffViewOf(paneId) === "code",
+      () => canvasModeOfPane(paneId) === "git-diff" && diffShowsCode(paneId, key),
     )
   ) {
     return;
@@ -1272,7 +1306,19 @@ function renderCanvasImpl(surface: CanvasSurface) {
        line diff from the two texts `readGitDiff` already holds, and draws its own red and green.
        This is the ONLY view for a file the canvas cannot render — a .ts, a .css, a .gitignore — and
        an alternate one for a document it can. */
-    if (diffViewOf(surface.paneId) === "code") {
+    /* A file the canvas cannot DRAW has only the one half, and the renderer is where that is
+       decided rather than the opener: a comparison reaches this branch from three doors (the panel,
+       a Diff lens, the Editor axis) and only this one sees every arrival. Forcing it here also
+       leaves `diffView` alone, so a document opened after a `.css` still comes up Visual. */
+    const renderable = canRenderComparison(gitDiffState.filePath ?? "");
+    if (diffShowsCode(surface.paneId, gitDiffState.filePath ?? "")) {
+      /* A null map is how the toolbar learns there is no visual half to offer: it draws Code as a
+         static label rather than as half of a choice, and reports the line marks instead of a node
+         count. Cleared rather than left, so a pane that compared a document and then a stylesheet
+         does not keep the document's count over the stylesheet's text. */
+      if (!renderable) {
+        setDiffChangeMap(surface.paneId, null);
+      }
       disposeSourceEditor(surface);
       let toolbarEl: HTMLElement | null = null;
       let editorEl: HTMLElement | null = null;
@@ -1394,7 +1440,7 @@ function renderCanvasImpl(surface: CanvasSurface) {
         origPanel as unknown as CanvasPanel,
         featureToggles,
         originalDoc,
-        changeMap?.original ?? null,
+        sideMarks(changeMap?.original, "modified-before"),
         diffGen,
       );
       renderCanvasIntoPanel(
@@ -1402,7 +1448,7 @@ function renderCanvasImpl(surface: CanvasSurface) {
         currPanel as unknown as CanvasPanel,
         featureToggles,
         currentDoc,
-        changeMap?.current ?? null,
+        sideMarks(changeMap?.current, "modified-after"),
         diffGen,
       );
     });

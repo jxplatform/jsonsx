@@ -198,11 +198,24 @@ function viewTpl(paneId: string, hasVisual: boolean): TemplateResult {
  * rather than "0 of 12", because the author is not on a change yet.
  */
 export function diffToolbarTpl(paneId: string): TemplateResult {
-  const total = diffChangeCount(paneId);
-  const index = diffStepOf(paneId);
   const map = diffChangeMapOf(paneId);
-  const label =
-    total === 0 ? "No changes" : index < 0 ? `${total} changes` : `${index + 1} of ${total}`;
+  /* THE COUNT BELONGS TO THE VIEW THAT IS SHOWING, and the two views count different things. The
+     change map counts NODES, which is the right answer for the artboards and the wrong one for a
+     text comparison: a `package.json` whose dependency versions moved has no node change at all —
+     its keys are the ROOT's, and a root key is reported in words rather than tinted — so the Code
+     view sat over a screenful of red and green saying "No changes, document settings changed".
+     Monaco owns the line diff and its own navigation there, so the toolbar states what it is
+     showing and steps out of the way. */
+  const code = diffViewOf(paneId) === "code" || map === null;
+  const total = code ? 0 : diffChangeCount(paneId);
+  const index = code ? -1 : diffStepOf(paneId);
+  const label = code
+    ? "Changed lines are marked"
+    : total === 0
+      ? "No changes"
+      : index < 0
+        ? `${total} ${total === 1 ? "change" : "changes"}`
+        : `${index + 1} of ${total}`;
   const stepper =
     total === 0
       ? nothing
@@ -232,14 +245,14 @@ export function diffToolbarTpl(paneId: string): TemplateResult {
       ${viewTpl(paneId, map !== null)}
       ${total === 0 ? html`<span class="diff-step-count">${label}</span>` : stepper}
       ${
-        map?.degraded
+        !code && map?.degraded
           ? html`<span class="diff-note" title="A group of siblings was too large to pair up"
               >some shown as add/remove</span
             >`
           : nothing
       }
       ${
-        map?.rootKeys.length
+        !code && map?.rootKeys.length
           ? html`<span class="diff-note" title=${`Changed: ${map.rootKeys.join(", ")}`}
               >document settings changed</span
             >`

@@ -141,7 +141,9 @@ export function createGitOps(session: { readonly projectRoot: string | null }) {
 
   async function gitShow(params: { path: string; ref?: string }): Promise<string> {
     const ref = params.ref || "HEAD";
-    return git("show", `${ref}:${params.path}`);
+    // `./` so the path resolves against the project root rather than the repository root. See the
+    // Same call in the dev server's studio API for what it costs to omit.
+    return git("show", `${ref}:./${params.path}`);
   }
 
   async function gitDiscard(params: { files: string[] }): Promise<void> {

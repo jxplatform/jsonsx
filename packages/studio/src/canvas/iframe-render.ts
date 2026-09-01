@@ -349,7 +349,12 @@ export const DIFF_MARK_CSS = `
   border-left-color: #c9252d;
   background: color-mix(in srgb, #c9252d 12%, transparent);
 }
-[data-jx-diff="modified"] {
+[data-jx-diff="modified-before"] {
+  border-left-style: dashed;
+  border-left-color: #c9252d;
+  background: color-mix(in srgb, #c9252d 8%, transparent);
+}
+[data-jx-diff="modified-after"] {
   border-left-style: dashed;
   border-left-color: #0a7c42;
   background: color-mix(in srgb, #0a7c42 8%, transparent);

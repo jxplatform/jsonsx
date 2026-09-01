@@ -4,10 +4,10 @@
   "tolerance": 0.05,
   "budgets": {
     "studio.js": 3000000,
-    "iframe-entry.js": 262000,
+    "iframe-entry.js": 268000,
     "chunks": 12500000,
     "workers": 14000000
   },
   "$was-measuring-the-wrong-thing": "Until now the only budgeted key was studio.js at 14600000, and it was checked on the bundle-analysis lane after `bun run build:metafile` — a single unsplit `bun build` with no splitting and no shared contract, which inlines Monaco and everything else. That lane wrote its output to dist/ too, so it OVERWROTE the release build's studio.js at the same path. The artifact that actually ships is 2.93 MB, five times smaller, and had no ceiling at all; neither did iframe-entry.js, chunks/ or workers/. The metafile lane writes to dist-metafile/ now and the budgets below are measured from `bun run build`.",
-  "$ratchet-iframe-entry": "Change highlighting (git-diff artboards) added DIFF_MARK_CSS, syncDiffCss and applyDiffMarks to iframe-render.ts, moving iframe-entry.js 257959 -> 260075 bytes (+2116, +0.8%). The old 260000 ceiling was then being met on TOLERANCE rather than under the ceiling (100.0%), which is the exact shape the studio.js note below warns about: the next real growth would be absorbed silently. Raised to just above the measured figure so it has to be argued for instead."
+  "$ratchet-iframe-entry": "Change highlighting (git-diff artboards) added DIFF_MARK_CSS, syncDiffCss and applyDiffMarks to iframe-render.ts, moving iframe-entry.js 257959 -> 260075 bytes (+2116, +0.8%). The old 260000 ceiling was then being met on TOLERANCE rather than under the ceiling (100.0%), which is the exact shape the studio.js note below warns about: the next real growth would be absorbed silently. Raised to just above the measured figure so it has to be argued for instead. Then browser verification split a modification into the two faces it wears (red on the committed side, green on the working copy — marked identically it read as 'added' over the very text being replaced), which is one more CSS rule: 260075 -> 266632, and 101.8% of the 262000 set above. Raised again to just above the measured figure, on the same rule: under the ceiling, not on the tolerance."
 }

@@ -32,6 +32,16 @@ import type { Tab } from "../tabs/tab";
  */
 const DIFF_STUB_DOCUMENT = { children: [], tagName: "div" };
 
+/** `.json` files that configure a project rather than being documents of it. */
+const NON_DOCUMENT_JSON = new Set([
+  "bunfig.json",
+  "jsconfig.json",
+  "package-lock.json",
+  "package.json",
+  "tsconfig.json",
+  "wrangler.json",
+]);
+
 /**
  * Whether this path has a visual half: a document the canvas can draw from its text.
  *
@@ -40,6 +50,15 @@ const DIFF_STUB_DOCUMENT = { children: [], tagName: "div" };
  * and its comparison belongs in the Code view.
  */
 export function canRenderComparison(path: string): boolean {
+  /* NOT EVERY `.json` IS A DOCUMENT, and the visual half is meaningless for the ones that are not.
+     `package.json`, `tsconfig.json` and the generated schema files are all `.json` and none of them
+     has a `tagName`; offered a Visual view they draw whatever the runtime makes of an object with
+     no tag, and the change map reports every top-level key as "document settings changed" — which
+     is how a dependency bump came to be described as a settings change. */
+  const name = path.slice(path.lastIndexOf("/") + 1);
+  if (NON_DOCUMENT_JSON.has(name) || name.endsWith(".schema.json")) {
+    return false;
+  }
   return path.endsWith(".json") || Boolean(formatForPath(path));
 }
 
@@ -60,6 +79,14 @@ export function canRenderComparison(path: string): boolean {
  * @returns {string | null}
  */
 export function comparisonRefusal(path: string, fileStatus: string): string | null {
+  /* ABOVE THE PROJECT ROOT. `git status` reports paths relative to the cwd, so a project nested in
+     a larger repository legitimately lists files outside itself — `../bun.lock`, a sibling package.
+     Those are real changes and the panel is right to show them, but a comparison cannot be built:
+     the server refuses a `..` in a git path outright, which is a traversal guard worth keeping.
+     Refused here by name, rather than as a failed read after the click. */
+  if (path.startsWith("../") || path.includes("/../")) {
+    return `"${path}" is outside this project, so its comparison belongs to the project that owns it.`;
+  }
   if (fileStatus === "R") {
     return `A renamed file's comparison needs both paths, and Studio does not model the old name yet.`;
   }
