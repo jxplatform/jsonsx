@@ -1636,6 +1636,39 @@ describe("git-diff mode", () => {
     expect(createdDiffEditors).toHaveLength(1);
   });
 
+  test("retargeting to a different file disposes the old editor before claiming new URIs", async () => {
+    /* The second race, and `mountStillWanted` cannot catch it: that guard answers false when the
+       slot is already filled, so without this the comparison would switch files and keep the old
+       editor, still holding the previous pair of URIs. */
+    openSyncedTab();
+    setMode("git-diff");
+    ctx.gitDiffState = {
+      currentContent: '{"tagName":"div"}',
+      filePath: "one.json",
+      originalContent: '{"tagName":"section"}',
+    };
+    setDiffView("primary", "code");
+    renderCanvas();
+    await flush();
+    const first = createdDiffEditors[0]!;
+    expect(first.dispose).not.toHaveBeenCalled();
+
+    ctx.gitDiffState = {
+      currentContent: '{"tagName":"main"}',
+      filePath: "two.json",
+      originalContent: '{"tagName":"aside"}',
+    };
+    renderCanvas();
+    await flush();
+
+    expect(first.dispose).toHaveBeenCalled();
+    expect(createdDiffEditors).toHaveLength(2);
+    const second = createdDiffEditors[1]!;
+    expect(second.getModel()?.modified.getValue()).toBe('{"tagName":"main"}');
+    // And the new pair of URIs names the new file, not the one the disposed editor held.
+    expect(String(second.getModel()?.original.uri)).toContain("two.json");
+  });
+
   test("switching back to Visual disposes the code editor and draws the artboards", async () => {
     openSyncedTab();
     setMode("git-diff");
