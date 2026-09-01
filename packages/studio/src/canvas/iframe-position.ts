@@ -18,7 +18,7 @@
  * @docs studio/editing/writing
  */
 
-import { parseJxPath, serializeJxPath } from "./path-mapping";
+import { jxPathSelector, parseJxPath, serializeJxPath } from "./path-mapping";
 import type { JxPath } from "../state";
 
 /** A caret/selection endpoint in document coordinates: a block path + a character offset into it. */
@@ -82,11 +82,10 @@ export function activeBlockAt(
 
 /** Locate the rendered element for a document path via its stamped `data-jx-path`. */
 export function elementForPath(container: HTMLElement, path: JxPath): HTMLElement | null {
-  const serialized = serializeJxPath(path);
-  // Wrap in single quotes (the serialized JSON only ever uses double quotes) and escape the few
-  // Characters that could still break out of an attribute-value selector.
-  const esc = serialized.replaceAll("\\", String.raw`\\`).replaceAll("'", String.raw`\'`);
-  const el = container.querySelector(`[data-jx-path='${esc}']`);
+  // The escaping lives in `jxPathSelector`, which the popover work extracted for its own lookup.
+  // This function had the only other copy of it, and two spellings of one escaping rule is how the
+  // Two come to disagree about a path containing a quote.
+  const el = container.querySelector(jxPathSelector(serializeJxPath(path)));
   return el instanceof HTMLElement ? el : null;
 }
 

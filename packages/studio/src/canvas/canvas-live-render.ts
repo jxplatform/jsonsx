@@ -130,12 +130,27 @@ export function markLayoutNodes(node: JxMutableNode, file: string, path: JxPath 
  * editable frame for a document nobody was editing. `canvasModeOfTab(tab)` is the same composition
  * every other gate reads, applied to the tab that is actually being drawn.
  *
+ * **`modeOverride` is the last of those six, and `canvasModeOfTab` is not enough for it.** A LENS
+ * draws the source pane's document in a mode of its own, and that mode is deliberately never
+ * written onto the tab — so `tabOfPane` hops to the source tab and reports ITS mode. A Diff lens
+ * beside a page in Design therefore resolved both of its artboards in `design`: editable frame,
+ * placeholders on, anchors de-linked, and `classifyRenderNode` collapsing repeater hops that the
+ * primary pane's `git-diff` render leaves alone. Two entry points to one comparison disagreed about
+ * both editability and the coordinate space of every stamped path.
+ *
+ * `canvasModeOfPane(paneId)` is the answer, and it degrades to `canvasModeOfTab` for every pane
+ * that is not a lens — so the one production caller passes it unconditionally, the way it already
+ * passes `tabOfPane(surface.paneId)` for `tab`. Null keeps the old derivation for callers with a
+ * tab and no pane.
+ *
  * @param {JxMutableNode} doc
  * @param {Tab | null} tab — the tab whose document and view settings this render is of.
+ * @param {string | null} modeOverride — the PANE's mode, when the caller has resolved one.
  */
 export async function resolveCanvasDocument(
   doc: JxMutableNode,
   tab: Tab | null,
+  modeOverride: string | null = null,
 ): Promise<{
   renderDoc: JxMutableNode;
   docBase: string | undefined;
@@ -145,7 +160,7 @@ export async function resolveCanvasDocument(
   siteStyle: Record<string, unknown> | null;
 }> {
   const S = { documentPath: tab?.documentPath, mode: tab?.doc.mode };
-  const canvasMode = canvasModeOfTab(tab);
+  const canvasMode = modeOverride ?? canvasModeOfTab(tab);
 
   let renderDoc =
     canvasMode === "preview"
@@ -227,8 +242,16 @@ export async function resolveCanvasDocument(
     }
   }
 
+  /* THE CONDITION IS "did `prepareForEditMode` run", not a list of modes, and the two had drifted.
+     `prepareForEditMode` above builds a repeater perimeter for EVERY non-preview mode, and
+     `arrayPaths` is what tells `classifyRenderNode` to collapse that perimeter's template hop back
+     into a `map` segment. Naming two of those modes here meant a git-diff artboard grew the
+     perimeters and then stamped every node under a `$prototype: "Array"` with the RENDER path
+     instead of a document path — an address no document-space caller can resolve, which is exactly
+     what a diff mark is. Stylebook and grid never reach this function with an array document, so
+     the widening is only observable in git-diff. */
   const arrayPaths = new Set<string>();
-  if (canvasMode === "design" || canvasMode === "edit") {
+  if (canvasMode !== "preview") {
     (function findArrayPaths(node: JxMutableNode, path: (string | number)[]) {
       if (!node || typeof node !== "object") {
         return;

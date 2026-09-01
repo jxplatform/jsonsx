@@ -23,11 +23,16 @@ import type { JxExpressionNode, JxMutableNode } from "@jxsuite/schema/types";
  */
 export type WireDocOp = JxDocOp;
 
-export const CANVAS_MODES = ["preview", "design", "edit", "stylebook"] as const;
+export const CANVAS_MODES = ["preview", "design", "edit", "stylebook", "git-diff"] as const;
 
 /**
- * How the iframe renders the document: live `preview`, instrumented `design`/`edit`, or the
- * `stylebook` specimen catalog (hit/hover/measure only — no inline editing, DnD, or insert zones).
+ * How the iframe renders the document: live `preview`, instrumented `design`/`edit`, the
+ * `stylebook` specimen catalog (hit/hover/measure only — no inline editing, DnD, or insert zones),
+ * or a `git-diff` comparison artboard (a read-only render carrying {@link WireDiffMarks}).
+ *
+ * `git-diff` was reaching the frame long before it was listed here: `preparePassRender` casts the
+ * resolved mode with `as CanvasMode`, so the one mode this union did not admit crossed the wire
+ * anyway and `isCanvasMode` answered false for a mode the frame was actively rendering.
  */
 export type CanvasMode = (typeof CANVAS_MODES)[number];
 
@@ -62,6 +67,24 @@ export interface SyncedChord {
   chord: string;
   scope: "caret" | "canvas" | "global";
 }
+
+/** One node the comparison says changed, addressed in THIS artboard's document. */
+export interface WireDiffMark {
+  path: (string | number)[];
+  /**
+   * How to draw it.
+   *
+   * A modification is ONE change with two faces, and the artboard it is drawn on decides which:
+   * `modified-before` on the committed side, `modified-after` on the working copy. The parent
+   * splits them when it hands each artboard its own marks, because the frame does not know which
+   * side it is. Marked identically on both, a modification read as "added" on the left — the green
+   * of the added colour over the text that is being replaced.
+   */
+  kind: "added" | "removed" | "modified-before" | "modified-after";
+}
+
+/** An artboard's whole mark set. Each side receives only its own; `[]` clears. */
+export type WireDiffMarks = readonly WireDiffMark[];
 
 /** Messages the editor (parent) sends into the canvas iframe. */
 export type ParentToIframe =
@@ -102,6 +125,17 @@ export type ParentToIframe =
       // Forced color-scheme preview (spec §9.5): "light"/"dark" sets data-color-scheme on the
       // Iframe root, null clears it (auto — follow the OS).
       colorScheme: "light" | "dark" | null;
+      /**
+       * Which nodes to tint on a `git-diff` artboard, in this side's own coordinates.
+       *
+       * A FIELD ON THE RENDER, not a message of its own, and the reason is ordering. A render ends
+       * in `container.replaceChildren(el)`, which destroys the DOM any earlier mark was stamped on
+       * — so a separate message would need its own generation, a queue for arriving early, and a
+       * re-apply hook after every render, three mechanisms to reproduce what carrying the data
+       * already guarantees. The transport settles it too: a host holds ONE `pending` message while
+       * its iframe boots, so a marks message posted beside a queued render would replace it.
+       */
+      diffMarks?: WireDiffMarks | null;
       /**
        * Which popover the artboard draws OPEN, by document path — absent or null for none.
        *

@@ -118,6 +118,7 @@ const KNOWN_UNREACHABLE: Record<string, Record<string, string>> = {
       "fit itself; the distinction is real but has no reader while zoom-to-fit is still moving",
     resetFits: TEST_RESET,
   },
+  "canvas/diff-view.ts": { resetDiffViews: TEST_RESET },
   "canvas/edit-width.ts": { resetEditWidths: TEST_RESET },
   "canvas/iframe-channel.ts": {
     fakeChannelPair:

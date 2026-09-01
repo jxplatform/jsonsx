@@ -1,9 +1,16 @@
 ---
 title: "Source control"
 description: "The Source Control panel in Jx Studio: review and stage changes, commit and sync, switch branches, pull safely, and browse your project's history."
+spec:
+  - studio.md#5.5
+  - studio.md#21
 code:
   - packages/studio/src/panels/git-panel.ts
   - packages/studio/src/packages/pull-package-sync.ts
+  - packages/studio/src/panels/git-diff-open.ts
+  - packages/studio/src/canvas/diff-marks.ts
+  - packages/studio/src/canvas/diff-toolbar.ts
+  - packages/studio/src/canvas/diff-view.ts
 ---
 
 # Source control
@@ -18,15 +25,34 @@ With no project open at all, the panel says what source control is for and offer
 
 ## Review your changes
 
-The **Local Changes** tab lists every changed file, grouped by the part of the project it belongs to. Each row shows the file's name and a status badge: **M** for modified, **A** for added, **U** for a brand-new untracked file.
+The **Local Changes** tab lists every changed file, grouped by the part of the project it belongs to. Each row shows the file's name and a status badge: **M** for modified, **A** for added, **D** for deleted, **U** for a brand-new untracked file.
 
-- Click a changed file to see what changed since your last commit: the pane switches to its **Diff** editor, at full pane size. Put it in a [second pane](/docs/studio/interface/tabs#two-panes) with :kbd[⌘\] and the review sits beside the page it is about, both live.
+- Click any changed file to see what changed since your last commit: the pane switches to its **Diff** editor, at full pane size. Put it in a [second pane](/docs/studio/interface/tabs#two-panes) with :kbd[⌘\] and the review sits beside the page it is about, both live.
+- Every row opens, whatever kind of file it is. A page or a component opens as a picture of the change; a stylesheet, a script or a config file opens as text. Deleted and brand-new files open too, with one side empty.
 - Click **+** on a row to stage it (mark it for the next commit), or the header's stage-all button to stage everything. Staged files move to a **Staged Changes** section, where **−** unstages them, and an unstage-all button beside its count clears the section.
 - Click the undo icon on a row to discard its changes. Studio asks for confirmation first. An untracked file has nothing to go back to, so its undo icon is disabled rather than offering to throw the file away.
 
 :::doc-warning
 **Discard** permanently throws away a file's changes since the last commit. There is no undo beyond the confirmation dialog.
 :::
+
+## Read a change
+
+The Diff editor compares your working copy against your last commit. It shows the change two ways, and the switch above the comparison chooses between them.
+
+**Visual** draws the page twice, side by side: the committed version on the left and your version on the right. Added blocks are marked in green, removed blocks in red, and edited ones are marked on both sides so you can read the before and the after together. Each mark also carries a symbol and its own edge style, so the change is legible without relying on colour.
+
+**Code** shows the file's text instead, with changed lines highlighted the way any code editor shows them. A page can be read either way. A file with no visual form, such as a stylesheet or a script, opens straight into Code and the switch reads as a label.
+
+:::doc-note
+The two views answer different questions and neither replaces the other. Visual tells you what moved on the page. Code tells you exactly which characters changed. Some changes are visible in one and not the other: reordering a key, or editing something inside a component, can leave the page looking identical while the text plainly differs.
+:::
+
+Use **Next change** and **Previous change**, or :kbd[F7] and :kbd[⇧F7], to walk the changes in order. The counter beside them says where you are. Both sides of the comparison move together, so the block you are reading stays lined up. The stepper stops at the last change rather than looping back to the first.
+
+The comparison keeps up with your work. Saving the file you are reviewing, committing, discarding, pulling or switching branches all refresh it, and your place in the change list is kept rather than reset. A file you have just committed has nothing left to compare, and the pane says so.
+
+Two kinds of change cannot be opened, and the panel says which. A **renamed** file needs both of its names to be compared and only the new one is recorded. An **image** or other binary file has no text on either side.
 
 ## Commit and sync
 

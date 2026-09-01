@@ -65,6 +65,14 @@ const ALLOWED_HEX = new Set([
      theme-responsive chrome colour. */
   "#808080",
   "#fff",
+  /* Iframe-render.ts DIFF_MARK_CSS: the change marks on the git-diff artboards, in that same
+     separate document. They cannot be --success/--danger, which are the near-white-on-dark chrome
+     tints — `.canvas-panel-viewport` pins `background: white; color-scheme: light` whatever the
+     chrome theme is, so the marks are always drawn on white and this pair is chosen against it.
+     Colour is never the only encoding: each kind also carries its own border-left-style, which is
+     what survives the forced-colours block beside them. */
+  "#0a7c42",
+  "#c9252d",
 ]);
 
 /** Files where a hex is a colour _value_ (user data), not chrome styling. */

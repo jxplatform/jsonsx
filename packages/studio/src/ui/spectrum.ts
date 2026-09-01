@@ -87,6 +87,7 @@ import { IconViewGrid } from "@spectrum-web-components/icons-workflow/src/elemen
 import { IconBrackets } from "@spectrum-web-components/icons-workflow/src/elements/IconBrackets.js";
 import { IconData } from "@spectrum-web-components/icons-workflow/src/elements/IconData.js";
 import { IconChevronDown } from "@spectrum-web-components/icons-workflow/src/elements/IconChevronDown.js";
+import { IconChevronUp } from "@spectrum-web-components/icons-workflow/src/elements/IconChevronUp.js";
 import { IconDelete } from "@spectrum-web-components/icons-workflow/src/elements/IconDelete.js";
 import { IconClose } from "@spectrum-web-components/icons-workflow/src/elements/IconClose.js";
 import { IconChevronRight } from "@spectrum-web-components/icons-workflow/src/elements/IconChevronRight.js";
@@ -236,6 +237,7 @@ const components = [
   ["sp-icon-brackets", IconBrackets],
   ["sp-icon-data", IconData],
   ["sp-icon-chevron-down", IconChevronDown],
+  ["sp-icon-chevron-up", IconChevronUp],
   ["sp-icon-chevron-right", IconChevronRight],
   ["sp-icon-delete", IconDelete],
   ["sp-icon-close", IconClose],

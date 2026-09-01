@@ -38,6 +38,7 @@ import { shell } from "../src/shell";
 import { setFormats } from "../src/format/format-host";
 import { setEditZoom } from "../src/canvas/canvas-utils";
 import { resetEditWidths, setEditWidth } from "../src/canvas/edit-width";
+import { diffChangeMapOf, diffViewOf, resetDiffViews, setDiffView } from "../src/canvas/diff-view";
 import { MARKDOWN_FORMAT } from "./format-fixture";
 import { createCommandRegistry } from "../src/commands/registry";
 import { makeContext } from "../src/commands/context";
@@ -123,6 +124,21 @@ interface FakeEditor {
 }
 const createdModels: FakeModel[] = [];
 const createdEditors: FakeEditor[] = [];
+interface FakeDiffEditor {
+  _model: { original: FakeModel; modified: FakeModel } | null;
+  _options: Record<string, unknown>;
+  _diffKey?: string;
+  container: HTMLElement;
+  dispose: ReturnType<typeof mock>;
+  getModel: () => { original: FakeModel; modified: FakeModel } | null;
+  setModel: (model: { original: FakeModel; modified: FakeModel } | null) => void;
+}
+const createdDiffEditors: FakeDiffEditor[] = [];
+/** What each `mountIframeCanvas` was told beyond the four arguments the DOM double needs. */
+const mountCalls: {
+  diffMarks: { kind: string; path: unknown[] }[] | null;
+  modeOverride: string | null;
+}[] = [];
 
 /**
  * Wait until the source editor's floating mount has actually landed.
@@ -225,6 +241,23 @@ void mock.module("monaco-editor/editor", () => ({
       createdModels.push(m);
       return m;
     },
+    /* The comparison's editor. A DIFFERENT Monaco type from `create` above: it owns two models
+       rather than one, and disposing it has to dispose both or their URIs stay claimed and the next
+       mount throws on a URI nobody can see. */
+    createDiffEditor: (container: HTMLElement, options: Record<string, unknown>) => {
+      const ed: FakeDiffEditor = {
+        _model: null,
+        _options: options,
+        container,
+        dispose: mock(() => {}),
+        getModel: () => ed._model,
+        setModel: (model: { original: FakeModel; modified: FakeModel } | null) => {
+          ed._model = model;
+        },
+      };
+      createdDiffEditors.push(ed);
+      return ed;
+    },
     setModelMarkers: () => {},
   },
 }));
@@ -266,7 +299,16 @@ void mock.module("../src/canvas/iframe-host.js", () => ({
     doc: JxMutableNode,
     canvas: HTMLElement,
     widthPx?: number | null,
-  ) => iframeImpl(gen, doc, canvas, widthPx),
+    _tabId?: string | null,
+    _viewTab?: unknown,
+    modeOverride?: string | null,
+    diffMarks?: { kind: string; path: unknown[] }[] | null,
+  ) => {
+    // The later arguments are recorded rather than forwarded: `iframeImpl` is the DOM double and
+    // Takes four, but the per-artboard facts a git-diff render carries are only observable here.
+    mountCalls.push({ diffMarks: diffMarks ?? null, modeOverride: modeOverride ?? null });
+    return iframeImpl(gen, doc, canvas, widthPx);
+  },
   // `insert.openSlashMenu`'s poster; a PARTIAL mock of a module the graph reaches is a load
   // Error, not a missing stub at call time.
   postOpenSlash: () => {},
@@ -505,10 +547,14 @@ beforeEach(() => {
   }
   createdModels.length = 0;
   createdEditors.length = 0;
+  createdDiffEditors.length = 0;
+  mountCalls.length = 0;
   canvasPanels.length = 0;
   surface.prevCanvasMode = null;
   surfaceForPane("primary").panzoomWrap = null;
   surfaceForPane("primary").monacoEditor = null;
+  surfaceForPane("primary").monacoDiffEditor = null;
+  resetDiffViews();
   view.functionEditor = null;
   surfaceForPane("primary").centerObserver = null;
   surfaceForPane("primary").renderGeneration = 0;
@@ -1511,6 +1557,153 @@ describe("git-diff mode", () => {
     // Diff panels are never live-patchable
     expect(orig!.ready).toBe(false);
     expect(curr!.ready).toBe(false);
+  });
+
+  test("the Code view mounts a diff editor over the two texts, and no artboards", async () => {
+    openSyncedTab();
+    setMode("git-diff");
+    ctx.gitDiffState = {
+      currentContent: '{"tagName":"div"}',
+      filePath: "/project/index.json",
+      originalContent: '{"tagName":"section"}',
+    };
+    setDiffView("primary", "code");
+    renderCanvas();
+    await flush();
+
+    expect(createdDiffEditors).toHaveLength(1);
+    const ed = createdDiffEditors[0]!;
+    // Read-only on BOTH sides: one of them is a committed version with nowhere on disk to go.
+    expect(ed._options.readOnly).toBe(true);
+    expect(ed._options.originalEditable).toBe(false);
+    expect(ed.getModel()?.original.getValue()).toBe('{"tagName":"section"}');
+    expect(ed.getModel()?.modified.getValue()).toBe('{"tagName":"div"}');
+    // No pan/zoom surface and no artboards: a comparison read as text has neither.
+    expect(canvasPanels.length).toBe(0);
+    expect(stageEl().querySelector(".panzoom-wrap")).toBeNull();
+    expect(stageEl().querySelector(".diff-code-editor")).not.toBeNull();
+  });
+
+  test("the two models take disjoint URIs, and neither is the file's own", async () => {
+    /* A source editor, a Code lens and a comparison can all want one path at once, and two models
+       on one URI throws. Disjoint URIs make the collision unrepresentable rather than refused. */
+    openSyncedTab();
+    setMode("git-diff");
+    ctx.gitDiffState = {
+      currentContent: "{}",
+      filePath: "index.json",
+      originalContent: "{}",
+    };
+    setDiffView("primary", "code");
+    renderCanvas();
+    await flush();
+
+    const uris = createdModels.map((m) => String(m.uri));
+    expect(new Set(uris).size).toBe(uris.length);
+    expect(uris.some((u) => u.includes("/head/"))).toBe(true);
+    expect(uris.some((u) => u.includes("/work/"))).toBe(true);
+    expect(uris).not.toContain("file:///index.json");
+  });
+
+  test("leaving the Code view disposes the editor AND both models", async () => {
+    // Monaco never disposes models a caller created, and a leaked model keeps its URI claimed —
+    // Which is the same throw one mount later, on a stage that looks merely empty.
+    openSyncedTab();
+    setMode("git-diff");
+    ctx.gitDiffState = {
+      currentContent: "{}",
+      filePath: "index.json",
+      originalContent: "{}",
+    };
+    setDiffView("primary", "code");
+    renderCanvas();
+    await flush();
+    const ed = createdDiffEditors[0]!;
+    const models = createdModels.slice(-2);
+
+    setMode("design");
+    renderCanvas();
+    await flush();
+
+    expect(ed.dispose).toHaveBeenCalled();
+    for (const m of models) {
+      expect(m.dispose).toHaveBeenCalled();
+    }
+    expect(surfaceForPane("primary").monacoDiffEditor).toBeNull();
+  });
+
+  test("a second synchronous render inside the cold load mounts exactly one diff editor", async () => {
+    /* The documented duplicate-mount race, in its diff shape: `renderCanvasImpl` writes
+       `prevCanvasMode` BEFORE the mount, so a second render during the cold Monaco load sees
+       `modeChanged === false` and a still-null slot and falls through to mount again — and the
+       second `createModel` claims a URI the first registered. */
+    openSyncedTab();
+    setMode("git-diff");
+    ctx.gitDiffState = {
+      currentContent: "{}",
+      filePath: "index.json",
+      originalContent: "{}",
+    };
+    setDiffView("primary", "code");
+    renderCanvas();
+    renderCanvas();
+    await flush();
+    expect(createdDiffEditors).toHaveLength(1);
+  });
+
+  test("retargeting to a different file disposes the old editor before claiming new URIs", async () => {
+    /* The second race, and `mountStillWanted` cannot catch it: that guard answers false when the
+       slot is already filled, so without this the comparison would switch files and keep the old
+       editor, still holding the previous pair of URIs. */
+    openSyncedTab();
+    setMode("git-diff");
+    ctx.gitDiffState = {
+      currentContent: '{"tagName":"div"}',
+      filePath: "one.json",
+      originalContent: '{"tagName":"section"}',
+    };
+    setDiffView("primary", "code");
+    renderCanvas();
+    await flush();
+    const first = createdDiffEditors[0]!;
+    expect(first.dispose).not.toHaveBeenCalled();
+
+    ctx.gitDiffState = {
+      currentContent: '{"tagName":"main"}',
+      filePath: "two.json",
+      originalContent: '{"tagName":"aside"}',
+    };
+    renderCanvas();
+    await flush();
+
+    expect(first.dispose).toHaveBeenCalled();
+    expect(createdDiffEditors).toHaveLength(2);
+    const second = createdDiffEditors[1]!;
+    expect(second.getModel()?.modified.getValue()).toBe('{"tagName":"main"}');
+    // And the new pair of URIs names the new file, not the one the disposed editor held.
+    expect(String(second.getModel()?.original.uri)).toContain("two.json");
+  });
+
+  test("switching back to Visual disposes the code editor and draws the artboards", async () => {
+    openSyncedTab();
+    setMode("git-diff");
+    ctx.gitDiffState = {
+      currentContent: '{"tagName":"div"}',
+      filePath: "/project/index.json",
+      originalContent: '{"tagName":"div"}',
+    };
+    setDiffView("primary", "code");
+    renderCanvas();
+    await flush();
+    const ed = createdDiffEditors[0]!;
+
+    setDiffView("primary", "visual");
+    surface.prevCanvasMode = null;
+    renderCanvas();
+    await flush();
+
+    expect(ed.dispose).toHaveBeenCalled();
+    expect(canvasPanels.length).toBe(2);
   });
 
   test("unparseable JSON falls back to a parse-failure document", async () => {
@@ -2697,5 +2890,83 @@ describe("a derived pane's stage", () => {
     expect(wrap.textContent).toContain("Looking for something to show here…");
     expect(renderWelcome).not.toHaveBeenCalledWith(wrap);
     wrap.remove();
+  });
+});
+
+describe("git-diff · a comparison with no visual half", () => {
+  /* All three of these were found in a browser, not by a test, and two of them could only be found
+     there: happy-dom performs no layout, so a container that mounts at zero width looks identical
+     to one that does not. */
+
+  test("a non-document .json forces the Code view without storing a choice", async () => {
+    openSyncedTab();
+    setMode("git-diff");
+    ctx.gitDiffState = {
+      currentContent: '{"name":"x","version":"2"}',
+      filePath: "package.json",
+      originalContent: '{"name":"x","version":"1"}',
+    };
+    renderCanvas();
+    await flush();
+    // Code, though nobody chose it…
+    expect(createdDiffEditors).toHaveLength(1);
+    expect(canvasPanels.length).toBe(0);
+    // …and the choice is not written, so the next document still opens Visual.
+    expect(diffViewOf("primary")).toBe("visual");
+  });
+
+  test("its change map is cleared, so the toolbar offers no dead Visual button", async () => {
+    openSyncedTab();
+    setMode("git-diff");
+    ctx.gitDiffState = {
+      currentContent: "{}",
+      filePath: "package.json",
+      originalContent: "{}",
+    };
+    renderCanvas();
+    await flush();
+    expect(diffChangeMapOf("primary")).toBeNull();
+  });
+
+  test("the mount guard agrees with the branch that built its container", async () => {
+    /* The guard used to ask only "did the author choose Code", while the branch asked "is there a
+       visual half OR did they choose Code". For a file with no visual half the branch built the
+       container and the guard then refused to mount into it: an empty stage and no error. */
+    openSyncedTab();
+    setMode("git-diff");
+    ctx.gitDiffState = {
+      currentContent: "b",
+      filePath: "notes.txt",
+      originalContent: "a",
+    };
+    renderCanvas();
+    await flush();
+    expect(createdDiffEditors).toHaveLength(1);
+    expect(createdDiffEditors[0]!.getModel()?.original.getValue()).toBe("a");
+  });
+
+  test("a modification wears a different face on each artboard", async () => {
+    // Marked identically on both, it read as "added" on the left: the green of the added colour
+    // Over the very text being replaced.
+    openSyncedTab();
+    setMode("git-diff");
+    ctx.gitDiffState = {
+      currentContent: JSON.stringify({
+        children: [{ tagName: "p", textContent: "after" }],
+        tagName: "div",
+      }),
+      filePath: "/project/index.json",
+      originalContent: JSON.stringify({
+        children: [{ tagName: "p", textContent: "before" }],
+        tagName: "div",
+      }),
+    };
+    renderCanvas();
+    await flush();
+    const kinds = mountCalls
+      .slice(-2)
+      .map((c) => (c.diffMarks ?? []).map((m: { kind: string }) => m.kind));
+    expect(kinds[0]).toEqual(["modified-before"]);
+    expect(kinds[1]).toEqual(["modified-after"]);
   });
 });

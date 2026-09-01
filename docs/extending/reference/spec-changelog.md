@@ -490,6 +490,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `studio.md`
 
+- **0.10.6-draft** (2026-09-01) — Change review: node-level diff marks on both artboards, a change stepper, a code comparison for every changed file, and revalidation after a save.
 - **0.10.5-draft** (2026-08-31) — the canvas de-popovers so an open popover lays out in place and grows the artboard (4.2.2); the selector axis is element-aware and choosing :popover-open changes the rendering (6.2); a third document report checks popover correctness (16.6).
 - **0.10.4-draft** (2026-08-31) — Edit's canvas column is drag-resizable, and the active breakpoint is derived from its width.
 - **0.10.3-draft** (2026-08-30) — 15: a brokered credential row reads from the broker, and carries reconnect, account choice and a disconnect that reaches it.

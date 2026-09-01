@@ -931,6 +931,7 @@ export function startCanvasIframe(opts: {
             pageContentOffset: mapperCtx.pageContentOffset,
             pageContentPrefix: mapperCtx.pageContentPrefix,
           },
+          diffMarks: msg.diffMarks ?? null,
           mode: msg.mode,
           popoverOpen: msg.popoverOpen ? serializeJxPath(msg.popoverOpen) : null,
           siteStyle: msg.siteStyle,

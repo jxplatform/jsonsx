@@ -61,6 +61,7 @@ describe("the set", () => {
       // Author believed was private.
       "content",
       "data",
+      "diff",
       "document",
       "edit",
       "file",

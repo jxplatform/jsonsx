@@ -1217,7 +1217,10 @@ const MUTANTS: Mutant[] = [
   {
     edits: [
       {
-        find: `    if (derived.diff?.filePath === path) {`,
+        find: `    if (
+      derived.diff?.filePath === path &&
+      (derived.diffRev === undefined || derived.diffRev === shell.git.rev)
+    ) {`,
         replace: `    if (derived.diff !== null) {`,
       },
     ],
@@ -1229,12 +1232,26 @@ const MUTANTS: Mutant[] = [
   {
     edits: [
       {
-        find: `(file) => file.path === path && (file.status === "M" || file.status === "A"),`,
-        replace: `(file) => file.path === path,`,
+        find: `      (derived.diffRev === undefined || derived.diffRev === shell.git.rev)`,
+        replace: `      true`,
       },
     ],
     file: "src/workspace/pane-derive.ts",
-    id: "pane-derive.ts · only M and A have a pair of texts to compare",
+    id: "pane-derive.ts · a held comparison is only current at the revision it was read at",
+    means:
+      "the lens holds the texts it read when it opened forever, so the change marks describe a " +
+      "file the author has since edited while looking at it",
+    test: "tests/pane-derive.test.ts",
+  },
+  {
+    edits: [
+      {
+        find: `        file.path === path && (file.status === "M" || file.status === "A" || file.status === "U"),`,
+        replace: `        file.path === path,`,
+      },
+    ],
+    file: "src/workspace/pane-derive.ts",
+    id: "pane-derive.ts · a lens compares only a status it can build a pair of texts for",
     means: "Diff is offered for an untracked or deleted file, and the comparison cannot be built",
     test: "tests/pane-derive.test.ts",
   },
@@ -1632,7 +1649,7 @@ const MUTANTS: Mutant[] = [
   {
     edits: [
       {
-        find: `  if (path === null || !change || _diffLoads.get(paneId)?.path === path) {`,
+        find: `  if (path === null || !change || (asked?.path === path && asked.rev === rev)) {`,
         replace: `  if (path === null || !change) {`,
       },
     ],

@@ -107,7 +107,7 @@ The two panes are independent in everything a document owns: each keeps its own 
 A second pane does not have to hold a document you picked. The **⟲** button on its context bar offers a short list of things it can be _about_ the other pane instead:
 
 - **Code of this document**: the JSON or Markdown, live, while you edit visually.
-- **Diff vs HEAD**: what you have changed, beside the page you changed it in.
+- **Diff vs HEAD**: what you have changed, beside the page you changed it in, with its own change stepper and its own choice of Visual or Code.
 - **Layout of this page**: the layout file the page uses, opened at the element you clicked if you came from **Open Layout →**.
 - **Component definition of the selection**: the source of whatever component you select, following you as you select others.
 - **Same page at ⟨breakpoint⟩**: one more size of the page you are already looking at.

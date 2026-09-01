@@ -53,6 +53,7 @@ import {
 
 import { isEditing } from "./editor/inline-edit";
 import { applyTransform, registerCanvasViewCommands } from "./canvas/canvas-utils";
+import { diffCommands } from "./canvas/diff-toolbar";
 import type { CanvasSurface } from "./canvas/canvas-surface";
 import {
   initCanvasRender,
@@ -94,7 +95,12 @@ import { mountJumpBar } from "./panels/jump-bar";
 import { cellForPane } from "./panels/pane-grid";
 import { notify } from "./services/notify";
 import { beginActivity } from "./panels/activity-panel";
-import { exportFile, parseSourceForPath, saveFile } from "./files/file-ops";
+import {
+  exportFile,
+  parseSourceForPath,
+  saveFile,
+  setDocumentSavedListener,
+} from "./files/file-ops";
 import { serializeDocument } from "./files/serialize-document";
 import {
   formatForPath,
@@ -164,6 +170,7 @@ import {
   loadDiffForLens,
   registerSourceControlCommands,
   renderGitPanel,
+  noteFileSaved,
 } from "./panels/git-panel";
 
 // ─── Spectrum Web Components ──────────────────────────────────────────────────
@@ -1490,6 +1497,15 @@ registerCanvasViewCommands(commandRegistry, {
   setOpenPopover,
   setResolvingOpen: paneContext.setResolvingOpen,
 });
+/* A save moves the working tree under any comparison of that file, and nothing about a
+   comparison notices on its own — see `noteFileSaved`. Injected rather than imported: `file-ops`
+   must not pull the Source Control panel into its graph. */
+setDocumentSavedListener((path) => {
+  void noteFileSaved(path);
+});
+/* Walking a comparison. No deps: the stepper reads the pane-keyed diff store directly and the
+   toolbar redraws itself, so there is nothing for the bootstrap to inject. */
+commandRegistry.registerAll(diffCommands());
 /* The one rule that opens a popover when the selection lands in one, from whichever surface made
    the selection. Started here because it is app-lifetime state, like the canvas's own watches. */
 ensurePopoverRevealWatch();

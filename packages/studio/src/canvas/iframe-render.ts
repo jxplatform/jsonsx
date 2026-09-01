@@ -28,9 +28,13 @@ import {
 } from "@jxsuite/runtime";
 import { resolveAssetRef } from "./asset-resolve";
 import { classifyRenderNode, jxPathSelector, serializeJxPath } from "./path-mapping";
+/* No cycle: `iframe-position.ts` imports only `path-mapping` and a type. It already owns the
+   stamped-attribute lookup, escaping included, so a second query built here would be a second
+   answer to "which element is this path". */
+import { elementForPath } from "./iframe-position";
 import type { AssetContext } from "./asset-resolve";
 import { SITE_STYLE_ID, buildSiteStyleCSS } from "@jxsuite/site/site-style";
-import type { CanvasMode } from "./iframe-protocol";
+import type { CanvasMode, WireDiffMarks } from "./iframe-protocol";
 import type { JxDocument } from "@jxsuite/schema/types";
 import type { PathMapCtx } from "./path-mapping";
 
@@ -301,6 +305,139 @@ export function syncEditModeCss(doc: Document, mode: CanvasMode): void {
   style.id = EDIT_PLACEHOLDER_STYLE_ID;
   style.textContent = EDIT_PLACEHOLDER_CSS;
   doc.head.append(style);
+}
+
+/** Id of the injected git-diff change-mark stylesheet. */
+export const DIFF_MARK_STYLE_ID = "jx-canvas-diff-css";
+
+/**
+ * Change marks for the diff artboards.
+ *
+ * **Colour is never the only encoding.** Each kind carries a distinct `border-left-style` and a
+ * distinct gutter glyph, so the three states stay apart for a reader with a red/green deficiency in
+ * the ordinary render, not only under forced colours. That is also what makes the forced-colours
+ * block below cheap: it drops the wash and keeps style and glyph, which were already carrying the
+ * meaning.
+ *
+ * **The forced-colours block has to live HERE, in the frame.** `styles/forced-colors.css` is chrome
+ * and never reaches this document. The artboard's own opt-out (`forced-color-adjust: none` on
+ * `iframe.canvas-iframe`) is about not repainting the AUTHOR'S palette, which is why these rules
+ * add editor chrome through an attribute selector rather than restyling content.
+ *
+ * Hexes rather than custom properties for the reason `EDIT_PLACEHOLDER_CSS` gives: this is a
+ * separate document where the parent's tokens do not exist. The pair is chosen against the white
+ * artboard (`.canvas-panel-viewport` pins `background: white; color-scheme: light` whatever the
+ * chrome theme is), so the dark chrome tints `--success`/`--danger` carry would be illegible here.
+ */
+export const DIFF_MARK_CSS = `
+[data-jx-diff] {
+  position: relative;
+  border-left-width: 3px;
+  border-left-color: currentColor;
+}
+[data-jx-diff]::before {
+  position: absolute;
+  top: 0;
+  left: -3px;
+  width: 3px;
+  content: "";
+}
+[data-jx-diff="added"] {
+  border-left-style: solid;
+  border-left-color: #0a7c42;
+  background: color-mix(in srgb, #0a7c42 12%, transparent);
+}
+[data-jx-diff="removed"] {
+  border-left-style: double;
+  border-left-color: #c9252d;
+  background: color-mix(in srgb, #c9252d 12%, transparent);
+}
+[data-jx-diff="modified-before"] {
+  border-left-style: dashed;
+  border-left-color: #c9252d;
+  background: color-mix(in srgb, #c9252d 8%, transparent);
+}
+[data-jx-diff="modified-after"] {
+  border-left-style: dashed;
+  border-left-color: #0a7c42;
+  background: color-mix(in srgb, #0a7c42 8%, transparent);
+}
+[data-jx-diff-within] {
+  border-left: 3px dotted color-mix(in srgb, #808080 60%, transparent);
+}
+@media (forced-colors: active) {
+  [data-jx-diff],
+  [data-jx-diff-within] {
+    background: none;
+    border-left-color: CanvasText;
+  }
+}
+`;
+
+/**
+ * Keep the change-mark stylesheet in sync with whether this render carries marks.
+ *
+ * Gated on the MARKS, not on the mode. The decoration should depend on the payload the decoration
+ * needs: a git-diff artboard whose comparison is still loading has no marks to show, and a mode
+ * check would leave a stale sheet behind it.
+ */
+export function syncDiffCss(doc: Document, on: boolean): void {
+  const existing = doc.head.querySelector(`#${DIFF_MARK_STYLE_ID}`);
+  if (!on) {
+    existing?.remove();
+    return;
+  }
+  if (existing) {
+    return;
+  }
+  const style = doc.createElement("style");
+  style.id = DIFF_MARK_STYLE_ID;
+  style.textContent = DIFF_MARK_CSS;
+  doc.head.append(style);
+}
+
+/**
+ * Stamp this artboard's change marks onto the rendered tree.
+ *
+ * Replaces the whole set: every previous `data-jx-diff` comes off first, so a render carrying no
+ * marks clears the last one's rather than layering on it.
+ *
+ * **An unresolvable mark climbs to the nearest stamped ancestor** and lands there as
+ * `data-jx-diff-within` — "something inside here changed that cannot be drawn here". Not every
+ * document path reaches an element: a component's internals are created by its own
+ * `connectedCallback` and never pass through {@link makeStamper}, and only the first expanded row
+ * of a repeater carries the template's collapsed path. Dropping those marks silently would make the
+ * artboard disagree with a count the header states out loud; climbing keeps the change locatable
+ * and honest about its resolution.
+ */
+export function applyDiffMarks(container: HTMLElement, marks: WireDiffMarks | null): void {
+  for (const stale of container.querySelectorAll("[data-jx-diff], [data-jx-diff-within]")) {
+    if (stale instanceof HTMLElement) {
+      delete stale.dataset.jxDiff;
+      delete stale.dataset.jxDiffWithin;
+    }
+  }
+  if (!marks?.length) {
+    return;
+  }
+  for (const mark of marks) {
+    const exact = elementForPath(container, mark.path);
+    if (exact) {
+      exact.dataset.jxDiff = mark.kind;
+      continue;
+    }
+    /* Climb by whole `["children", i]` hops: a path's segments come in that pairing, so dropping
+       one at a time would ask for `[..., "children"]`, which is never an address. */
+    let { path } = mark;
+    while (path.length >= 2) {
+      path = path.slice(0, -2);
+      const ancestor = elementForPath(container, path);
+      if (ancestor) {
+        ancestor.dataset.jxDiffWithin = "";
+        break;
+      }
+    }
+  }
 }
 
 /**
@@ -745,6 +882,8 @@ export async function renderResolvedDocument(opts: {
   assets?: AssetContext | null;
   /** This render may fetch automatic `Request` entries even outside preview (Data-panel Refresh). */
   allowAutoRequests?: boolean;
+  /** Change marks for a git-diff artboard, in this side's own document coordinates. */
+  diffMarks?: WireDiffMarks | null;
   /** Serialized path of the popover to draw open, or null/absent for none. */
   popoverOpen?: string | null;
 }): Promise<RenderHandle> {
@@ -784,6 +923,7 @@ export async function renderResolvedDocument(opts: {
   syncEditModeCss(opts.container.ownerDocument, opts.mode);
   syncPreviewShell(opts.container.ownerDocument, opts.mode);
   syncStylebookCss(opts.container.ownerDocument, opts.mode);
+  syncDiffCss(opts.container.ownerDocument, Boolean(opts.diffMarks?.length));
   // Seed the runtime's root $media before buildScope so a COMPONENT with its own `@--name` blocks
   // But no own `$media` resolves the breakpoint to its real query (the iframe path calls buildScope
   // Directly and never the runtime's `Jx()` entry, which is the only other place _rootMedia is set).
@@ -810,6 +950,9 @@ export async function renderResolvedDocument(opts: {
   // Claim (or release) the editing host AFTER the tree lands, so the browser computes editability
   // Against the final DOM rather than an empty container.
   syncEditableRoot(opts.container, opts.mode);
+  // Marks last, and for the same reason: they are resolved by querying stamped attributes, which
+  // Only exist once the tree the stamper walked is actually in the container.
+  applyDiffMarks(opts.container, opts.diffMarks ?? null);
   return {
     ctx: { defs: $defs, docBase: opts.docBase, mapperCtx: opts.mapperCtx, mode: opts.mode },
     dispose: stop,

@@ -18,6 +18,7 @@
     "./schema": "./src/schema.ts",
     "./op-bridge": "./src/op-bridge.ts",
     "./diff": "./src/diff.ts",
+    "./diff-core": "./src/diff-core.ts",
     "./envelope": "./src/envelope.ts",
     "./negotiate": "./src/negotiate.ts",
     "./awareness-types": "./src/awareness-types.ts",
