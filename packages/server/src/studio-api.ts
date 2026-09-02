@@ -1505,12 +1505,12 @@ export async function handleStudioApi(
   // Fails when a declared extension does not resolve, which is exactly the state a reader is in
   // When they need the catalogue to repair it; riding on formats would make the answer unavailable
   // Precisely when it is the fix.
-  if (path === "/__studio/extension-catalog" && req.method === "GET") {
+  if (path === "/__studio/catalog" && req.method === "GET") {
     const dir = url.searchParams.get("dir") || activeProjectRoot || root;
     const projectRoot = isAbsolute(dir) ? dir : resolve(root, dir);
     try {
       assertAccessible(projectRoot, root, activeProjectRoot);
-      const { buildExtensionCatalog } = await import("./extension-catalog.ts");
+      const { buildExtensionCatalog } = await import("./catalog.ts");
       return Response.json(await buildExtensionCatalog(projectRoot));
     } catch (error) {
       return problem("invalidRequest", errorMessage(error));

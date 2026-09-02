@@ -697,7 +697,7 @@ export function createCloudPlatform(project: CloudProject | null): StudioPlatfor
      */
     async listExtensionCatalog(): Promise<ExtensionCatalogEntry[]> {
       try {
-        const res = await api("/extension-catalog");
+        const res = await api("/catalog");
         if (!res.ok) {
           return [];
         }

@@ -98,7 +98,7 @@ const mockHandleServerFunction = mock(
 const mockBuildCatalog = mock(async () => [
   { installed: true, name: "@jxsuite/feed", sections: [{ key: "feed" }], source: "first-party" },
 ]);
-void mock.module("@jxsuite/server/extension-catalog", () => ({
+void mock.module("@jxsuite/server/catalog", () => ({
   buildExtensionCatalog: mockBuildCatalog,
 }));
 

@@ -78,7 +78,7 @@ Three things make a schema go stale, and only one of them is forgetting to run t
 
 `bun run schema:verify` still blocks in CI. The lane cannot push to a fork, and a required check is what keeps a stale schema off `main` when it cannot.
 
-A third committed build output follows the same shape: `packages/extension-catalog/catalog.json`, the list of first-party extensions Studio offers, generated from every `extensions/*/jx-extension.json` and the class descriptors it names.
+A third committed build output follows the same shape: `packages/catalog/catalog.json`, the list of first-party extensions Studio offers, generated from every `extensions/*/jx-extension.json` and the class descriptors it names.
 
 ```bash
 bun run catalog:verify  # is the catalogue what the extensions tree produces?

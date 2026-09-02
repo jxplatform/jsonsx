@@ -11,7 +11,7 @@ import { join } from "node:path";
 
 import { describe, expect, test } from "bun:test";
 
-import { buildCatalog, serializeCatalog } from "./check-extension-catalog.ts";
+import { buildCatalog, serializeCatalog } from "./check-catalog.ts";
 
 interface FakeExtension {
   dir: string;

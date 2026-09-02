@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
- * Check-extension-catalog.ts — `packages/extension-catalog/catalog.json` is what its generator
- * produces from the `extensions/` tree.
+ * Check-catalog.ts — `packages/catalog/catalog.json` is what its generator produces from the
+ * `extensions/` tree.
  *
  * The catalogue is the list of first-party extensions Studio advertises as "available", and every
  * byte of it is derived: each package's own `jx-extension.json` supplies the identity, the class
@@ -40,7 +40,7 @@ import { headingsOf } from "./docs/lib/headings.ts";
 const EXTENSIONS_DIR = "extensions";
 
 /** The committed artifact this script owns. */
-export const CATALOG_PATH = "packages/extension-catalog/catalog.json";
+export const CATALOG_PATH = "packages/catalog/catalog.json";
 
 /** The well-known manifest filename, mirroring `@jxsuite/schema`'s `EXTENSION_MANIFEST`. */
 const MANIFEST = "jx-extension.json";

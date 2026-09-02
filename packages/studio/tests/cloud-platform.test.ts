@@ -1081,7 +1081,7 @@ describe("formats (session backend registry)", () => {
    */
   test("listExtensionCatalog asks the gateway and marks everything bundled", async () => {
     const calls = mockFetch({
-      "/extension-catalog": {
+      "/catalog": {
         body: [
           { name: "@jxsuite/parser", sections: [{ key: "content" }], source: "first-party" },
           { name: "@jxsuite/feed", sections: [{ key: "feed" }], source: "first-party" },
@@ -1100,7 +1100,7 @@ describe("formats (session backend registry)", () => {
     // `installed` degrades to DECLARED, the only fact this adapter has.
     expect(catalog?.find((e) => e.name === "@jxsuite/parser")?.installed).toBe(true);
     expect(catalog?.find((e) => e.name === "@jxsuite/feed")?.installed).toBe(false);
-    expect(calls.some((c) => c.url === `${BASE}/extension-catalog`)).toBe(true);
+    expect(calls.some((c) => c.url === `${BASE}/catalog`)).toBe(true);
   });
 
   test("the catalogue degrades to nothing rather than to the shipped list", async () => {
@@ -1109,7 +1109,7 @@ describe("formats (session backend registry)", () => {
      * five extensions three of which the Worker cannot load would put a toggle in front of the
      * reader that silently does not work.
      */
-    mockFetch({ "/extension-catalog": { status: 404, body: { error: "no such route" } } });
+    mockFetch({ "/catalog": { status: 404, body: { error: "no such route" } } });
     expect(await createCloudPlatform(PROJECT).listExtensionCatalog?.()).toEqual([]);
     expect(await createCloudPlatform(null).listExtensionCatalog?.()).toEqual([]);
   });

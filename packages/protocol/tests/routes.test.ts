@@ -72,8 +72,8 @@ describe("STUDIO_ROUTES", () => {
     expect(STUDIO_ROUTES.formats.summary).toContain("listExtensions");
   });
 
-  test("the extension-catalogue route is optional and says what its absence costs", () => {
-    expect(STUDIO_ROUTES.extensionCatalog.path).toBe("/__studio/extension-catalog");
+  test("the catalogue route is optional and says what its absence costs", () => {
+    expect(STUDIO_ROUTES.extensionCatalog.path).toBe("/__studio/catalog");
     expect(STUDIO_ROUTES.extensionCatalog.method).toBe("GET");
     // Optional because a backend that cannot enumerate what it supports must be able to say so by
     // Omission; Studio then falls back to a typed package name, which is what it does today.
