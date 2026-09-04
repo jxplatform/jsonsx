@@ -3,6 +3,7 @@ import { beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { registerPlatform } from "../src/platform";
 import { exportFile, openFile, parseSourceForPath, saveFile } from "../src/files/file-ops";
 import { activeTab, closeTab, openTab } from "../src/workspace/workspace";
+import { openMediaTab } from "../src/media/media-open";
 import { mockFormatAction, seedMarkdownFormat } from "./format-fixture";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import type { StudioPlatform } from "../src/types";
@@ -281,6 +282,49 @@ describe("saveFile", () => {
 
     // Should not throw
     await saveFile();
+  });
+
+  /* A media tab reaches `saveFile` through the ordinary ⌘S: `file.save` is gated on `documentOpen`
+     alone, and a media tab has a `documentPath`. Before the guard, `serializeDocument` returned the
+     stub `openMediaTab` gives every media tab and `writeFile` put it on disk, so saving with a PNG
+     open destroyed the PNG. The assertion is that NOTHING is written — a returned `false` alone would
+     have passed against the broken code, which wrote and then reported success. */
+  test("refuses a media tab rather than writing the stub document over the file", async () => {
+    const writes: unknown[][] = [];
+    registerPlatform({
+      ...formatPlatform,
+      uploadFile: (...args: unknown[]) => {
+        writes.push(["uploadFile", ...args]);
+        return { path: String(args[0]) };
+      },
+      writeFile: (...args: unknown[]) => {
+        writes.push(["writeFile", ...args]);
+      },
+    } as any);
+
+    const tab = openMediaTab("public/hero.png");
+
+    expect(await saveFile(tab)).toBe(false);
+    expect(writes).toEqual([]);
+  });
+
+  /* `.svg` is the one media type with a second, TEXT mode, so a guard written against
+     `canvasMode === "media"` would have left it able to overwrite itself from the Code view. It is a
+     media file either way, which is what the guard actually keys on. */
+  test("refuses an .svg media tab, whose source alternate has the same stub behind it", async () => {
+    const writes: unknown[][] = [];
+    registerPlatform({
+      ...formatPlatform,
+      writeFile: (...args: unknown[]) => {
+        writes.push(args);
+      },
+    } as any);
+
+    const tab = openMediaTab("public/icon.svg");
+    tab.session.ui.canvasMode = "source";
+
+    expect(await saveFile(tab)).toBe(false);
+    expect(writes).toEqual([]);
   });
 });
 

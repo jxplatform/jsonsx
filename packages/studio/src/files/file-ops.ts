@@ -208,6 +208,26 @@ function reportSaved(tab: Tab) {
 }
 
 /**
+ * Whether this tab holds a document {@link serializeDocument} can honestly produce bytes for.
+ *
+ * A media tab does not. `openMediaTab` gives it a STUB — `{ children: [], tagName: "div" }` — because
+ * the tab model wants A DOCUMENT and a PNG is not one, and the viewer never reads it. Nothing
+ * downstream knew that: `file.save` is gated on `documentOpen` alone (`commands/defaults.ts`), a media
+ * tab satisfies it, and `serializeDocument`'s tail is `JSON.stringify(tab.doc.document)`. So the whole
+ * of the ordinary save path ran and wrote `{"children":[],"tagName":"div"}` OVER the image, through
+ * `writeFile`, with no dirty flag, no confirmation and nothing to undo. The bytes were simply gone.
+ *
+ * **Keyed on the FILE, not on the mode**, because the mode is not the hazard. An `.svg` in its
+ * `source` alternate has the same stub behind it — `canvas-render.ts`'s `sourceContent` falls through
+ * to the same `JSON.stringify` when no format class claims the path — so a guard reading
+ * `canvasMode === "media"` would have left the one media type that offers a text editor still able to
+ * overwrite itself with a placeholder it never showed anyone.
+ */
+function hasSerializableDocument(tab: Tab): boolean {
+  return !isMediaFile(tab.documentPath ?? "");
+}
+
+/**
  * Save a document back to its source location. Defaults to the focused tab.
  *
  * Two things here are for the tab strip's Save-on-close, and both are what a caller that must
@@ -254,6 +274,21 @@ export async function saveFile(tab: Tab | null = activeTab.value): Promise<boole
         key: `save.readOnly:${tab.documentPath ?? tab.id}`,
         ...(tab.documentPath === null ? {} : { path: tab.documentPath }),
         source: "Collaboration",
+      },
+    );
+    return false;
+  }
+  /* A media file has no document behind it (see {@link hasSerializableDocument}), and the refusal is
+     said out loud rather than returned quietly: a ⌘S that does nothing at all is indistinguishable
+     from one that worked. `warn` rather than `error` — nothing is broken and there is nothing to fix;
+     the file is simply not the kind of thing Save writes. */
+  if (!hasSerializableDocument(tab)) {
+    notify.warn(
+      `${tab.documentPath ?? "This file"} is a media file, so there is no document for Save to write.`,
+      {
+        key: `save.notADocument:${tab.documentPath ?? tab.id}`,
+        ...(tab.documentPath === null ? {} : { path: tab.documentPath }),
+        source: "Save",
       },
     );
     return false;
