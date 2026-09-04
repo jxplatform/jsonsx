@@ -26,6 +26,15 @@ function makePage(): { page: Page; viewports: { width: number; height: number }[
   return { page, viewports };
 }
 
+/**
+ * Register both in-band samples for one breakpoint with the SAME styles - a value the site
+ * authored, which does not move when the viewport does inside the band.
+ */
+function authored(testWidth: number, direction: "max" | "min", styles: CapturedStyle[]): void {
+  capturesByWidth.set(testWidth, styles);
+  capturesByWidth.set(testWidth + (direction === "min" ? 40 : -40), styles);
+}
+
 beforeEach(() => {
   captureWidths.length = 0;
   capturesByWidth = new Map();
@@ -133,10 +142,10 @@ describe("extractMedia", () => {
     const base: CapturedStyle[] = [
       { path: [0], tagName: "div", styles: { width: "800px", display: "flex" } },
     ];
-    capturesByWidth = new Map([
-      [768, [{ path: [0], tagName: "div", styles: { width: "400px", display: "flex" } }]],
-      [1024, base],
+    authored(768, "max", [
+      { path: [0], tagName: "div", styles: { width: "400px", display: "flex" } },
     ]);
+    authored(1024, "min", base);
     const { page, viewports } = makePage();
 
     const result = await extractMedia(
@@ -147,7 +156,7 @@ describe("extractMedia", () => {
       { policy: { mode: "all" } },
     );
 
-    expect(captureWidths).toEqual([768, 1024]);
+    expect(captureWidths).toEqual([768, 728, 1024, 1064]);
     expect(result.breakpoints).toEqual({ "--768": "(max-width: 768px)" });
     expect(result.deltas["--768"]).toEqual([{ path: [0], style: { width: "400px" } }]);
     expect(result.deltas["--1024"]).toBeUndefined();
@@ -159,11 +168,9 @@ describe("extractMedia", () => {
       { path: [0], tagName: "div", styles: { width: "800px", display: "flex" } },
     ];
     const narrow = [{ path: [0], tagName: "div", styles: { width: "400px", display: "flex" } }];
-    capturesByWidth = new Map([
-      [520, narrow],
-      [782, narrow],
-      [1390, narrow],
-    ]);
+    authored(520, "max", narrow);
+    authored(782, "min", narrow);
+    authored(1390, "min", narrow);
     const { page } = makePage();
 
     const result = await extractMedia(page, base, uaDefaults, [
@@ -179,7 +186,7 @@ describe("extractMedia", () => {
     ]);
 
     // The narrowest, the middle one and the widest — and no viewport pass for the other six.
-    expect(captureWidths).toEqual([520, 782, 1390]);
+    expect(captureWidths).toEqual([520, 480, 782, 822, 1390, 1430]);
     expect(Object.keys(result.breakpoints)).toEqual(["--520", "--782", "--1390"]);
   });
 
@@ -187,8 +194,8 @@ describe("extractMedia", () => {
     const base: CapturedStyle[] = [
       { path: [0], tagName: "div", styles: { width: "800px", display: "flex" } },
     ];
-    capturesByWidth = new Map([
-      [900, [{ path: [0], tagName: "div", styles: { width: "500px", display: "flex" } }]],
+    authored(900, "min", [
+      { path: [0], tagName: "div", styles: { width: "500px", display: "flex" } },
     ]);
     const { page } = makePage();
 
@@ -196,7 +203,7 @@ describe("extractMedia", () => {
       plan: [{ name: "--wide", query: "(min-width: 900px)", testWidth: 900 }],
     });
 
-    expect(captureWidths).toEqual([900]);
+    expect(captureWidths).toEqual([900, 940]);
     expect(result.breakpoints).toEqual({ "--wide": "(min-width: 900px)" });
   });
 
@@ -204,8 +211,8 @@ describe("extractMedia", () => {
     const base: CapturedStyle[] = [
       { path: [0], tagName: "div", styles: { width: "600px", display: "flex" } },
     ];
-    capturesByWidth = new Map([
-      [480, [{ path: [0], tagName: "div", styles: { width: "300px", display: "flex" } }]],
+    authored(480, "max", [
+      { path: [0], tagName: "div", styles: { width: "300px", display: "flex" } },
     ]);
     const { page, viewports } = makePage();
 
@@ -215,5 +222,59 @@ describe("extractMedia", () => {
 
     expect(result.breakpoints).toEqual({ "--480": "(max-width: 480px)" });
     expect(viewports).toEqual([{ width: 1280, height: 900 }]);
+  });
+  test("drops a value that moves with the viewport inside its own band", async () => {
+    /* The defect this exists for: `getComputedStyle` returns USED values, so a fluid element
+       reports the pixels it happens to occupy. Diffing one sample against the base called that a
+       responsive change, and two thirds of a real import's breakpoint declarations turned out to be
+       the viewport's own width written back as the element's - pinning the layout it was meant to
+       describe. Measured twice in the band, a resolved value disagrees with itself. */
+    const base: CapturedStyle[] = [
+      { path: [0], tagName: "div", styles: { width: "1440px", display: "flex" } },
+    ];
+    capturesByWidth.set(767, [
+      { path: [0], tagName: "div", styles: { width: "767px", display: "flex" } },
+    ]);
+    capturesByWidth.set(727, [
+      { path: [0], tagName: "div", styles: { width: "727px", display: "flex" } },
+    ]);
+    const { page } = makePage();
+
+    const result = await extractMedia(page, base, uaDefaults, ["(max-width: 767px)"]);
+
+    expect(result.breakpoints).toEqual({});
+    expect(result.deltas["--767"]).toBeUndefined();
+  });
+
+  test("keeps real intent that sits beside a viewport-derived value", async () => {
+    const base: CapturedStyle[] = [
+      { path: [0], tagName: "div", styles: { width: "1440px", "flex-direction": "row" } },
+    ];
+    capturesByWidth.set(767, [
+      { path: [0], tagName: "div", styles: { width: "767px", "flex-direction": "column" } },
+    ]);
+    capturesByWidth.set(727, [
+      { path: [0], tagName: "div", styles: { width: "727px", "flex-direction": "column" } },
+    ]);
+    const { page } = makePage();
+
+    const result = await extractMedia(page, base, uaDefaults, ["(max-width: 767px)"]);
+
+    // The stacking survives; the measurement it was buried in does not.
+    expect(result.deltas["--767"]).toEqual([{ path: [0], style: { flexDirection: "column" } }]);
+  });
+
+  test("samples upward inside a min-width band and downward inside a max-width band", async () => {
+    const base: CapturedStyle[] = [{ path: [0], tagName: "div", styles: { display: "flex" } }];
+    authored(600, "max", base);
+    authored(900, "min", base);
+    const { page } = makePage();
+
+    await extractMedia(page, base, uaDefaults, ["(max-width: 600px)", "(min-width: 900px)"], {
+      policy: { mode: "all" },
+    });
+
+    // Leaving the band would measure the very rules the breakpoint exists to distinguish itself from.
+    expect(captureWidths).toEqual([600, 560, 900, 940]);
   });
 });

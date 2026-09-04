@@ -178,3 +178,87 @@ describe("STYLE_ALLOWLIST", () => {
     expect(STYLE_ALLOWLIST).toContain("background-color");
   });
 });
+
+describe("stripped tags and the path contract with to-jx", () => {
+  /*
+   * `apply-styles.ts` resolves a captured path against the tree `to-jx.ts` produced, so the walk
+   * and the strip set must agree. They did not: `capture.ts` removes only script/noscript from the
+   * live DOM while `to-jx.ts` also drops iframe/object/embed/link/meta/style, and every element
+   * after such a sibling shifted by one. On a real WordPress import that left 64% of the page's
+   * elements with no style at all.
+   */
+  const MIXED_BODY = `<style>.a{color:red}</style><div id="first"></div><iframe></iframe><div id="second"><span></span><link rel="x"><b></b></div>`;
+
+  it("skips stripped tags without consuming a child index", async () => {
+    setDom("", MIXED_BODY);
+    const { page } = makeFakePage();
+    const result = await captureStyles(page);
+
+    expect(result.elements.map((e) => e.tagName)).toEqual(["div", "div", "span", "b"]);
+    // <b> is [1,1] because the <link> before it is stripped from the tree too.
+    expect(result.elements.map((e) => e.path)).toEqual([[0], [1], [1, 0], [1, 1]]);
+  });
+
+  it("agrees with convertToJx's own tree indices", async () => {
+    setDom("", MIXED_BODY);
+    const { page } = makeFakePage();
+    const result = await captureStyles(page);
+    const { convertToJx } = await import("../src/to-jx.ts");
+    const { document: tree } = convertToJx(MIXED_BODY);
+
+    /* Element-only indexing, exactly as `apply-styles.ts` walks it: a text child never consumes
+       an index on either side. */
+    function at(path: number[]): string {
+      let node = tree;
+      for (const index of path) {
+        const kids = (node.children as unknown[]).filter((c) => typeof c !== "string");
+        node = kids[index] as typeof tree;
+      }
+      return String(node.tagName);
+    }
+    for (const element of result.elements) {
+      expect(at(element.path)).toBe(element.tagName);
+    }
+  });
+
+  it("applies the same skip at every breakpoint re-capture", async () => {
+    setDom("", MIXED_BODY);
+    const { page } = makeFakePage();
+    const elements = await captureStylesAtWidth(page, 600);
+
+    expect(elements.map((e) => e.tagName)).toEqual(["div", "div", "span", "b"]);
+    expect(elements.map((e) => e.path)).toEqual([[0], [1], [1, 0], [1, 1]]);
+  });
+});
+
+describe("UA-default probe sandbox", () => {
+  /*
+   * The sandbox used to carry `visibility:hidden;pointer-events:none`. Both are INHERITED and both
+   * are on the allowlist, so every probe inherited them and they became each tag's "UA default":
+   * a real `visibility:hidden` was then dropped as a no-op, and the mirror values were emitted on
+   * ~5,300 nodes each, making them the two most common declarations in the imported project.
+   */
+  it("does not inherit an allowlisted property into the probes", async () => {
+    setDom(STYLED_HEAD, STYLED_BODY);
+    const { page } = makeFakePage();
+    const result = await captureStyles(page);
+
+    for (const tag of Object.keys(result.uaDefaults)) {
+      expect(result.uaDefaults[tag]!["visibility"]).not.toBe("hidden");
+      expect(result.uaDefaults[tag]!["pointer-events"]).not.toBe("none");
+    }
+  });
+
+  it("keeps a real hidden element distinguishable from the baseline", async () => {
+    setDom(
+      `<style>.gone { visibility: hidden; pointer-events: none; }</style>`,
+      `<div class="gone"></div>`,
+    );
+    const { page } = makeFakePage();
+    const result = await captureStyles(page);
+
+    const node = result.elements[0]!;
+    expect(node.styles["visibility"]).toBe("hidden");
+    expect(result.uaDefaults["div"]!["visibility"]).not.toBe(node.styles["visibility"]);
+  });
+});

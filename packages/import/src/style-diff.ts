@@ -166,11 +166,24 @@ export function computeMediaDelta(
     const baseStyle = diffStyles(baseEl.styles, defaults);
     const bpStyle = diffStyles(bpEl.styles, defaults);
 
-    // Only keep properties that changed from base
+    /* The breakpoint's values BEFORE the UA-default and noise filters.
+       `diffStyles` drops a declaration that matches the tag's UA default, which is exactly what a
+       property REVERTING at a breakpoint looks like: `display: flex` going back to `block` leaves
+       nothing in `bpStyle`, because `block` is the UA default for a div. Iterating only `bpStyle`
+       therefore made every revert invisible - across the whole corpus there was not one
+       `display: block` delta, and a site's entire "stack on mobile" behaviour was discarded. The
+       raw value is what a revert has to be expressed WITH, since the filtered one is gone. */
+    const bpRaw: Record<string, string | number> = {};
+    for (const [prop, value] of Object.entries(bpEl.styles)) {
+      bpRaw[kebabToCamel(prop)] = maybeNumeric(value);
+    }
+
+    // Every property either side declares, so a revert counts as a change rather than an absence.
     const delta: Record<string, string | number> = {};
-    for (const [prop, val] of Object.entries(bpStyle)) {
-      if (baseStyle[prop] !== val) {
-        delta[prop] = val;
+    for (const prop of new Set([...Object.keys(baseStyle), ...Object.keys(bpStyle)])) {
+      const value = prop in bpStyle ? bpStyle[prop] : bpRaw[prop];
+      if (value !== undefined && baseStyle[prop] !== value) {
+        delta[prop] = value;
       }
     }
 

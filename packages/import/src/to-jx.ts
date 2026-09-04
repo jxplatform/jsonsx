@@ -10,7 +10,33 @@ export interface ToJxResult {
   collectedStyles: string[];
 }
 
-const STRIP_TAGS = new Set(["script", "noscript", "iframe", "object", "embed", "link", "meta"]);
+/**
+ * Tags removed from the converted tree — and therefore tags the style capture must skip too.
+ *
+ * Exported because two passes have to agree about it. `style-capture.ts` walks the LIVE DOM to
+ * build each element's child-index path; `apply-styles.ts` looks those paths up in the STRIPPED
+ * tree. Anything dropped here but present during the walk shifts every following sibling by one,
+ * and the shift cascades through the subtree, so the lookup misses and the node gets no style at
+ * all. On a WordPress page carrying sixteen in-body `<style>` blocks and an `<iframe>`, that was
+ * 62.8% of elements unstyled.
+ *
+ * `style` is a member: it is stripped in `stripTags` by its own branch (its text is harvested into
+ * `collectedStyles` first), which is exactly the kind of second exit that made the sets diverge.
+ *
+ * The live DOM must NOT have these removed before capture — `getComputedStyle` is about to read the
+ * cascade that `<style>` and `<link>` define. Skipping them in the walk is the correct fix;
+ * removing them from the page is not.
+ */
+export const STRIP_TAGS = new Set([
+  "script",
+  "noscript",
+  "iframe",
+  "object",
+  "embed",
+  "link",
+  "meta",
+  "style",
+]);
 
 function countNodes(node: JxElement | string): number {
   if (typeof node === "string") {

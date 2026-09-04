@@ -118,6 +118,79 @@ describe("runImportPipeline — no filesystem, no puppeteer", () => {
     expect(phases).toContain("emit");
   });
 
+  test("an accordion is emitted as native <details>, not inert directives", async () => {
+    /* The source drives it with a client framework the clone does not ship, so carried across
+       verbatim it is markup nothing can ever open - and its content is unreachable. */
+    const row = (index: number, title: string, body: string): string =>
+      `<div class="accordion-item" :class="{ 'active': open_accordion_item === ${index} }">
+         <div class="accordion-title" @click="open_accordion_item = (open_accordion_item === ${index} ? null : ${index})"><h5>${title}</h5></div>
+         <div class="accordion-text" x-show="open_accordion_item === ${index}" hidden=""><p>${body}</p></div>
+       </div>`;
+    const { io, files } = memoryIo();
+    const { browser } = fakeBrowser({
+      [HOME]: {
+        title: "Specs",
+        html: `<main><div x-data="{ open_accordion_item: null }" class="accordion-wrapper">${row(0, "Available Sizes", "12x12 to 40x80")}${row(1, "Roof Pitch", "8/12")}</div></main>`,
+      },
+    });
+    const phases: string[] = [];
+
+    await runImportPipeline(
+      { browser, io, url: HOME, styles: false, assets: false, scroll: false, maxDepth: 0 },
+      (event) => phases.push(event.phase),
+    );
+
+    const page = String(files.get("pages/index.json") ?? "");
+    const everything = [...files.values()].map(String).join("\n");
+
+    /* The disclosure stays in the page as a real <details>. It must NOT become a component: a
+       component template root takes the component's own tag name, so promoting it would hand
+       back a custom element with none of the browser behaviour that made the rewrite worth doing. */
+    expect(page).toContain('"details"');
+    expect(page).toContain('"summary"');
+    expect(page.match(/"details"/g)).toHaveLength(2);
+    // Same widget, one name, so the two rows stay mutually exclusive the way the source was.
+    expect(page.match(/open-accordion-item-0/g)).toHaveLength(2);
+
+    // The content both rows were hiding is now reachable.
+    expect(everything).toContain("12x12 to 40x80");
+    expect(everything).toContain("8/12");
+    // And the directives that could never run are gone.
+    for (const directive of ["x-show", "x-data", "@click", ":class"]) {
+      expect(everything).not.toContain(directive);
+    }
+    expect(phases).toContain("convert");
+  });
+
+  test("a dropdown is emitted as a working popover, not a permanently hidden panel", async () => {
+    /* The corpus's submenu came out as `{ display: grid, opacity: 0, position: absolute }` with
+       nothing left anywhere to change the opacity: every signal preserved, and the menu unable to
+       open ever again. */
+    const { io, files } = memoryIo();
+    const { browser } = fakeBrowser({
+      [HOME]: {
+        title: "Nav",
+        html: `<nav><li><span><button aria-haspopup="true" aria-expanded="false">Models</button></span><ul id="submenu" style="display:grid;opacity:0;position:absolute;z-index:10"><li><a href="/lancaster">Lancaster</a></li></ul></li></nav>`,
+      },
+    });
+    const phases: string[] = [];
+
+    /* MaxDepth 0 takes the single-page path, which skips the crawl entirely - a genuinely separate
+       copy of the styles, assets and convert stages that a crawl-only test never reaches. */
+    await runImportPipeline(
+      { browser, io, url: HOME, assets: false, scroll: false, maxDepth: 0 },
+      (event) => phases.push(event.phase),
+    );
+
+    const page = String(files.get("pages/index.json") ?? "");
+    expect(page).toContain('"popover": "auto"');
+    expect(page).toContain('"popovertarget": "submenu"');
+    // The closed state must not survive in the base rule, where it beats the UA sheet.
+    const panel = JSON.parse(page) as unknown;
+    expect(JSON.stringify(panel)).toContain(":popover-open");
+    expect(phases).toContain("convert");
+  });
+
   test("a crawl walks same-origin links and emits a page per route", async () => {
     const { io, files } = memoryIo();
     const { browser } = fakeBrowser({
@@ -149,6 +222,65 @@ describe("runImportPipeline — no filesystem, no puppeteer", () => {
     // Two pages sharing a header and footer are what layout detection is for.
     const layout = JSON.parse(files.get("layouts/base.json") as string) as { children: unknown[] };
     expect(layout.children.length).toBeGreaterThan(1);
+  });
+
+  test("a read-more control becomes a disclosure, freeing the copy behind it", async () => {
+    /* The site already declared which control opens which panel, in `aria-expanded` plus
+       `aria-controls`. The script that acted on it is gone, so the panel's copy was on disk and
+       unreachable - the largest body of trapped text on the reference corpus. */
+    const { io, files } = memoryIo();
+    const { browser } = fakeBrowser({
+      [HOME]: {
+        title: "Specs",
+        html: `<main><div><div><p>Intro</p></div><div id="more-1" hidden><p>the hidden remainder</p></div><p><a role="button" aria-expanded="false" aria-controls="more-1" tabindex="-1">Read more</a></p></div></main>`,
+      },
+    });
+    const phases: string[] = [];
+
+    await runImportPipeline(
+      { browser, io, url: HOME, assets: false, scroll: false, maxDepth: 0 },
+      (event) => phases.push(event.phase),
+    );
+
+    const everything = [...files.values()].map(String).join("\n");
+    expect(everything).toContain('"details"');
+    expect(everything).toContain('"summary"');
+    expect(everything).toContain("the hidden remainder");
+    expect(everything).toContain("Read more");
+    // The control is gone, and with it the state nothing could change.
+    expect(everything).not.toContain("aria-expanded");
+    expect(phases).toContain("convert");
+  });
+
+  test("both conversions also run on the crawl path", async () => {
+    /* The styles, assets and convert stages exist TWICE - once for a single page and again for a
+       crawl - and a multi-page import only ever runs the second copy. A pass verified on one path
+       is not verified on the other. */
+    const widgets =
+      `<div x-data="{ open: null }">` +
+      `<div><div @click="open = (open === 0 ? null : 0)"><h5>One</h5></div>` +
+      `<div x-show="open === 0" hidden=""><p>first</p></div></div>` +
+      `<div><div @click="open = (open === 1 ? null : 1)"><h5>Two</h5></div>` +
+      `<div x-show="open === 1" hidden=""><p>second</p></div></div></div>` +
+      `<nav><span><button aria-haspopup="true">Menu</button></span>` +
+      `<ul id="sub" style="opacity:0;position:absolute"><li>item</li></ul></nav>`;
+    const { io, files } = memoryIo();
+    const { browser } = fakeBrowser({
+      [HOME]: { title: "Home", html: `<main><a href="${HOME}b">b</a>${widgets}</main>` },
+      [`${HOME}b`]: { title: "B", html: `<main>${widgets}</main>` },
+    });
+    const phases: string[] = [];
+
+    await runImportPipeline(
+      { browser, io, url: HOME, assets: false, scroll: false, maxPages: 2 },
+      (event) => phases.push(event.phase),
+    );
+
+    const everything = [...files.values()].map(String).join("\n");
+    expect(everything).toContain('"details"');
+    expect(everything).toContain('"popover": "auto"');
+    expect(everything).toContain("popovertarget");
+    expect(phases).toContain("convert");
   });
 
   test("reference screenshots come back as bytes, keyed by route", async () => {

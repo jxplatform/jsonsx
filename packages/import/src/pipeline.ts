@@ -31,10 +31,14 @@ import { diffAllStyles, kebabToCamel } from "./style-diff.ts";
 import { applyStylesToTree } from "./apply-styles.ts";
 import { collectAssets } from "./asset-collect.ts";
 import { downloadAssets } from "./asset-download.ts";
+import { applyFamilyAliases, planImageFamilies } from "./image-family.ts";
 import { rewriteAssetUrls } from "./asset-rewrite.ts";
 import { applyTokens } from "./css-tokens.ts";
 import { crawlSite } from "./crawl.ts";
 import { detectLayout } from "./layout-detect.ts";
+import { applyAccordions } from "./apply-accordions.ts";
+import { applyPopovers } from "./apply-popovers.ts";
+import { applyDisclosures } from "./apply-disclosures.ts";
 import type { ImportIo } from "./io.ts";
 import type { JxElement } from "@jxsuite/schema/types";
 import type { ComponentizeResult } from "./componentize.ts";
@@ -99,6 +103,7 @@ export type ImportPhase =
   | "crawl"
   | "styles"
   | "assets"
+  | "convert"
   | "layout"
   | "components"
   | "ai"
@@ -322,7 +327,7 @@ export async function runImportPipeline(
         if (bpCount > 0) {
           progress("styles", `${bpCount} breakpoints with style changes`);
           ({ breakpoints } = media);
-          applyStylesToTree(jx.document, diffed, media.deltas);
+          applyStylesToTree(jx.document, diffed, media.deltas, media.breakpoints);
         } else {
           progress("styles", "No responsive breakpoints with style changes");
           applyStylesToTree(jx.document, diffed);
@@ -368,7 +373,12 @@ export async function runImportPipeline(
 
       if (collected.assets.length > 0) {
         progress("assets", "Downloading assets...");
-        const downloaded = await downloadAssets(collected.assets, io, url);
+        /* One member per responsive family reaches the network; every dropped derivative is
+           aliased onto the file that WAS written, so a reference to any rung of the ladder still
+           resolves. The compiler regenerates the sizes from the original it now owns. */
+        const families = planImageFamilies(collected.assets);
+        const downloaded = await downloadAssets(families.keep, io, url);
+        applyFamilyAliases(downloaded.rewriteMap, families.alias);
         progress(
           "assets",
           `Downloaded ${downloaded.rewriteMap.size} assets (${formatBytes(downloaded.totalBytes)})`,
@@ -408,6 +418,31 @@ export async function runImportPipeline(
     await capture.page.close();
 
     throwIfAborted(signal);
+    /* Widgets become native markup BEFORE layout detection, which replaces the pages it extracts a
+       layout from - a pass after it would see the site's widgets in neither half. */
+    const singleConverted = applyAccordions(jx.document);
+    const singleDisclosures = applyDisclosures(jx.document);
+    if (singleDisclosures.converted > 0) {
+      progress(
+        "convert",
+        `Converted ${singleDisclosures.converted} disclosure${singleDisclosures.converted === 1 ? "" : "s"} to native <details>`,
+      );
+    }
+    const singleOverlays = applyPopovers(jx.document);
+    if (singleOverlays.converted > 0) {
+      progress(
+        "convert",
+        `Converted ${singleOverlays.converted} dropdown${singleOverlays.converted === 1 ? "" : "s"} to popovers`,
+      );
+    }
+    if (singleConverted.converted > 0) {
+      progress(
+        "convert",
+        `Converted ${singleConverted.converted} accordion${singleConverted.converted === 1 ? "" : "s"} ` +
+          `(${singleConverted.rows} rows) to native <details>`,
+      );
+    }
+
     const pageMap = new Map([["pages/index.json", jx.document]]);
     const precomputedComponents = await maybeAiComponentize(
       pageMap,
@@ -482,6 +517,39 @@ export async function runImportPipeline(
     const pageMap = new Map<string, JxElement>();
     for (const page of result.pages) {
       pageMap.set(page.route, page.jx.document);
+    }
+
+    /* Widgets become native markup BEFORE layout detection, which replaces the pages it extracts a
+       layout from - a pass after it would see the site's widgets in neither half. */
+    let convertedWidgets = 0;
+    let convertedRows = 0;
+    let convertedOverlays = 0;
+    let convertedDisclosures = 0;
+    for (const document of pageMap.values()) {
+      const converted = applyAccordions(document);
+      convertedWidgets += converted.converted;
+      convertedRows += converted.rows;
+      convertedDisclosures += applyDisclosures(document).converted;
+      convertedOverlays += applyPopovers(document).converted;
+    }
+    if (convertedDisclosures > 0) {
+      progress(
+        "convert",
+        `Converted ${convertedDisclosures} disclosure${convertedDisclosures === 1 ? "" : "s"} to native <details>`,
+      );
+    }
+    if (convertedOverlays > 0) {
+      progress(
+        "convert",
+        `Converted ${convertedOverlays} dropdown${convertedOverlays === 1 ? "" : "s"} to popovers`,
+      );
+    }
+    if (convertedWidgets > 0) {
+      progress(
+        "convert",
+        `Converted ${convertedWidgets} accordion${convertedWidgets === 1 ? "" : "s"} ` +
+          `(${convertedRows} rows) to native <details>`,
+      );
     }
 
     // Layout detection

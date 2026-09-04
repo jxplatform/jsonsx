@@ -46,6 +46,61 @@ describe("rewriteAssetUrls", () => {
     );
   });
 
+  test("collapses a srcset whose candidates all became one file", () => {
+    /* After family selection every rung of a responsive ladder resolves to the ONE file that was
+       written, so the attribute is the same path repeated with different width descriptors - a
+       list that lies to the browser about what it can choose. */
+    const tree: JxElement = {
+      tagName: "div",
+      children: [
+        {
+          tagName: "img",
+          attributes: {
+            src: "https://example.com/photo-300x200.jpg",
+            srcset:
+              "https://example.com/photo-300x200.jpg 300w, https://example.com/photo-768x512.jpg 768w",
+            sizes: "(max-width: 400px) 100vw, 400px",
+          },
+        },
+      ],
+    };
+    const map = new Map([
+      ["https://example.com/photo-300x200.jpg", "/assets/images/photo.jpg"],
+      ["https://example.com/photo-768x512.jpg", "/assets/images/photo.jpg"],
+    ]);
+
+    rewriteAssetUrls(tree, map);
+    const attrs = (tree.children as JxElement[])[0]!.attributes!;
+
+    expect(attrs["srcset"]).toBeUndefined();
+    // `sizes` describes a layout that no longer exists, and the compiler honours it over its own
+    // Container measurement, so leaving it would misdescribe the imported page.
+    expect(attrs["sizes"]).toBeUndefined();
+    expect(attrs["src"]).toBe("/assets/images/photo.jpg");
+  });
+
+  test("leaves a partly-remote srcset alone rather than narrowing it", () => {
+    const tree: JxElement = {
+      tagName: "div",
+      children: [
+        {
+          tagName: "img",
+          attributes: {
+            srcset:
+              "https://example.com/photo-300x200.jpg 300w, https://cdn.other.test/photo.jpg 768w",
+          },
+        },
+      ],
+    };
+    const map = new Map([["https://example.com/photo-300x200.jpg", "/assets/images/photo.jpg"]]);
+
+    rewriteAssetUrls(tree, map);
+    const attrs = (tree.children as JxElement[])[0]!.attributes!;
+
+    // One candidate never downloaded, so the set is only partly local and must not be collapsed.
+    expect(attrs["srcset"]).toContain("https://cdn.other.test/photo.jpg");
+  });
+
   test("rewrites background-image url() in style", () => {
     const tree: JxElement = {
       tagName: "div",
