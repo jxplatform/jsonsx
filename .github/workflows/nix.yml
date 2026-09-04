@@ -173,6 +173,13 @@ jobs:
           # An afternoon.
           extra-conf: |
             accept-flake-config = true
+          # `nixConfig` above is a plain-Nix feature — accepting a flake's own substituter needs
+          # no Determinate-only capability (FlakeHub substituters, lazy trees), so there is nothing
+          # this job loses by turning `determinate` off. Left at its `true` default,
+          # `determinate-nixd` tries to log into FlakeHub on every run and fails, because this repo
+          # isn't registered there — a failure annotation on green builds that this silences at
+          # the source rather than working around downstream.
+          determinate: false
 
       # Backs /nix/store with the GitHub Actions cache. cache.nixos.org already serves the nixpkgs
       # half of the closure; what it can never serve is the ~1000 fixed-output npm tarball
@@ -182,6 +189,9 @@ jobs:
         with:
           # Perf/diagnostic telemetry to Determinate Systems is on by default; "" disables it.
           diagnostic-endpoint: ""
+          # This lane doesn't use FlakeHub Cache; without this the action makes its own opportunistic
+          # FlakeHub probe and logs a second, separate authentication-failure annotation.
+          use-flakehub: false
 
       # Installs the `cachix` binary and adds https://jxsuite.cachix.org as a substituter. Pushing
       # is deliberately NOT delegated to this action: its default daemon mode pushes every path
