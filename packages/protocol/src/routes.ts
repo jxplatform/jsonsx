@@ -192,7 +192,7 @@ export const STUDIO_ROUTES = {
   ),
   extensionCatalog: route(
     "GET",
-    "/__studio/extension-catalog",
+    "/__studio/catalog",
     "Extensions this backend can OFFER (ExtensionCatalogEntry[]) — the shipped first-party " +
       "catalogue plus any package in the project's own dependencies exporting a jx-extension.json, " +
       "each marked with whether the host resolves it without a project install and whether the " +

@@ -6,7 +6,7 @@
     "**/_studio_fixtures/*",
     "CHANGELOG.md",
     "packages/schema/*.json",
-    "packages/extension-catalog/catalog.json",
+    "packages/catalog/catalog.json",
     "**/project.schema.json",
     "**/document.schema.json"
   ],

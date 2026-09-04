@@ -18,7 +18,7 @@
     "./ai-api": "./src/ai-api.ts",
     "./data": "./src/data-api.ts",
     "./import-api": "./src/import-api.ts",
-    "./extension-catalog": "./src/extension-catalog.ts",
+    "./catalog": "./src/extension-catalog.ts",
     "./packages": "./src/packages.ts",
     "./project-server": "./src/project-server.ts",
     "./oauth-loopback": "./src/oauth-loopback.ts",
@@ -40,10 +40,10 @@
     "upgrade": "bun update --latest && bun install"
   },
   "dependencies": {
+    "@jxsuite/catalog": "workspace:^",
     "@jxsuite/collab": "workspace:^",
     "@jxsuite/compiler": "workspace:^",
     "@jxsuite/create": "workspace:^",
-    "@jxsuite/extension-catalog": "workspace:^",
     "@jxsuite/import": "workspace:^",
     "@jxsuite/protocol": "workspace:^",
     "@jxsuite/runtime": "workspace:^",

@@ -1,11 +1,11 @@
 /**
- * Extension-catalog — what THIS backend can offer a project (specs/extensions.md §9.2).
+ * Catalog — what THIS backend can offer a project (specs/extensions.md §9.2).
  *
  * The available half of the pair whose enabled half is `buildExtensionsPayload`. Two sources, and
  * the split is the point:
  *
- * 1. The shipped first-party catalogue (`@jxsuite/extension-catalog`), which is data generated from
- *    the `extensions/` tree, so core keeps no dependency on an extension package (§2).
+ * 1. The shipped first-party catalogue (`@jxsuite/catalog`), which is data generated from the
+ *    `extensions/` tree, so core keeps no dependency on an extension package (§2).
  * 2. The project's own dependencies, scanned for anything exporting a `jx-extension.json`.
  *
  * Both are then annotated with two facts only a backend holds: whether the PROJECT resolves the
@@ -24,7 +24,7 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { listCatalog } from "@jxsuite/extension-catalog";
+import { listCatalog } from "@jxsuite/catalog";
 import { buildExtensionRegistry } from "@jxsuite/schema/extension-registry";
 import { createNodeFormatIO, probeExtension } from "@jxsuite/compiler/format-host";
 import type { ExtensionCatalogEntry, ExtensionSectionInfo } from "@jxsuite/protocol";

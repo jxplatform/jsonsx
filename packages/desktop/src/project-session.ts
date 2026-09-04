@@ -635,8 +635,7 @@ export function createProjectSession(initialRoot: string | null) {
   }
 
   /**
-   * What this backend can OFFER, enabled or not — the desktop twin of GET
-   * /__studio/extension-catalog.
+   * What this backend can OFFER, enabled or not — the desktop twin of GET /__studio/catalog.
    *
    * Same builder as the dev server, deliberately: what differs between the two hosts is what the
    * resolution PROBE answers, not the code. A desktop build stages what it stages, and hardcoding a
@@ -651,7 +650,7 @@ export function createProjectSession(initialRoot: string | null) {
       return [];
     }
     try {
-      const { buildExtensionCatalog } = await import("@jxsuite/server/extension-catalog");
+      const { buildExtensionCatalog } = await import("@jxsuite/server/catalog");
       return await buildExtensionCatalog(projectRoot);
     } catch (error) {
       console.error("[desktop] listExtensionCatalog failed:", error);

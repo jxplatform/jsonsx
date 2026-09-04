@@ -1,12 +1,12 @@
 {
-  "name": "@jxsuite/extension-catalog",
+  "name": "@jxsuite/catalog",
   "version": "0.1.0",
   "description": "The catalogue of first-party Jx extensions a project can turn on",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/jxsuite/jx.git",
-    "directory": "packages/extension-catalog"
+    "directory": "packages/catalog"
   },
   "files": [
     "index.ts",

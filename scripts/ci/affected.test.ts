@@ -36,15 +36,15 @@ describe("the whole matrix", () => {
     expect(flags).toContain("server");
     expect(flags).toContain("parser");
     /*
-     * Every workspace EXCEPT `extension-catalog`, which depends on nothing at all. That is not an
+     * Every workspace EXCEPT `catalog`, which depends on nothing at all. That is not an
      * oversight in its manifest: it is the catalogue of first-party extensions, and it names them
      * as data precisely so that no core package acquires a dependency on `extensions/*`
      * (specs/extensions.md §2). A dependency added to satisfy this assertion would be the very
      * edge the rule forbids, so the exception is the design working.
      */
-    const standalone = workspaces.filter((w) => w.flag === "extension-catalog");
+    const standalone = workspaces.filter((w) => w.flag === "catalog");
     expect(standalone.length).toBe(1);
-    expect(flags).not.toContain("extension-catalog");
+    expect(flags).not.toContain("catalog");
     expect(flags.length).toBe(workspaces.length - standalone.length);
   });
 
