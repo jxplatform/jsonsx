@@ -1012,14 +1012,14 @@ describe("formats", () => {
         title: "Feeds",
       },
     ];
-    route("/__studio/extension-catalog", (c) => {
+    route("/__studio/catalog", (c) => {
       expect(c.search.get("dir")).toBe(".");
       return json(catalog);
     });
     const p = createDevServerPlatform();
     expect(await p.listExtensionCatalog?.()).toEqual(catalog);
     // A backend without the route costs the OFFER, not the section.
-    route("/__studio/extension-catalog", () => json({}, 404));
+    route("/__studio/catalog", () => json({}, 404));
     expect(await p.listExtensionCatalog?.()).toEqual([]);
   });
 

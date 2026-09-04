@@ -754,9 +754,7 @@ export function createDevServerPlatform() {
      * catalogue to repair it.
      */
     async listExtensionCatalog(): Promise<ExtensionCatalogEntry[]> {
-      const res = await fetch(
-        `/__studio/extension-catalog?dir=${encodeURIComponent(serverPath("."))}`,
-      );
+      const res = await fetch(`/__studio/catalog?dir=${encodeURIComponent(serverPath("."))}`);
       return res.ok ? await readJson<ExtensionCatalogEntry[]>(res) : [];
     },
 

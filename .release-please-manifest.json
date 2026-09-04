@@ -19,5 +19,5 @@
   "packages/formulas": "0.0.16",
   "extensions/search": "0.2.6",
   "extensions/feed": "0.3.5",
-  "packages/extension-catalog": "0.1.0"
+  "packages/catalog": "0.1.0"
 }

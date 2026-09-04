@@ -136,9 +136,9 @@
       "component": "feed",
       "bump-minor-pre-major": true
     },
-    "packages/extension-catalog": {
+    "packages/catalog": {
       "release-type": "node",
-      "component": "extension-catalog",
+      "component": "catalog",
       "bump-minor-pre-major": true
     }
   }

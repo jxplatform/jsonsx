@@ -9,7 +9,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { buildExtensionCatalog } from "../src/extension-catalog.ts";
+import { buildExtensionCatalog } from "../src/catalog.ts";
 
 interface FakeDep {
   name: string;
