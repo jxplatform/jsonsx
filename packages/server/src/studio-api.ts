@@ -1510,7 +1510,7 @@ export async function handleStudioApi(
     const projectRoot = isAbsolute(dir) ? dir : resolve(root, dir);
     try {
       assertAccessible(projectRoot, root, activeProjectRoot);
-      const { buildExtensionCatalog } = await import("./catalog.ts");
+      const { buildExtensionCatalog } = await import("./extension-catalog.ts");
       return Response.json(await buildExtensionCatalog(projectRoot));
     } catch (error) {
       return problem("invalidRequest", errorMessage(error));
