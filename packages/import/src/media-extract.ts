@@ -16,7 +16,7 @@ import type { ImportPage } from "./capture.ts";
 import type { CapturedStyle } from "./style-capture.ts";
 import { captureStylesAtWidth } from "./style-capture.ts";
 import { computeMediaDelta } from "./style-diff.ts";
-import { analyzeMediaQueries, planBreakpoints } from "./breakpoint-plan.ts";
+import { analyzeMediaQueries, parseWidthQuery, planBreakpoints } from "./breakpoint-plan.ts";
 import type { Breakpoint, BreakpointPolicy } from "./breakpoint-plan.ts";
 import type { DiffedStyle } from "./style-diff.ts";
 
@@ -54,6 +54,66 @@ export interface ExtractMediaOptions {
 }
 
 /**
+ * How far inside its own band the corroborating sample sits. Wide enough that a fluid element
+ * measures differently, narrow enough to stay clear of the neighbouring breakpoint.
+ */
+const SECOND_SAMPLE_OFFSET = 40;
+
+/**
+ * A second viewport width INSIDE the same media band.
+ *
+ * The direction is the whole point: for `(max-width: N)` the band runs downward, so the second
+ * sample is narrower; for `(min-width: N)` it runs upward and the sample must be wider, or it
+ * leaves the band and measures the rules this breakpoint exists to distinguish itself from.
+ */
+export function secondSampleWidth(bp: Breakpoint): number {
+  const parsed = parseWidthQuery(bp.query);
+  const direction = parsed?.type === "min" ? 1 : -1;
+  return Math.max(1, bp.testWidth + direction * SECOND_SAMPLE_OFFSET);
+}
+
+/**
+ * Keep only the declarations two samples of the same band AGREE on.
+ *
+ * `getComputedStyle` returns used values, so `width` and `height` come back as the pixels the
+ * element happens to occupy - never the authored `100%` or `auto`. Diffing one sample against the
+ * base therefore reported a "change" for every fluid element at every breakpoint: two thirds of all
+ * responsive declarations in a real import were the viewport's own width written back as the
+ * element's, which does not merely waste space but PINS the layout and defeats the reflow the
+ * breakpoint existed for.
+ *
+ * Measuring twice inside the band separates the two cases without knowing which properties are
+ * geometry. An authored value is the same at both widths and survives; a resolved one moves with
+ * the viewport and is dropped. A property whose value legitimately differs across the band (a
+ * percentage-positioned element) is dropped too - that is the intended trade, since nothing in a
+ * computed-style capture can tell it from noise.
+ */
+export function agreedDeltas(
+  primary: readonly DiffedStyle[],
+  corroborating: readonly DiffedStyle[],
+): DiffedStyle[] {
+  const second = new Map(corroborating.map((d) => [d.path.join(","), d.style]));
+  const agreed: DiffedStyle[] = [];
+
+  for (const delta of primary) {
+    const other = second.get(delta.path.join(","));
+    if (!other) {
+      continue;
+    }
+    const style: Record<string, string | number> = {};
+    for (const [prop, value] of Object.entries(delta.style)) {
+      if (other[prop] === value) {
+        style[prop] = value;
+      }
+    }
+    if (Object.keys(style).length > 0) {
+      agreed.push({ path: delta.path, style });
+    }
+  }
+  return agreed;
+}
+
+/**
  * Extract `$media` style deltas by re-capturing at each KEPT breakpoint width.
  *
  * @param {ImportPage} page - Browser page (must still have the target page loaded)
@@ -81,8 +141,17 @@ export async function extractMedia(
   const allDeltas: Record<string, DiffedStyle[]> = {};
 
   for (const bp of keep) {
-    const bpElements = await captureStylesAtWidth(page, bp.testWidth);
-    const deltas = computeMediaDelta(baseElements, bpElements, uaDefaults);
+    const primary = computeMediaDelta(
+      baseElements,
+      await captureStylesAtWidth(page, bp.testWidth),
+      uaDefaults,
+    );
+    const corroborating = computeMediaDelta(
+      baseElements,
+      await captureStylesAtWidth(page, secondSampleWidth(bp)),
+      uaDefaults,
+    );
+    const deltas = agreedDeltas(primary, corroborating);
 
     if (deltas.length > 0) {
       projectBreakpoints[bp.name] = bp.query;

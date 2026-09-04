@@ -103,14 +103,14 @@ describe("computeMediaDelta", () => {
     // Font-size changed: base had "24px" (non-default), bp has "16px" (matches UA default,
     // So it's dropped from the diff). That means the bp diff is empty for font-size,
     // But the base diff had fontSize: "24px". The delta should show the difference.
-    // Actually: base diffed = { fontSize: "24px", display: "flex" }
-    //           Bp diffed   = { display: "flex" }
-    // Delta = properties in bpStyle that differ from baseStyle
-    // Display is same → skip. fontSize is in base but not in bp → skip (not in bpStyle).
-    // Hmm, this means we'd miss that fontSize went back to default at the breakpoint.
-    // Let me reconsider — for media deltas we should also check for properties that
-    // Disappeared (went back to default).
-    expect(deltas).toHaveLength(0);
+    /* Base diffed = { fontSize: "24px", display: "flex" }; bp diffed = { display: "flex" }.
+       `display` is unchanged, but `fontSize` REVERTED to the UA default at the breakpoint, so it
+       vanished from the bp side rather than staying there with a new value. A revert is a change:
+       it is emitted with the breakpoint's own raw value, which is what the element actually
+       computes to there. */
+    expect(deltas).toHaveLength(1);
+    expect(deltas[0]!.style).toHaveProperty("fontSize", "16px");
+    expect(deltas[0]!.style).not.toHaveProperty("display");
   });
 
   test("detects style additions at breakpoint", () => {
@@ -137,10 +137,12 @@ describe("computeMediaDelta", () => {
     const uaDefaults = { div: { display: "block" }, span: {} };
     const deltas = computeMediaDelta(base, bp, uaDefaults);
 
-    // Only the div should have a delta (display changed back to block = UA default,
-    // So diffStyles returns empty for it at bp). Base had display: "flex".
-    // Bp diffed = {} (block is UA default). base diffed = { display: "flex" }.
-    // Delta: nothing in bpStyle differs from baseStyle (bpStyle is empty).
-    expect(deltas).toHaveLength(0);
+    /* The div went `flex` -> `block`, and `block` is the div's UA default, so the bp side filters
+       to {}. That is the single most common responsive change there is (stack on mobile) and it
+       must survive: the delta carries `display: block` from the raw capture. The span is absent at
+       the breakpoint entirely and contributes nothing. */
+    expect(deltas).toHaveLength(1);
+    expect(deltas[0]!.path).toEqual([0]);
+    expect(deltas[0]!.style).toHaveProperty("display", "block");
   });
 });

@@ -15,6 +15,7 @@ import type { Breakpoint, BreakpointPolicy } from "./breakpoint-plan.ts";
 import { applyStylesToTree } from "./apply-styles.ts";
 import { collectAssets } from "./asset-collect.ts";
 import { downloadAssets } from "./asset-download.ts";
+import { applyFamilyAliases, planImageFamilies } from "./image-family.ts";
 import { rewriteAssetUrls } from "./asset-rewrite.ts";
 import { applyTokens } from "./css-tokens.ts";
 
@@ -327,7 +328,7 @@ export async function crawlSite(options: CrawlOptions): Promise<CrawlResult> {
               mergedBreakpoints = {};
             }
             Object.assign(mergedBreakpoints, media.breakpoints);
-            applyStylesToTree(jx.document, diffed, media.deltas);
+            applyStylesToTree(jx.document, diffed, media.deltas, media.breakpoints);
           } else {
             applyStylesToTree(jx.document, diffed);
           }
@@ -365,7 +366,12 @@ export async function crawlSite(options: CrawlOptions): Promise<CrawlResult> {
         }
 
         if (collected.assets.length > 0) {
-          const downloaded = await downloadAssets(collected.assets, io, entry.url);
+          /* One member per responsive family reaches the network; every dropped derivative is
+             aliased onto the file that WAS written, so a reference to any rung of the ladder still
+             resolves. The compiler regenerates the sizes from the original it now owns. */
+          const families = planImageFamilies(collected.assets);
+          const downloaded = await downloadAssets(families.keep, io, entry.url);
+          applyFamilyAliases(downloaded.rewriteMap, families.alias);
           if (downloaded.rewriteMap.size > 0) {
             rewriteAssetUrls(jx.document, downloaded.rewriteMap, entry.url);
             // Collect font rewrites (R2)

@@ -52,20 +52,34 @@ export function rewriteAssetUrls(
    * the importer would fetch one set of URLs and rewrite another — the attribute would be
    * reassembled around fragments nothing had downloaded.
    */
-  function rewriteSrcset(srcset: string): string {
-    return srcset
+  function rewriteSrcset(srcset: string): { srcset: string; collapsedTo: string | null } {
+    const locals = new Set<string>();
+    let unresolved = false;
+
+    const rewritten = srcset
       .split(SRCSET_SEPARATOR)
       .map((entry) => {
         const parts = entry.trim().split(/\s+/);
         const [url = ""] = parts;
-        const rewritten = rewriteUrl(url);
-        if (rewritten) {
+        const local = rewriteUrl(url);
+        if (local) {
           count += 1;
-          parts[0] = rewritten;
+          parts[0] = local;
+          locals.add(local);
+        } else {
+          unresolved = true;
         }
         return parts.join(" ");
       })
       .join(", ");
+
+    /* Every candidate now points at the ONE file the family kept, so the attribute has become a
+       list of the same path repeated with different width descriptors — which lies to the browser
+       about what it can choose. Collapse it, and let the compiler build a real `srcset` from the
+       original it owns. A candidate that failed to resolve means the family is only partly local,
+       so the attribute stays as it is rather than silently narrowing the set. */
+    const collapsedTo = !unresolved && locals.size === 1 ? [...locals][0]! : null;
+    return { collapsedTo, srcset: rewritten };
   }
 
   function rewriteCssUrls(value: string): string {
@@ -125,7 +139,17 @@ export function rewriteAssetUrls(
 
       // Srcset attribute
       if (typeof attrs.srcset === "string") {
-        attrs.srcset = rewriteSrcset(attrs.srcset);
+        const result = rewriteSrcset(attrs.srcset);
+        if (result.collapsedTo === null) {
+          attrs.srcset = result.srcset;
+        } else {
+          delete attrs.srcset;
+          /* `sizes` describes a layout that no longer exists once the candidate list is gone, and
+             the compiler honours an author `sizes` over its own container measurement — so a stale
+             one would misdescribe the imported layout rather than merely be redundant. */
+          delete attrs.sizes;
+          attrs.src = result.collapsedTo;
+        }
       }
     }
 

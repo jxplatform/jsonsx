@@ -9,6 +9,14 @@ code:
   - packages/studio/src/services/import-seed.ts
   - packages/import/src/strip-classes.ts
   - packages/import/src/emit.ts
+  - packages/import/src/apply-accordions.ts
+  - packages/import/src/image-family.ts
+  - packages/import/src/style-capture.ts
+  - packages/import/src/componentize.ts
+  - packages/import/src/apply-popovers.ts
+  - packages/import/src/apply-disclosures.ts
+  - packages/import/src/derived-geometry.ts
+  - packages/import/src/apply-styles.ts
 ---
 
 # Create a project
@@ -103,6 +111,18 @@ So the Import tab asks. There are three answers:
 The first two also take a **rounding rule** (nearest, round down, or round up) deciding which declared width backs a kept one. A width that isn't kept is folded into the kept one nearest it, so nothing the site expressed is thrown away; the import's log says which widths went where.
 
 You can change all of this afterwards in **[Project settings › Contexts](/docs/studio/projects/settings)**.
+
+:::doc-note
+Interactive pieces are rebuilt as native HTML wherever the import can read them. An accordion whose rows a client framework opened and closed becomes a group of `<details>` elements sharing a `name`, so one row at a time stays open exactly as it did on the source site, with no JavaScript and nothing left to wire up. A **Read more** link, or anything else whose button already says which panel it opens, becomes a `<details>` too, so the copy behind it is readable again. A dropdown or a slide-out menu becomes a popover instead, with its button wired to it by the browser rather than by script: what a panel turns into depends on whether it sat in the page or floated above it. In both cases the framework's own attributes go, because the code that gave them meaning is not carried across, and the content those pieces were hiding becomes reachable again. Where the logic cannot be read with confidence the markup is left exactly as it was rather than guessed at.
+:::
+
+:::doc-note
+A responsive image arrives as one file. A CMS publishes the same photograph a dozen times over at every size it might need, and every one of those copies appears in the page's `srcset`: one real site offered 2,446 image files for 451 actual images. The import downloads the largest of each and drops the rest, then removes the `srcset` and `sizes` that described them, so your project's own build can generate the sizes it wants from a full-resolution source.
+:::
+
+:::doc-note
+Sizes the browser measured are not mistaken for sizes the site chose. A full-width section is full-width because it fills the page, not because it happens to be 1440 pixels across on the machine that captured it, so its measured width is left out and it keeps filling whatever it is put in. The rules that actually shaped it, a maximum width or a grid track, are kept. Images, absolutely positioned panels and elements that shrink to fit their content keep their measurements, because nothing else in the page would reproduce those.
+:::
 
 :::doc-note
 Class names from the source site are not carried into your project. The import rebuilds every style from what the browser actually computed, and never emits the original stylesheets, so a `class="hero grid-cols-3"` left on a page would name rules that don't exist. The styles are all there; the class attributes are not.

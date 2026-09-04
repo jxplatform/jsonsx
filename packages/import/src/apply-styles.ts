@@ -5,6 +5,8 @@
 
 import type { JxElement, JxStyle } from "@jxsuite/schema/types";
 import type { DiffedStyle } from "./style-diff.ts";
+import { parseWidthQuery } from "./breakpoint-plan.ts";
+import { dropDerivedGeometry } from "./derived-geometry.ts";
 
 /** Build a lookup from path key → style object for fast application. */
 function buildStyleMap(diffed: DiffedStyle[]): Map<string, Record<string, string | number>> {
@@ -13,6 +15,43 @@ function buildStyleMap(diffed: DiffedStyle[]): Map<string, Record<string, string
     map.set(d.path.join(","), d.style);
   }
   return map;
+}
+
+/**
+ * The order breakpoint keys must be WRITTEN in, so the cascade resolves the way the source site
+ * did.
+ *
+ * A node's `@--name` keys become `@media` blocks at equal specificity, and equal specificity means
+ * the LAST matching rule wins. So the order is not cosmetic: with `--767` written before `--1024`,
+ * a 500px viewport matches both and takes the 1024 rule, which is the wrong one. Breakpoints are
+ * planned and iterated ascending, so every multi-breakpoint node came out inverted.
+ *
+ * Correct order is per direction. `max-width` narrows downward, so the NARROWER query must come
+ * last to win at narrow viewports: descending. `min-width` widens upward, so the WIDER query must
+ * come last: ascending. A query neither shape (or one the planner could not read) keeps its
+ * relative order at the end, where it cannot displace a rule that was understood.
+ *
+ * This is deliberately NOT the order `$media` itself is written in — `emit.ts` sorts that map
+ * ascending for Studio's Contexts list, and a lookup table has no cascade to get wrong.
+ */
+export function orderBreakpointKeys(
+  names: readonly string[],
+  queries: Record<string, string> | undefined,
+): string[] {
+  const rank = (name: string): { band: number; width: number } => {
+    const parsed = queries?.[name] === undefined ? null : parseWidthQuery(queries[name]!);
+    if (!parsed) {
+      return { band: 2, width: 0 };
+    }
+    return parsed.type === "max"
+      ? { band: 0, width: -parsed.width }
+      : { band: 1, width: parsed.width };
+  };
+  return names.toSorted((a, b) => {
+    const ra = rank(a);
+    const rb = rank(b);
+    return ra.band === rb.band ? ra.width - rb.width : ra.band - rb.band;
+  });
 }
 
 /**
@@ -26,12 +65,13 @@ export function applyStylesToTree(
   root: JxElement,
   baseStyles: DiffedStyle[],
   mediaDeltas?: Record<string, DiffedStyle[]>,
+  breakpointQueries?: Record<string, string>,
 ): void {
   const baseMap = buildStyleMap(baseStyles);
-  const mediaMaps: Record<string, Map<string, Record<string, string | number>>> = {};
+  const mediaMaps: [string, Map<string, Record<string, string | number>>][] = [];
   if (mediaDeltas) {
-    for (const [bpName, deltas] of Object.entries(mediaDeltas)) {
-      mediaMaps[bpName] = buildStyleMap(deltas);
+    for (const bpName of orderBreakpointKeys(Object.keys(mediaDeltas), breakpointQueries)) {
+      mediaMaps.push([bpName, buildStyleMap(mediaDeltas[bpName]!)]);
     }
   }
 
@@ -55,24 +95,33 @@ function walkAndApply(
   node: JxElement,
   path: number[],
   baseMap: Map<string, Record<string, string | number>>,
-  mediaMaps: Record<string, Map<string, Record<string, string | number>>>,
+  mediaMaps: readonly [string, Map<string, Record<string, string | number>>][],
 ): void {
   const key = path.join(",");
 
-  // Apply base styles
+  /* Measured geometry is filtered against the NODE, because the question is structural: a
+     block-level box in normal flow fills its container, so its measured width states a fact the
+     layout already implies and pinning it is what stops the clone reflowing. The copy is per node
+     because the same captured style object is shared between every instance of a component. */
   const baseStyle = baseMap.get(key);
   if (baseStyle) {
-    node.style = mergeStyle(node.style, baseStyle);
+    const filtered = { ...baseStyle };
+    dropDerivedGeometry(node, filtered);
+    node.style = mergeStyle(node.style, filtered);
   }
 
   // Apply media-responsive deltas as @breakpointName nested objects
-  for (const [bpName, deltaMap] of Object.entries(mediaMaps)) {
+  for (const [bpName, deltaMap] of mediaMaps) {
     const delta = deltaMap.get(key);
-    if (delta && Object.keys(delta).length > 0) {
-      if (!node.style) {
-        node.style = {};
+    if (delta) {
+      const filtered = { ...delta };
+      dropDerivedGeometry(node, filtered, (node.style ?? {}) as Record<string, unknown>);
+      if (Object.keys(filtered).length > 0) {
+        if (!node.style) {
+          node.style = {};
+        }
+        (node.style as Record<string, unknown>)[`@${bpName}`] = filtered;
       }
-      (node.style as Record<string, unknown>)[`@${bpName}`] = delta;
     }
   }
 

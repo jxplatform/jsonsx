@@ -83,6 +83,10 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `desktop.md`
 
+- **0.4.13-draft** (2026-09-02) — Only authored sizes are emitted: a block-level box in normal flow drops the width and height a browser measured, so an imported layout stays fluid instead of pinned to the capture viewport.
+- **0.4.12-draft** (2026-09-02) — A control that declares which panel it expands becomes a native disclosure, with the flow deciding whether a pair is a details element or a popover.
+- **0.4.11-draft** (2026-09-02) — Import pairs a control with the panel it opens from the accessibility contract a site already ships, and emits a popover whose closed state lives in :popover-open rather than the base rule.
+- **0.4.10-draft** (2026-09-01) — Import emits one file per image family, rewrites readable interactions to native markup, and samples each breakpoint twice so responsive styles carry declared values rather than measured ones.
 - **0.4.9-draft** (2026-08-31) — The PAL member table names listExtensionCatalog, the extension catalogue a backend answers for itself (extensions.md §9.2).
 - **0.4.8-draft** (2026-08-28) — Distinguish the window's own icon (favicon-driven, studio.md 11.2) from the taskbar/dock icon (StartupWMClass) in section 9.3.
 - **0.4.7-draft** (2026-08-27) — The files route answers in stable path order, in every backend.

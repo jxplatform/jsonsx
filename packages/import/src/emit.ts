@@ -166,10 +166,16 @@ export async function emitMultiPageProject({
         tagName: comp.tagName,
       };
 
-      const state: Record<string, string> = {};
-      extractStateDefaults(comp.template, state);
+      /* Derived placeholders fill in for props the template interpolates but nobody declared;
+         a value the template DECLARED wins over them. This was an assignment over the spread, so
+         a component that carried its own `state` — the `active` index a tab group switches on —
+         lost it on the way out, and every interpolation referencing it went dead. */
+      const derived: Record<string, string> = {};
+      extractStateDefaults(comp.template, derived);
+      const declared = (comp.template.state ?? {}) as Record<string, unknown>;
+      const state = { ...derived, ...declared };
       if (Object.keys(state).length > 0) {
-        compDoc.state = state;
+        compDoc.state = state as Record<string, string>;
       }
 
       componentFiles.set(fileName, compDoc);
@@ -298,16 +304,29 @@ export async function emitMultiPageProject({
   return { classesStripped, files, projectJson: projectText };
 }
 
+/**
+ * The state key a whole-string `${state.x}` names, or null.
+ *
+ * The identifier check is the point. The capture used to be `([^}]+)`, so `${state.active !== 0}` —
+ * an expression, not a reference — minted a state entry literally called `active !== 0` beside the
+ * real one. Only a bare identifier is a key; anything else is an expression over state and has no
+ * default of its own to declare.
+ */
+function stateKey(text: string): string | undefined {
+  const key = text.match(/^\$\{state\.([^}]+)\}$/)?.[1];
+  return key !== undefined && /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(key) ? key : undefined;
+}
+
 function extractStateDefaults(node: JxElement | string, out: Record<string, string>) {
   if (typeof node === "string") {
-    const key = node.match(/^\$\{state\.([^}]+)\}$/)?.[1];
+    const key = stateKey(node);
     if (key && !(key in out)) {
       out[key] = "";
     }
     return;
   }
   if (typeof node.textContent === "string") {
-    const key = node.textContent.match(/^\$\{state\.([^}]+)\}$/)?.[1];
+    const key = stateKey(node.textContent);
     if (key && !(key in out)) {
       out[key] = "";
     }
@@ -315,7 +334,7 @@ function extractStateDefaults(node: JxElement | string, out: Record<string, stri
   if (node.attributes) {
     for (const v of Object.values(node.attributes)) {
       if (typeof v === "string") {
-        const key = v.match(/^\$\{state\.([^}]+)\}$/)?.[1];
+        const key = stateKey(v);
         if (key && !(key in out)) {
           out[key] = "";
         }

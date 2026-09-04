@@ -185,6 +185,39 @@ function setNodeAt(root: JxElement, path: number[], replacement: JxElement): JxE
   return result;
 }
 
+/**
+ * Tags that must never become a component ROOT, because the element itself carries the behaviour.
+ *
+ * A component's template root takes the component's own tag name, so promoting one of these
+ * replaces it with a custom element and the browser semantics go with it: `<details>` stops being a
+ * disclosure, `<summary>` stops being its label, `<dialog>` stops being a dialog, and a table or
+ * list part is torn out of the parent structure that gives it meaning. The children of one of these
+ * are still fair game — only the root is refused.
+ *
+ * This matters most for the widgets `apply-accordions.ts` converts: rewriting an accordion into
+ * `<details name>` makes its rows structurally identical, which is exactly the shape componentize
+ * looks for, so without this guard the pass would hand back a working disclosure and componentize
+ * would immediately turn it into an inert custom element.
+ */
+const NEVER_A_COMPONENT_ROOT = new Set([
+  "details",
+  "summary",
+  "dialog",
+  "table",
+  "thead",
+  "tbody",
+  "tfoot",
+  "tr",
+  "td",
+  "th",
+  "li",
+  "dt",
+  "dd",
+  "option",
+  "optgroup",
+  "figcaption",
+]);
+
 function collectSubtrees(
   node: JxElement,
   pageRoute: string,
@@ -193,7 +226,8 @@ function collectSubtrees(
   out: SubtreeLocation[],
 ) {
   // Skip root node (path.length === 0) — don't componentize entire pages
-  if (path.length > 0 && nodeDepth(node) >= minDepth) {
+  const tag = String(node.tagName ?? "").toLowerCase();
+  if (path.length > 0 && nodeDepth(node) >= minDepth && !NEVER_A_COMPONENT_ROOT.has(tag)) {
     out.push({ pageRoute, path: [...path], node });
   }
   if (Array.isArray(node.children)) {
