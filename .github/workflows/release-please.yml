@@ -322,6 +322,9 @@ jobs:
         with:
           extra-conf: |
             accept-flake-config = true
+          # See nix.yml: no Determinate-only capability is in play here, and leaving this at its
+          # `true` default just logs a FlakeHub-login-failure annotation on this job too.
+          determinate: false
 
       - name: A consumer substitutes instead of building
         env:
