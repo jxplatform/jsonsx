@@ -15836,6 +15836,16 @@
                 }
               ]
             },
+            "max-size": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                }
+              ]
+            },
             "max-width": {
               "oneOf": [
                 {
@@ -15877,6 +15887,16 @@
               ]
             },
             "maxLines": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                }
+              ]
+            },
+            "maxSize": {
               "oneOf": [
                 {
                   "type": "string"
@@ -15936,6 +15956,16 @@
                 }
               ]
             },
+            "min-size": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                }
+              ]
+            },
             "min-width": {
               "oneOf": [
                 {
@@ -15977,6 +16007,16 @@
               ]
             },
             "minIntrinsicSizing": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                }
+              ]
+            },
+            "minSize": {
               "oneOf": [
                 {
                   "type": "string"
@@ -19187,6 +19227,16 @@
               ]
             },
             "shapeRendering": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                }
+              ]
+            },
+            "size": {
               "oneOf": [
                 {
                   "type": "string"

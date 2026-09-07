@@ -45,7 +45,7 @@
     "upgrade": "bun update --latest && bun install"
   },
   "dependencies": {
-    "@apidevtools/json-schema-ref-parser": "^16.0.1",
+    "@apidevtools/json-schema-ref-parser": "^16.0.2",
     "@jxsuite/create": "workspace:^",
     "@jxsuite/runtime": "workspace:^",
     "@jxsuite/schema": "workspace:^",
@@ -56,7 +56,7 @@
     "sharp": "^0.35.4"
   },
   "devDependencies": {
-    "@happy-dom/global-registrator": "^20.12.2",
+    "@happy-dom/global-registrator": "^20.14.0",
     "@jxsuite/connector": "workspace:^",
     "@jxsuite/parser": "workspace:^",
     "@types/mdast": "^4.0.4"

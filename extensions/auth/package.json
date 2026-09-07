@@ -40,11 +40,11 @@
   "dependencies": {
     "@jxsuite/connector": "workspace:^",
     "@jxsuite/schema": "workspace:^",
-    "better-auth": "^1.7.2",
+    "better-auth": "^1.7.3",
     "kysely": "^0.29.5"
   },
   "devDependencies": {
-    "@happy-dom/global-registrator": "^20.12.2",
+    "@happy-dom/global-registrator": "^20.14.0",
     "ajv": "^8.20.0"
   },
   "jx": "./jx-extension.json"

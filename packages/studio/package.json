@@ -113,11 +113,11 @@
     "yaml": "^2.9.0"
   },
   "devDependencies": {
-    "@happy-dom/global-registrator": "^20.12.2",
+    "@happy-dom/global-registrator": "^20.14.0",
     "@types/mdast": "^4.0.4",
-    "@webref/css": "^8.7.3",
+    "@webref/css": "^8.7.4",
     "@webref/elements": "^2.8.0",
-    "@webref/idl": "^3.83.0"
+    "@webref/idl": "^3.83.1"
   },
   "//vue-reactivity": "Exact pin required — must match @jxsuite/runtime to avoid cross-boundary proxy bugs"
 }
