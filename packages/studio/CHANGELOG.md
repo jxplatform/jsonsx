@@ -1,5 +1,51 @@
 # Changelog
 
+## [5.0.0](https://github.com/jxsuite/jx/compare/studio-v4.1.0...studio-v5.0.0) (2026-09-09)
+
+
+### ⚠ BREAKING CHANGES
+
+* **runtime,compiler,site,studio:** `@jxsuite/runtime` no longer writes authored declarations to `el.style`, so code reading them back off an element after `applyStyle` sees nothing. The `elementStyleTags` export is replaced by `releaseElementStyles` and `resetDocumentStyles`, which refcount a shared rule set rather than handing out an element to remove by hand; `documentStyleText` reads back what was written.
+
+### Features
+
+* popovers become a first-class thing the canvas can open, and a rule it can check ([bf757f1](https://github.com/jxsuite/jx/commit/bf757f1c9a9d94e15cbaac3be5405588c082cee3))
+* **runtime,compiler,site,studio:** authored styles become adopted CSS rules ([1542477](https://github.com/jxsuite/jx/commit/15424770e40f979eaaad78682004cf8d87f8180f))
+* **studio,server,protocol:** one toggle installs an extension and enables it ([abe69bb](https://github.com/jxsuite/jx/commit/abe69bb60242ef97a49766040466d480ec3b93c9))
+* **studio,server,protocol:** one toggle installs an extension and enables it ([f6d6b2c](https://github.com/jxsuite/jx/commit/f6d6b2cc88810401a57ca941c1bdef182137df6e))
+* **studio:** highlight what changed in a diff, and open every changed file ([a54fa6d](https://github.com/jxsuite/jx/commit/a54fa6dc15fbe4ad7e8617d4e788c1670292ea2b))
+* **studio:** highlight what changed in a diff, and open every changed file ([248c9de](https://github.com/jxsuite/jx/commit/248c9de8b5109898f0f4b442d7c805abdf9cdd70))
+* **studio:** the canvas opens a popover in place, and reports the ones it cannot fix ([4eb4a6f](https://github.com/jxsuite/jx/commit/4eb4a6ffe4e8a582b9c3826ac392fefaed479be3))
+* **studio:** the Edit canvas resizes by dragging, and the breakpoint follows the width ([d31e301](https://github.com/jxsuite/jx/commit/d31e301d04750cc63b90f4855b829db2ddc80295))
+* **studio:** the Edit canvas resizes by dragging, and the breakpoint follows the width ([73ec4e8](https://github.com/jxsuite/jx/commit/73ec4e8ab265a16f95c762c7b3ca66fed318caa5))
+
+
+### Bug Fixes
+
+* **ai:** stop sending an empty assistant turn, and replay a model's reasoning ([9b0d735](https://github.com/jxsuite/jx/commit/9b0d7353897444825087cace1b4489bc6965e9fb))
+* **ai:** stop sending an empty assistant turn, and replay a model's reasoning ([d0b7fe1](https://github.com/jxsuite/jx/commit/d0b7fe19e0b40660f4ecb69e585df2682b05a129))
+* restore three spec releases the merge dropped, and one type-aware lint ([9b11526](https://github.com/jxsuite/jx/commit/9b11526d4e937fb211490a3c9a083a18bc44b818))
+* **studio,server:** the diff view drew line numbers and no text ([76d8d97](https://github.com/jxsuite/jx/commit/76d8d97f600622d2e381f3e1b2e37e88b0c40663))
+* **studio:** a cloud recent project opens the project it names ([876310f](https://github.com/jxsuite/jx/commit/876310fc71050e8cc9b60b98640becca88e5f74b))
+* **studio:** a cloud recent project opens the project it names ([b30652c](https://github.com/jxsuite/jx/commit/b30652c33035a65d5438f4a2bc74ea28c066ddca))
+* **studio:** a media tab has no document, so Save must not write one over the file ([8909b62](https://github.com/jxsuite/jx/commit/8909b62001ab6d03ee3b636430f05030fba943c7))
+* **studio:** the four gates the change-review branch broke ([6167375](https://github.com/jxsuite/jx/commit/616737567ec604611b1de6551da0ce860ba98d23))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/ai bumped to 0.37.1
+    * @jxsuite/collab bumped to 0.9.0
+    * @jxsuite/create bumped to 1.3.10
+    * @jxsuite/formulas bumped to 0.0.17
+    * @jxsuite/markup bumped to 0.4.10
+    * @jxsuite/protocol bumped to 2.3.0
+    * @jxsuite/runtime bumped to 4.0.0
+    * @jxsuite/schema bumped to 2.2.0
+    * @jxsuite/site bumped to 2.0.0
+
 ## [4.1.0](https://github.com/jxsuite/jx/compare/studio-v4.0.0...studio-v4.1.0) (2026-08-30)
 
 

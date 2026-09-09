@@ -1,6 +1,6 @@
 {
   "name": "@jxsuite/formulas",
-  "version": "0.0.16",
+  "version": "0.0.17",
   "description": "Composite pure formulas for Jx, authored as declarative $expression JSON",
   "license": "MIT",
   "repository": {

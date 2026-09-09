@@ -1,5 +1,43 @@
 # Changelog
 
+## [4.2.0](https://github.com/jxsuite/jx/compare/server-v4.1.0...server-v4.2.0) (2026-09-09)
+
+
+### Features
+
+* **studio,server,protocol:** one toggle installs an extension and enables it ([abe69bb](https://github.com/jxsuite/jx/commit/abe69bb60242ef97a49766040466d480ec3b93c9))
+* **studio,server,protocol:** one toggle installs an extension and enables it ([f6d6b2c](https://github.com/jxsuite/jx/commit/f6d6b2cc88810401a57ca941c1bdef182137df6e))
+* **studio:** highlight what changed in a diff, and open every changed file ([a54fa6d](https://github.com/jxsuite/jx/commit/a54fa6dc15fbe4ad7e8617d4e788c1670292ea2b))
+
+
+### Bug Fixes
+
+* **ai:** stop sending an empty assistant turn, and replay a model's reasoning ([9b0d735](https://github.com/jxsuite/jx/commit/9b0d7353897444825087cace1b4489bc6965e9fb))
+* **ai:** stop sending an empty assistant turn, and replay a model's reasoning ([d0b7fe1](https://github.com/jxsuite/jx/commit/d0b7fe19e0b40660f4ecb69e585df2682b05a129))
+* **desktop,server:** the coverage gates the new catalogue member missed ([18eccd9](https://github.com/jxsuite/jx/commit/18eccd9af978bb7ed3a627939c14cb7e72e2f759))
+* **server:** point catalog imports at extension-catalog.ts, not the renamed package ([8b171f4](https://github.com/jxsuite/jx/commit/8b171f400f9c8638c320341efeec8f1a06268a27))
+* **server:** point package.json's ./catalog export at extension-catalog.ts ([97cdbd6](https://github.com/jxsuite/jx/commit/97cdbd690cba274b260c18b7ea52a09591798a3a))
+* **studio,server:** the diff view drew line numbers and no text ([76d8d97](https://github.com/jxsuite/jx/commit/76d8d97f600622d2e381f3e1b2e37e88b0c40663))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/collab bumped to 0.9.0
+    * @jxsuite/compiler bumped to 4.0.0
+    * @jxsuite/create bumped to 1.3.10
+    * @jxsuite/import bumped to 0.40.2
+    * @jxsuite/protocol bumped to 2.3.0
+    * @jxsuite/runtime bumped to 4.0.0
+    * @jxsuite/schema bumped to 2.2.0
+    * @jxsuite/site bumped to 2.0.0
+    * @jxsuite/starters bumped to 1.7.1
+  * devDependencies
+    * @jxsuite/auth bumped to 0.5.8
+    * @jxsuite/connector bumped to 0.5.8
+    * @jxsuite/parser bumped to 1.8.0
+
 ## [4.1.0](https://github.com/jxsuite/jx/compare/server-v4.0.0...server-v4.1.0) (2026-08-30)
 
 

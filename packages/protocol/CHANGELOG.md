@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.3.0](https://github.com/jxsuite/jx/compare/protocol-v2.2.0...protocol-v2.3.0) (2026-09-09)
+
+
+### Features
+
+* **studio,server,protocol:** one toggle installs an extension and enables it ([abe69bb](https://github.com/jxsuite/jx/commit/abe69bb60242ef97a49766040466d480ec3b93c9))
+* **studio,server,protocol:** one toggle installs an extension and enables it ([f6d6b2c](https://github.com/jxsuite/jx/commit/f6d6b2cc88810401a57ca941c1bdef182137df6e))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/schema bumped to 2.2.0
+
 ## [2.2.0](https://github.com/jxsuite/jx/compare/protocol-v2.1.0...protocol-v2.2.0) (2026-08-30)
 
 

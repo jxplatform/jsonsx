@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.8.0](https://github.com/jxsuite/jx/compare/parser-v1.7.0...parser-v1.8.0) (2026-09-09)
+
+
+### Features
+
+* **parser:** the popover states reach Jx Markdown ([4b1f255](https://github.com/jxsuite/jx/commit/4b1f2554f4d209bba64cbc2a06b34107830b14ce))
+* popovers become a first-class thing the canvas can open, and a rule it can check ([bf757f1](https://github.com/jxsuite/jx/commit/bf757f1c9a9d94e15cbaac3be5405588c082cee3))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/markup bumped to 0.4.10
+    * @jxsuite/schema bumped to 2.2.0
+  * devDependencies
+    * @jxsuite/runtime bumped to 4.0.0
+
 ## [1.7.0](https://github.com/jxsuite/jx/compare/parser-v1.6.0...parser-v1.7.0) (2026-08-30)
 
 

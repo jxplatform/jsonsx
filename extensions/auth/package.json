@@ -1,6 +1,6 @@
 {
   "name": "@jxsuite/auth",
-  "version": "0.5.7",
+  "version": "0.5.8",
   "description": "Better Auth sessions, sign-in flows, and table permissions for Jx sites over /_jx/auth",
   "license": "MIT",
   "repository": {

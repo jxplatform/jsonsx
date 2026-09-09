@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.2.0](https://github.com/jxsuite/jx/compare/schema-v2.1.0...schema-v2.2.0) (2026-09-09)
+
+
+### Features
+
+* popovers become a first-class thing the canvas can open, and a rule it can check ([bf757f1](https://github.com/jxsuite/jx/commit/bf757f1c9a9d94e15cbaac3be5405588c082cee3))
+* **schema:** popover correctness rules, shared by every surface that judges a document ([6eb394e](https://github.com/jxsuite/jx/commit/6eb394e2ff14c1059561bfbce085d0e2667e510c))
+
 ## [2.1.0](https://github.com/jxsuite/jx/compare/schema-v2.0.0...schema-v2.1.0) (2026-08-30)
 
 

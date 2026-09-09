@@ -1,6 +1,6 @@
 {
   "name": "@jxsuite/collab",
-  "version": "0.8.5",
+  "version": "0.9.0",
   "description": "Realtime co-editing for Jx Studio — Y.Doc schema, op bridge, structural differ, wire envelope, and provider contracts shared by every collab backend",
   "license": "MIT",
   "repository": {
