@@ -1,6 +1,6 @@
 {
   "name": "@jxsuite/search",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "description": "Static site search for Jx: build-time index emission from content collections and a headless MiniSearch browser client",
   "license": "MIT",
   "repository": {

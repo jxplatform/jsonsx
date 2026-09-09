@@ -1,5 +1,37 @@
 # Changelog
 
+## [4.0.0](https://github.com/jxsuite/jx/compare/compiler-v3.1.0...compiler-v4.0.0) (2026-09-09)
+
+
+### ⚠ BREAKING CHANGES
+
+* **runtime,compiler,site,studio:** `@jxsuite/runtime` no longer writes authored declarations to `el.style`, so code reading them back off an element after `applyStyle` sees nothing. The `elementStyleTags` export is replaced by `releaseElementStyles` and `resetDocumentStyles`, which refcount a shared rule set rather than handing out an element to remove by hand; `documentStyleText` reads back what was written.
+
+### Features
+
+* popovers become a first-class thing the canvas can open, and a rule it can check ([bf757f1](https://github.com/jxsuite/jx/commit/bf757f1c9a9d94e15cbaac3be5405588c082cee3))
+* **runtime,compiler,site,studio:** authored styles become adopted CSS rules ([1542477](https://github.com/jxsuite/jx/commit/15424770e40f979eaaad78682004cf8d87f8180f))
+* **studio,server,protocol:** one toggle installs an extension and enables it ([abe69bb](https://github.com/jxsuite/jx/commit/abe69bb60242ef97a49766040466d480ec3b93c9))
+* **studio,server,protocol:** one toggle installs an extension and enables it ([f6d6b2c](https://github.com/jxsuite/jx/commit/f6d6b2cc88810401a57ca941c1bdef182137df6e))
+
+
+### Bug Fixes
+
+* **compiler:** every boolean-attribute writer defers to booleanAttrValue ([596d2d6](https://github.com/jxsuite/jx/commit/596d2d6b8fc29283d312a95aacf02f0c09e3c5ad))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/create bumped to 1.3.10
+    * @jxsuite/runtime bumped to 4.0.0
+    * @jxsuite/schema bumped to 2.2.0
+    * @jxsuite/site bumped to 2.0.0
+  * devDependencies
+    * @jxsuite/connector bumped to 0.5.8
+    * @jxsuite/parser bumped to 1.8.0
+
 ## [3.1.0](https://github.com/jxsuite/jx/compare/compiler-v3.0.0...compiler-v3.1.0) (2026-08-30)
 
 

@@ -1,6 +1,6 @@
 {
   "name": "@jxsuite/site",
-  "version": "1.1.0",
+  "version": "2.0.0",
   "description": "What a Jx project's page at a route consists of — routing, layout, context, head and the document that boots it",
   "license": "MIT",
   "repository": {

@@ -1,5 +1,24 @@
 # Changelog
 
+## [2.0.0](https://github.com/jxsuite/jx/compare/site-v1.1.0...site-v2.0.0) (2026-09-09)
+
+
+### ⚠ BREAKING CHANGES
+
+* **runtime,compiler,site,studio:** `@jxsuite/runtime` no longer writes authored declarations to `el.style`, so code reading them back off an element after `applyStyle` sees nothing. The `elementStyleTags` export is replaced by `releaseElementStyles` and `resetDocumentStyles`, which refcount a shared rule set rather than handing out an element to remove by hand; `documentStyleText` reads back what was written.
+
+### Features
+
+* **runtime,compiler,site,studio:** authored styles become adopted CSS rules ([1542477](https://github.com/jxsuite/jx/commit/15424770e40f979eaaad78682004cf8d87f8180f))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/runtime bumped to 4.0.0
+    * @jxsuite/schema bumped to 2.2.0
+
 ## [1.1.0](https://github.com/jxsuite/jx/compare/site-v1.0.0...site-v1.1.0) (2026-08-30)
 
 

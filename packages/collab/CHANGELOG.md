@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.9.0](https://github.com/jxsuite/jx/compare/collab-v0.8.5...collab-v0.9.0) (2026-09-09)
+
+
+### Features
+
+* **studio:** highlight what changed in a diff, and open every changed file ([a54fa6d](https://github.com/jxsuite/jx/commit/a54fa6dc15fbe4ad7e8617d4e788c1670292ea2b))
+* **studio:** highlight what changed in a diff, and open every changed file ([248c9de](https://github.com/jxsuite/jx/commit/248c9de8b5109898f0f4b442d7c805abdf9cdd70))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/schema bumped to 2.2.0
+
 ## [0.8.5](https://github.com/jxsuite/jx/compare/collab-v0.8.4...collab-v0.8.5) (2026-08-30)
 
 

@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.40.2](https://github.com/jxsuite/jx/compare/import-v0.40.1...import-v0.40.2) (2026-09-09)
+
+
+### Bug Fixes
+
+* **import:** stop pinning imported layouts to their capture viewport ([71132d7](https://github.com/jxsuite/jx/commit/71132d723e2c308a677c89e96eb887f25d341b31))
+* **import:** stop pinning imported layouts to their capture viewport ([158e989](https://github.com/jxsuite/jx/commit/158e989c27d78c24f5eada237b802526cf8020ae))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/markup bumped to 0.4.10
+    * @jxsuite/schema bumped to 2.2.0
+  * optionalDependencies
+    * @jxsuite/compiler bumped to 4.0.0
+
 ## [0.40.1](https://github.com/jxsuite/jx/compare/import-v0.40.0...import-v0.40.1) (2026-08-30)
 
 

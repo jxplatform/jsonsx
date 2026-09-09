@@ -1,5 +1,25 @@
 # Changelog
 
+## [4.0.0](https://github.com/jxsuite/jx/compare/runtime-v3.1.0...runtime-v4.0.0) (2026-09-09)
+
+
+### ⚠ BREAKING CHANGES
+
+* **runtime,compiler,site,studio:** `@jxsuite/runtime` no longer writes authored declarations to `el.style`, so code reading them back off an element after `applyStyle` sees nothing. The `elementStyleTags` export is replaced by `releaseElementStyles` and `resetDocumentStyles`, which refcount a shared rule set rather than handing out an element to remove by hand; `documentStyleText` reads back what was written.
+
+### Features
+
+* popovers become a first-class thing the canvas can open, and a rule it can check ([bf757f1](https://github.com/jxsuite/jx/commit/bf757f1c9a9d94e15cbaac3be5405588c082cee3))
+* **runtime,compiler,site,studio:** authored styles become adopted CSS rules ([1542477](https://github.com/jxsuite/jx/commit/15424770e40f979eaaad78682004cf8d87f8180f))
+* **runtime:** declaration-body at-rules, and the canvas hooks a popover needs ([a701ee1](https://github.com/jxsuite/jx/commit/a701ee1f2434e1153cddfa1b536c97ba8c849eda))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/schema bumped to 2.2.0
+
 ## [3.1.0](https://github.com/jxsuite/jx/compare/runtime-v3.0.0...runtime-v3.1.0) (2026-08-30)
 
 

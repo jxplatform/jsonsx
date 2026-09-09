@@ -1,6 +1,6 @@
 {
   "name": "@jxsuite/connector",
-  "version": "0.5.7",
+  "version": "0.5.8",
   "description": "Jx database connections and dynamic data tables served over /_jx/data",
   "license": "MIT",
   "repository": {

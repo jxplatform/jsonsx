@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.37.1](https://github.com/jxsuite/jx/compare/ai-v0.37.0...ai-v0.37.1) (2026-09-09)
+
+
+### Bug Fixes
+
+* **ai:** stop sending an empty assistant turn, and replay a model's reasoning ([9b0d735](https://github.com/jxsuite/jx/commit/9b0d7353897444825087cace1b4489bc6965e9fb))
+* **ai:** stop sending an empty assistant turn, and replay a model's reasoning ([d0b7fe1](https://github.com/jxsuite/jx/commit/d0b7fe19e0b40660f4ecb69e585df2682b05a129))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/protocol bumped to 2.3.0
+
 ## [0.37.0](https://github.com/jxsuite/jx/compare/ai-v0.36.5...ai-v0.37.0) (2026-08-30)
 
 

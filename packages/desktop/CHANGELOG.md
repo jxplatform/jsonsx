@@ -1,5 +1,37 @@
 # Changelog
 
+## [5.1.0](https://github.com/jxsuite/jx/compare/desktop-v5.0.1...desktop-v5.1.0) (2026-09-09)
+
+
+### Features
+
+* **studio,server,protocol:** one toggle installs an extension and enables it ([abe69bb](https://github.com/jxsuite/jx/commit/abe69bb60242ef97a49766040466d480ec3b93c9))
+* **studio,server,protocol:** one toggle installs an extension and enables it ([f6d6b2c](https://github.com/jxsuite/jx/commit/f6d6b2cc88810401a57ca941c1bdef182137df6e))
+* **studio:** highlight what changed in a diff, and open every changed file ([a54fa6d](https://github.com/jxsuite/jx/commit/a54fa6dc15fbe4ad7e8617d4e788c1670292ea2b))
+
+
+### Bug Fixes
+
+* **desktop,server:** the coverage gates the new catalogue member missed ([18eccd9](https://github.com/jxsuite/jx/commit/18eccd9af978bb7ed3a627939c14cb7e72e2f759))
+* **studio,server:** the diff view drew line numbers and no text ([76d8d97](https://github.com/jxsuite/jx/commit/76d8d97f600622d2e381f3e1b2e37e88b0c40663))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/compiler bumped to 4.0.0
+    * @jxsuite/create bumped to 1.3.10
+    * @jxsuite/parser bumped to 1.8.0
+    * @jxsuite/protocol bumped to 2.3.0
+    * @jxsuite/schema bumped to 2.2.0
+    * @jxsuite/server bumped to 4.2.0
+    * @jxsuite/starters bumped to 1.7.1
+    * @jxsuite/studio bumped to 5.0.0
+  * devDependencies
+    * @jxsuite/connector bumped to 0.5.8
+    * @jxsuite/server bumped to 4.2.0
+
 ## [5.0.1](https://github.com/jxsuite/jx/compare/desktop-v5.0.0...desktop-v5.0.1) (2026-08-30)
 
 

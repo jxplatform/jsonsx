@@ -1,6 +1,6 @@
 {
   "name": "@jxsuite/feed",
-  "version": "0.3.5",
+  "version": "0.3.6",
   "description": "Syndication feeds for Jx: Atom (RFC 4287) and JSON Feed emitted from content collections at build time",
   "license": "MIT",
   "repository": {

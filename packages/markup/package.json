@@ -1,6 +1,6 @@
 {
   "name": "@jxsuite/markup",
-  "version": "0.4.9",
+  "version": "0.4.10",
   "description": "Browser-safe markup conversion: HTML → Jx nodes, markdown → sanitized HTML",
   "license": "MIT",
   "repository": {
